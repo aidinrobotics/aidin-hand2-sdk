@@ -1,0 +1,8 @@
+kinematics_version: 1.1.0
+soversion:          1
+built:              2026-09-10T04:16:02Z
+arch:               aarch64
+compiler:           aarch64-linux-gnu-g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+cross_built_on:     x86_64
+internal_commit:    e0bebed3aca4d94dfd6bc2f9bd4eaeb37d6bb44d
+source_dirty:       no

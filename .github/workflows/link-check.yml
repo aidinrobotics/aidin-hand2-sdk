@@ -1,0 +1,45 @@
+name: Link check
+
+# Checks that the external links in the documentation (README, CHANGELOG, docs/) still resolve.
+# A link can break for reasons that have nothing to do with this code, so this job does not fail
+# the build; it records when the links were last checked and which ones are broken, in the
+# Actions tab and in the job summary.
+#
+# lychee is fast because it caches and runs in parallel, and it separates a 404 from a timeout
+# and from a redirect.
+#
+# Actions is disabled at the repository level on the internal repo, so these triggers spend no
+# organisation minutes there; the public repository runs them for free.
+on:
+  push:
+    branches: [main]
+    paths: ['**/*.md']
+  schedule:
+    - cron: '0 0 * * 1'   # Mondays 00:00 UTC, to catch an external link that died quietly
+  workflow_dispatch:
+
+jobs:
+  links:
+    name: check markdown links
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check links (lychee)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Both READMEs, the changelog and every markdown file under docs. Relative links
+          # between documents are checked as well. --include-fragments compares the #anchor
+          # too, which is what catches a renamed heading in the API reference, where the
+          # documents are tied together by dense symbol anchors.
+          args: >-
+            --no-progress
+            --cache
+            --max-cache-age 1d
+            --include-fragments
+            'README.md' 'README.ko.md' 'CHANGELOG.md' 'docs/**/*.md'
+          # A broken link does not fail the job, which keeps an external outage separate from a
+          # defect in this repository. The result lands in the job summary. Set this to false to
+          # make broken links block instead.
+          fail: false

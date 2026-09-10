@@ -1,0 +1,23 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)  # 타깃이 Threads::Threads 를 PUBLIC 링크 — 소비자도 필요
+
+# Eigen and spdlog end inside the shared library. Eigen is header-only and compiles away, and
+# spdlog is resolved at runtime through DT_NEEDED. Neither is needed at the consumer's link step.
+
+# The prebuilt kinematics library. aidin_hand2's link interface references this target, so it has
+# to exist before Targets.cmake is included. No include path is attached, because the internal
+# interface header is not installed and consumers use the public API only.
+if(NOT TARGET aidin_hand2_kinematics)
+  add_library(aidin_hand2_kinematics SHARED IMPORTED)
+  set_target_properties(aidin_hand2_kinematics PROPERTIES
+    IMPORTED_LOCATION
+      "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/libaidin_hand2_kinematics.so.@AIDIN_HAND2_KINEMATICS_SOVERSION@"
+    IMPORTED_SONAME
+      "libaidin_hand2_kinematics.so.@AIDIN_HAND2_KINEMATICS_SOVERSION@")
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/aidin_hand2Targets.cmake")
+
+check_required_components(aidin_hand2)

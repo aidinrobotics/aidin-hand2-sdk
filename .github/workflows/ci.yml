@@ -1,0 +1,118 @@
+name: CI
+
+# Turns the build row (GCC, CMake, spdlog) from a claim into a check: build plus ctest on the
+# two supported Ubuntu releases, on both architectures, and the unit tests again under
+# ThreadSanitizer.
+#
+# 22.04 stays in the matrix alongside 24.04 because it is the oldest release the SDK supports.
+# 20.04 is not supported, because spdlog 1.9 is required. CAN-FD, PREEMPT_RT and the 500 Hz loop
+# are kernel-side and still need real hardware, so they are verified on-device rather than here.
+#
+# The jobs run on the GitHub-hosted runner images directly rather than in a bare distro
+# container. That costs one property worth naming: a container started from ubuntu:22.04 with
+# only the packages below installed would fail if a dependency were missing from that list,
+# whereas a runner image carries a compiler and CMake already. Run dev/ci-local.sh to get the
+# bare-distro check back.
+#
+# Actions is disabled at the repository level on the internal repo, so these triggers spend no
+# organisation minutes there; the public repository runs them for free. dev/ci-local.sh is the
+# internal equivalent.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            label: "x86_64 · jammy · gcc 11"
+          - runner: ubuntu-24.04
+            label: "x86_64 · noble · gcc 13"
+          # arm64 is a deployment target of its own, and cpp/prebuilt/aarch64/ is the library
+          # these two jobs link against.
+          - runner: ubuntu-22.04-arm
+            label: "arm64 · jammy · gcc 11"
+          - runner: ubuntu-24.04-arm
+            label: "arm64 · noble · gcc 13"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # The runner image already has GCC, CMake and git. spdlog is the one dependency the SDK
+      # looks for, and linux-libc-dev provides linux/can.h. Eigen is deliberately absent: it is
+      # compiled into the prebuilt kinematics library and cpp/CMakeLists.txt no longer finds it.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libspdlog-dev linux-libc-dev
+
+      - name: Tool versions
+        run: |
+          gcc --version | head -1
+          cmake --version | head -1
+          dpkg-query -W libspdlog-dev
+
+      - name: Configure
+        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --label-exclude hardware
+
+  docs:
+    name: docs regression (ko/en)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # blockcheck compiles the cpp blocks in the documentation against the real public headers,
+      # so this job needs the toolchain as well.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libspdlog-dev linux-libc-dev
+
+      # dev/ is internal-only, so the public snapshot of this workflow has no script to run.
+      # The ko/en regression suite is an authoring gate, and authoring happens internally.
+      - name: Check docs
+        run: |
+          if [ -x dev/docs-check.sh ]; then
+            dev/docs-check.sh
+          else
+            echo "dev/docs-check.sh is internal-only; skipped"
+          fi
+
+  tsan:
+    name: thread sanitizer (unit tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libspdlog-dev linux-libc-dev
+
+      - name: Configure (ThreadSanitizer)
+        run: |
+          cmake -S cpp -B build-tsan -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+      - name: Build
+        run: cmake --build build-tsan -j"$(nproc)"
+
+      - name: Test under TSan
+        run: TSAN_OPTIONS="halt_on_error=1" ctest --test-dir build-tsan --output-on-failure --label-exclude hardware
