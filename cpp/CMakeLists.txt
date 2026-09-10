@@ -326,6 +326,7 @@ if(AIDIN_HAND2_BUILD_EXAMPLES)
     19_external_server
     19_external_client
     20_exit_on_failure
+    21_motion_sequence
     basic_control
   )
   foreach(example IN LISTS AIDIN_HAND2_EXAMPLES)
