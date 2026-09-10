@@ -9,7 +9,8 @@ Build, test, and install the SDK, then confirm it works with the example. Comple
 &nbsp;&nbsp;[**1. Install dependencies**](#1-install-dependencies)<br>
 &nbsp;&nbsp;[**2. Build**](#2-build)<br>
 &nbsp;&nbsp;[**3. Install and link**](#3-install-and-link)<br>
-&nbsp;&nbsp;[**4. Test program**](#4-test-program)
+&nbsp;&nbsp;[**4. Test program**](#4-test-program)<br>
+&nbsp;&nbsp;[**5. Uninstall**](#5-uninstall)
 
 ## 1. Install dependencies
 
@@ -30,7 +31,36 @@ Run all following commands from the SDK repo root.
 
 ```bash
 cd aidin-hand2-sdk
+```
+
+> [!IMPORTANT]
+> **Two of the thumb actuators have a ball screw whose lead is either 1 mm or 2 mm, depending on
+> the hardware generation.** The lead decides how many encoder counts one millimetre of actuator
+> travel takes, so building for the wrong one makes those two actuators move **twice or half as
+> far as asked.** Identify your hardware before you build, and if you cannot, ask on the
+> [issue tracker](https://github.com/aidinrobotics/aidin-hand2-sdk/issues).
+
+Run only the one below that matches your hand.
+
+**a) 1 mm lead**
+
+```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+#   -- aidin_hand2: thumb lead = 1mm
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics.so.0.5.2
+```
+
+**b) 2 mm lead**
+
+```bash
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_THUMB_LEAD=2mm
+#   -- aidin_hand2: thumb lead = 2mm
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics.so.0.5.2-2mm
+```
+
+Confirm the selection from those two lines, then build.
+
+```bash
 cmake --build cpp/build -j"$(nproc)"
 ```
 
@@ -50,29 +80,71 @@ lsb_release -d; uname -srm; gcc --version | head -1; cmake --version | head -1
 
 ## 3. Install and link
 
-Install the public headers, two shared libraries, and the CMake package config into `/usr/local`.
-The loader has to find the shared libraries, so refresh its cache with `ldconfig` afterwards.
+What gets installed is the public headers, two shared libraries, and the CMake package config.
+
+Follow **one** of the two below. `/usr/local` is the default; go to b) only when you cannot use
+`sudo`.
+
+**a) Install into `/usr/local` (recommended)**
+
+`/usr/local` is both a default CMake search path and a path the loader keeps in its cache, so
+your application never has to name a location.
 
 ```bash
 sudo cmake --install cpp/build
 sudo ldconfig
 ```
 
-To avoid touching system paths, set a prefix: `cmake --install cpp/build --prefix <prefix>`.
-`ldconfig` is not needed then, because CMake puts a RUNPATH into your application.
+`ldconfig` registers the shared libraries in the loader cache. Skip it and the libraries are not
+found at run time.
 
-Add the following to your application's CMakeLists.txt to link the SDK. Always request the
-version: a different minor is not compatible, and CMake skips the version check when none is
-requested.
+Your application's CMakeLists.txt is two lines. Always request the version: a different minor is
+not compatible, and CMake skips the version check when none is requested.
 
 ```cmake
-list(APPEND CMAKE_PREFIX_PATH "<prefix>")   # only if you installed outside /usr/local
 find_package(aidin_hand2 0.5 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
-If you install your application itself, CMake strips that RUNPATH at install time. Set
-`INSTALL_RPATH` on your application when you used a prefix other than `/usr/local`.
+**b) Install into a user prefix**
+
+Use this only when `sudo` is unavailable. `ldconfig` is not needed, but your application has to
+name two paths instead.
+
+```bash
+cmake --install cpp/build --prefix "$HOME/.local"
+```
+
+Tell your application's CMakeLists.txt where the prefix is.
+
+```cmake
+list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
+find_package(aidin_hand2 0.5 REQUIRED)
+target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
+```
+
+If you install your application itself, CMake strips the RUNPATH at install time, so set
+`INSTALL_RPATH` as well. Without it the installed application does not find the SDK.
+
+```cmake
+set_target_properties(your_app PROPERTIES INSTALL_RPATH "$ENV{HOME}/.local/lib")
+```
+
+> [!WARNING]
+> Do **not** use a) and b) together. If you later move to `/usr/local`, remove the SDK from the
+> earlier prefix first. With the SDK in two prefixes, which one `find_package` picks is not
+> determined, and libraries from two different releases can end up in one process.
+>
+> ```bash
+> rm -rf "$HOME/.local/lib/libaidin_hand2"* "$HOME/.local/lib/cmake/aidin_hand2" \
+>        "$HOME/.local/include/aidin_hand2"
+> ```
+>
+> Check what a prefix holds with the following.
+>
+> ```bash
+> grep -m1 'set(PACKAGE_VERSION "' <prefix>/lib/cmake/aidin_hand2/aidin_hand2ConfigVersion.cmake
+> ```
 
 ## 4. Test program
 
@@ -100,3 +172,39 @@ A normal run produces the following output.
 ```text
 <!-- TODO: replace with the actual normal log from running basic_control on real hardware -->
 ```
+
+## 5. Uninstall
+
+The build tree's `install_manifest.txt` lists what was installed. When the build tree is still
+around, removing what that file names is the most accurate way.
+
+```bash
+xargs -a cpp/build/install_manifest.txt sudo rm -f
+sudo rm -rf /usr/local/include/aidin_hand2 /usr/local/lib/cmake/aidin_hand2
+sudo ldconfig
+```
+
+The manifest lists files only and leaves the directories behind, so those two go separately.
+`ldconfig` then updates the loader cache.
+
+Without the build tree, remove the paths directly. `<prefix>` is the prefix you installed into,
+or `/usr/local` if you named none.
+
+```bash
+sudo rm -rf <prefix>/include/aidin_hand2 \
+            <prefix>/lib/cmake/aidin_hand2 \
+            <prefix>/lib/libaidin_hand2.so* \
+            <prefix>/lib/libaidin_hand2_kinematics.so*
+sudo ldconfig
+```
+
+Either way, confirm that nothing is left.
+
+```bash
+ldconfig -p | grep aidin_hand2        # should print nothing
+ls <prefix>/lib/cmake/aidin_hand2     # should say No such file or directory
+```
+
+Repeat this for every prefix you have installed into. Clearing one and leaving another keeps the
+remaining prefix on the search path, so libraries from two different releases can still end up in
+one process.

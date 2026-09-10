@@ -26,22 +26,16 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.label }}
+    name: ${{ matrix.runner }} · lead ${{ matrix.lead }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: ubuntu-22.04
-            label: "x86_64 · jammy · gcc 11"
-          - runner: ubuntu-24.04
-            label: "x86_64 · noble · gcc 13"
-          # arm64 is a deployment target of its own, and cpp/prebuilt/aarch64/ is the library
-          # these two jobs link against.
-          - runner: ubuntu-22.04-arm
-            label: "arm64 · jammy · gcc 11"
-          - runner: ubuntu-24.04-arm
-            label: "arm64 · noble · gcc 13"
+        # Both thumb ball screw leads ship, so both are built and tested here. Without the 2mm
+        # half, the library that goes out for the earlier hardware would never be linked or run
+        # by CI on the architecture it runs on.
+        runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
+        lead: ["1mm", "2mm"]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -61,7 +55,9 @@ jobs:
           dpkg-query -W libspdlog-dev
 
       - name: Configure
-        run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        run: |
+          cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DAIDIN_HAND2_THUMB_LEAD=${{ matrix.lead }}
 
       - name: Build
         run: cmake --build build -j"$(nproc)"

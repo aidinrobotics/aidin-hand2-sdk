@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(aidin_hand2 VERSION 0.5.1 LANGUAGES CXX)
+project(aidin_hand2 VERSION 0.5.2 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -31,18 +31,35 @@ find_package(spdlog 1.9 REQUIRED)  # 로깅 backend — logging.cpp 전용, 공�
 #
 # That .so is committed in both repos, which is why a clone builds without a bootstrap step.
 # dev/build-kinematics.sh regenerates it from the source and is run when the equations change.
-# SOVERSION names the interface generation and is what the loader matches, so it moves only when
-# the four declarations in hand_kinematics_core.hpp change. Keeping it put is what lets a fixed
-# kinematics library be dropped in without relinking libaidin_hand2.
 #
-# VERSION moves whenever the equations or the constants change. It is not in the file name: the
-# library is recorded in prebuilt/<arch>/BUILD-INFO instead, together with the commit it was
-# built from, which is what support actually needs to identify a shipped binary.
-set(AIDIN_HAND2_KINEMATICS_SOVERSION 1)
-set(AIDIN_HAND2_KINEMATICS_VERSION 1.1.0)
-set(_kin_soname libaidin_hand2_kinematics.so.${AIDIN_HAND2_KINEMATICS_SOVERSION})
+# The soname carries the full SDK version, so every release has its own file name. What this
+# library exports is four signatures that have never changed, but what it *means* is a set of
+# equations and calibration constants, and those do change: 0.5.1 halved the lead of two thumb
+# screws, which doubled their counts per millimetre. A soname that tracked only the signatures
+# stayed at .so.1 across that change, so a 0.5.0 library satisfied a 0.5.1 consumer and the wrong
+# thumb kinematics loaded in silence. Tying the name to the release removes the judgement call:
+# nobody has to notice that a constant changed.
+#
+# The thumb comes in two hardware generations, differing in the lead of the d1 and d2 screws, and
+# each has its own library. The 1 mm one is the default and carries no suffix, so only the
+# exception is marked. Picking the wrong one is a loud failure rather than a quiet one: the
+# sonames differ, so the library a consumer was built against is the only one that satisfies it.
+set(AIDIN_HAND2_THUMB_LEAD "1mm" CACHE STRING "Thumb d1/d2 screw lead: 1mm or 2mm")
+set_property(CACHE AIDIN_HAND2_THUMB_LEAD PROPERTY STRINGS "1mm" "2mm")
+if(AIDIN_HAND2_THUMB_LEAD STREQUAL "1mm")
+  set(_kin_suffix "")
+  set(_kin_variant_src hand_kinematics_core.cpp)
+elseif(AIDIN_HAND2_THUMB_LEAD STREQUAL "2mm")
+  set(_kin_suffix "-2mm")
+  set(_kin_variant_src hand_kinematics_core_2mm.cpp)
+else()
+  message(FATAL_ERROR
+    "AIDIN_HAND2_THUMB_LEAD is '${AIDIN_HAND2_THUMB_LEAD}'. Use 1mm or 2mm.")
+endif()
+
+set(_kin_soname libaidin_hand2_kinematics.so.${PROJECT_VERSION}${_kin_suffix})
 set(_kin_dir ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${CMAKE_SYSTEM_PROCESSOR})
-set(_kin_src ${CMAKE_CURRENT_SOURCE_DIR}/src/hand_core/kinematics/hand_kinematics_core.cpp)
+set(_kin_src ${CMAKE_CURRENT_SOURCE_DIR}/src/hand_core/kinematics/${_kin_variant_src})
 
 if(NOT EXISTS ${_kin_dir}/${_kin_soname})
   # In the internal repo this is a missing rebuild, and the fix is one command.
@@ -71,11 +88,12 @@ endif()
 
 # The file is named after its SONAME and there is no version symlink chain. This library is an
 # implementation detail of the SDK rather than something consumers link by name, so one file per
-# SOVERSION is enough and there is no second place for the version to drift.
+# release is enough and there is no second place for the version to drift.
 add_library(aidin_hand2_kinematics SHARED IMPORTED)
 set_target_properties(aidin_hand2_kinematics PROPERTIES
   IMPORTED_LOCATION ${_kin_dir}/${_kin_soname}
   IMPORTED_SONAME ${_kin_soname})
+message(STATUS "aidin_hand2: thumb lead = ${AIDIN_HAND2_THUMB_LEAD}")
 message(STATUS "aidin_hand2: kinematics = ${_kin_dir}/${_kin_soname}")
 
 add_library(aidin_hand2 SHARED
@@ -124,7 +142,7 @@ set_target_properties(aidin_hand2 PROPERTIES
   POSITION_INDEPENDENT_CODE ON  # implied by SHARED, kept in case this goes back to STATIC
   # Find the kinematics .so next to this one. DT_RUNPATH is not inherited by dependencies, so
   # without this a non-default install prefix makes consumers die with
-  # "libaidin_hand2_kinematics.so.1 not found".
+  # "libaidin_hand2_kinematics.so.<version> not found".
   INSTALL_RPATH "$ORIGIN")
 
 add_library(aidin_hand2::aidin_hand2 ALIAS aidin_hand2)

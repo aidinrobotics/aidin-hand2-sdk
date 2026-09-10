@@ -1,7 +1,7 @@
 sdk_version:        0.5.2
-thumb_lead:         1mm
-soname:             libaidin_hand2_kinematics.so.0.5.2
-built:              2026-09-10T08:24:41Z
+thumb_lead:         2mm
+soname:             libaidin_hand2_kinematics.so.0.5.2-2mm
+built:              2026-09-10T08:24:49Z
 arch:               x86_64
 compiler:           g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
 internal_commit:    a5327c9084ee7a01cfc7488b13d8b297a8da97b7

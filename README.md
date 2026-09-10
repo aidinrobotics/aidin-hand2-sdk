@@ -1,12 +1,12 @@
 <div align="center">
 
-<img height="240" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2 — AIDIN Robotics">
+<a href="https://www.aidinrobotics.co.kr/"><img height="240" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2 — AIDIN Robotics"></a>
 
 <h1>AIDIN Hand Gen2 SDK</h1>
 
 The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. It provides C++ and Python APIs.
 
-[![version](https://img.shields.io/badge/version-0.5.1-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml)
+[![version](https://img.shields.io/badge/version-0.5.2-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
 
 [Build](#build-from-source) | [Documentation](#documentation) | [Changelog](CHANGELOG.md) | [Official Site](https://www.aidinrobotics.co.kr/) | English | [한국어](README.ko.md)
 
@@ -125,4 +125,4 @@ The AIDIN Hand Gen2 SDK is licensed under the [Apache License 2.0](LICENSE). [NO
 
 The SDK also includes and links third-party software. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists each component with its license and where its source can be obtained, and [licenses/](licenses) holds the full license texts.
 
-`cpp/prebuilt/<arch>/libaidin_hand2_kinematics.so.1` is covered by the same Apache License 2.0 as the rest of the repository. It ships as a binary because the kinematics equations and the hand geometry constants are not published, and the license permits distribution in object form.
+`cpp/prebuilt/<arch>/libaidin_hand2_kinematics.so.<version>` is covered by the same Apache License 2.0 as the rest of the repository. It ships as a binary because the kinematics equations and the hand geometry constants are not published, and the license permits distribution in object form.

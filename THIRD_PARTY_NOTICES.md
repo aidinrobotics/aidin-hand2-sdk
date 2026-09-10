@@ -9,7 +9,7 @@ Components reach a user of this SDK in two different ways, and the difference de
 this repository has to carry.
 
 - **Compiled into a binary distributed here.** Eigen is a header-only library. The kinematics
-  library shipped as `cpp/prebuilt/<arch>/libaidin_hand2_kinematics.so.1` is built from a
+  library shipped as `cpp/prebuilt/<arch>/libaidin_hand2_kinematics.so.<version>` is built from a
   source file that includes Eigen headers, so Eigen-derived code is part of that binary.
 - **Installed by the user and linked at build time.** spdlog and fmt are taken from the
   distribution's packages. This repository does not redistribute either one.
@@ -18,7 +18,7 @@ this repository has to carry.
 
 | Component | Version | License | How it is used |
 |---|---|---|---|
-| [Eigen](https://eigen.tuxfamily.org) | 3.4.0 | MPL-2.0, with BSD-3-Clause parts | Compiled into `libaidin_hand2_kinematics.so.1` |
+| [Eigen](https://eigen.tuxfamily.org) | 3.4.0 | MPL-2.0, with BSD-3-Clause parts | Compiled into `libaidin_hand2_kinematics.so.<version>` |
 | [spdlog](https://github.com/gabime/spdlog) | ≥ 1.9 | MIT | Linked into `libaidin_hand2.so` |
 | [fmt](https://github.com/fmtlib/fmt) | as packaged with spdlog | MIT with an optional exception | Linked transitively through spdlog |
 | Linux userspace API headers | kernel headers of the build host | BSD-3-Clause, or GPL-2.0 WITH Linux-syscall-note | Included when the SDK is compiled |
@@ -29,7 +29,7 @@ Eigen is licensed under the Mozilla Public License 2.0, whose text is in
 [licenses/MPL-2.0.txt](licenses/MPL-2.0.txt). Eigen is not modified in any way; the headers
 are used as the distribution installs them.
 
-`libaidin_hand2_kinematics.so.1` is distributed in this repository as an Executable Form of
+`libaidin_hand2_kinematics.so.<version>` is distributed in this repository as an Executable Form of
 software covered by the MPL. Section 3.2 of the MPL requires that recipients be informed of
 this and be able to obtain the Source Code Form of the covered files. The covered files are
 the unmodified Eigen headers, and the source is available from the Eigen project:

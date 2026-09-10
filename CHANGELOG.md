@@ -6,6 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/). The interface covered by that
 versioning is the public C++ API — the headers under `include/aidin_hand2/` and the CMake package.
 
+## [0.5.2] - 2026-09-10
+
+Both thumb hardware generations are supported from one release, and the prebuilt kinematics
+library is named after the SDK release so a library from one release can no longer satisfy another.
+
+### Added
+
+- **Support for the 2 mm thumb ball screw lead, alongside the 1 mm one.** Configure with
+  `-DAIDIN_HAND2_THUMB_LEAD=2mm` for the earlier hardware; 1 mm stays the default. Both libraries
+  ship, and their sonames differ, so a build for one hardware generation cannot load the other's
+  kinematics. 0.5.1 told owners of the 2 mm hardware to stay on 0.5.0, which meant giving up every
+  later fix; this replaces that with a build option.
+
+### Changed
+
+- **Breaking: `libaidin_hand2_kinematics.so.<SDK version>` replaces
+  `libaidin_hand2_kinematics.so.1`.** Relink against this release; a consumer built against 0.5.1
+  looks for a file name this release does not ship.
+- **The kinematics library no longer carries a version of its own.** Its two numbers are gone and
+  the file name comes from the project version, so there is one version to reason about.
+
+> [!IMPORTANT]
+> The old name made a silent mismatch possible, and it happened. What the library exports is four
+> signatures that have never changed, but what it means is a set of calibration constants, and
+> 0.5.1 halved the lead of two thumb screws. Under the fixed name a 0.5.0 library satisfied a
+> 0.5.1 consumer, so those two actuators converted at half the counts per millimetre with no
+> diagnostic of any kind. Installing two releases into different prefixes — `/usr/local` and
+> `~/.local`, say — was enough to trigger it. A mismatch now fails to load and names the file it
+> wanted.
+
+### Documentation
+
+- **Installing into a second prefix now carries a warning.** Build & install offered
+  `--prefix <prefix>` as the way to avoid `sudo` without saying that an SDK left behind in an
+  earlier prefix stays reachable, which is what let the mismatch above happen. Remove the earlier
+  one when you move.
+- **Build & install separates the two install paths and documents how to uninstall.** Section 3
+  interleaved the `/usr/local` steps with the user-prefix steps paragraph by paragraph, so a
+  reader following it in order had to keep filtering out the half that did not apply. It is now
+  3.1 and 3.2, one of which you follow, and the new section 5 removes what was installed.
+
 ## [0.5.1] - 2026-09-10
 
 The thumb's d1 and d2 screws changed from a 2 mm lead to a 1 mm one, so the kinematics converts
@@ -31,11 +72,10 @@ same release. The public API is unchanged.
   declarations it exports did not change, so it drops in without relinking `libaidin_hand2`.
 
 > [!IMPORTANT]
-> This release is built for a hand whose thumb carries 1 mm lead screws on d1 and d2. On a hand
-> with the 2 mm screws it converts those two actuators by a factor of two, so stay on
-> [v0.5.0](https://github.com/aidinrobotics/aidin-hand2-sdk/releases/tag/v0.5.0) for that
-> hardware. The compatibility policy is `SameMinorVersion`, so `find_package(aidin_hand2 0.5)`
-> accepts either one and will not stop the mismatch for you.
+> The default build is for a hand whose two thumb ball screws have a 1 mm lead. For the 2 mm
+> hardware, configure with `-DAIDIN_HAND2_THUMB_LEAD=2mm`; see
+> [2. Build](docs/en/06_sdk_build_and_install.md#2-build). Building for the wrong one moves those
+> two actuators twice or half as far as asked.
 
 ### Documentation
 
