@@ -51,7 +51,7 @@ void print_section(const char* title)
 {
   std::putchar('\n');
   print_rule('=');
-  std::printf("%s\n", title);
+  std::printf("[example] %s\n", title);
   print_rule('-');
 }
 
@@ -97,7 +97,7 @@ int main(int argc, char** argv)
     //    this is the cap it pushes with.
     hand.set_max_effort(600.0);  // % of rated current × 10, so 60 %
 
-    std::printf("homing_state = %s\n\n", to_string(hand.get_diagnostics().homing_state));
+    std::printf("[example] homing_state = %s\n\n", to_string(hand.get_diagnostics().homing_state));
 
     // 2) A joint target without a reference. The SDK refuses it, and the code says why:
     //    WrongCallOrder is the call sequence being wrong, not the target.
@@ -105,16 +105,16 @@ int main(int argc, char** argv)
     zero_pose.target.fill(0.0);  // rad
     try {
       hand.set_command(zero_pose);
-      std::printf("the command was accepted, which the SDK is not supposed to allow yet\n");
+      std::printf("[example] the command was accepted, which the SDK is not supposed to allow yet\n");
     } catch (const Exception& error) {
-      std::printf("before homing — %s: %s\n\n", to_string(error.code()), error.what());
+      std::printf("[example] before homing — %s: %s\n\n", to_string(error.code()), error.what());
     }
 
     // 3) Idle is the exception. It needs no reference because it sends an effort of 0.
     //    It still needs the drives on, so run() comes first.
     hand.run();
     hand.set_command(Idle{});
-    std::printf("Idle was accepted before homing, since it asks for no position\n\n");
+    std::printf("[example] Idle was accepted before homing, since it asks for no position\n\n");
 
     // 4) The counts before homing. They are whatever the drives happened to power up with.
     const HandState before = hand.get_state();
@@ -126,7 +126,7 @@ int main(int argc, char** argv)
     //    so the run() above was for the Idle command rather than for this call.
     print_section("homing — every finger travels to its hard stop");
     hand.home();
-    std::printf("home() returned, homing_state = %s\n\n", to_string(hand.get_diagnostics().homing_state));
+    std::printf("[example] home() returned, homing_state = %s\n\n", to_string(hand.get_diagnostics().homing_state));
 
     // 6) The counts after homing. They are now measured from the hard stops, which is what
     //    makes a joint target mean the same thing on every run. Every one of them reads -1000
@@ -139,7 +139,7 @@ int main(int argc, char** argv)
     // 7) The same command as step 2, unchanged. Homing is the only thing that happened in
     //    between, and homing also left a command holding the zero pose, so this replaces it.
     hand.set_command(zero_pose);
-    std::printf("after homing — the same command was accepted\n\n");
+    std::printf("[example] after homing — the same command was accepted\n\n");
 
     // 8) Give the fingers 2 s to leave the hard stop, then print the counts once. This is the
     //    half of the reference the table in step 6 cannot show on its own: -1000 was the stop
@@ -158,12 +158,12 @@ int main(int argc, char** argv)
     //    on costs the reference: reconnect() puts homing_state back to NotRun, so a recovered
     //    hand has to be homed again before it takes a command.
     hand.stop();
-    std::printf("done — homing_state stays %s until a reconnect() clears it\n",
+    std::printf("[example] done — homing_state stays %s until a reconnect() clears it\n",
                 to_string(hand.get_diagnostics().homing_state));
   } catch (const Exception& error) {
     // A HardwareFault here is most likely homing itself failing, and the message names the
     // actuator that did not reach its stop.
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

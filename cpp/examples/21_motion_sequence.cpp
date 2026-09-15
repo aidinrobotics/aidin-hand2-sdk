@@ -467,7 +467,7 @@ int main(int argc, char** argv)
         const Waypoint& to   = kMotion[(i + 1) % kMotion.size()];
         const int steps = static_cast<int>(from.dwell_sec * kControlRate + 0.5);
 
-        std::printf("\r\033[K  lap %d  %-14s  %4.0f ms  %d steps", lap, from.label,
+        std::printf("\r\033[K  [example] lap %d  %-14s  %4.0f ms  %d steps", lap, from.label,
                     from.dwell_sec * 1000.0, steps);
         std::fflush(stdout);
 
@@ -491,7 +491,7 @@ int main(int argc, char** argv)
     hand.set_command(Idle{});
     hand.stop();
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     exit_code = 1;
   }
 

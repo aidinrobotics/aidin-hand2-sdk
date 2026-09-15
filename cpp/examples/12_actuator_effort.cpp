@@ -81,7 +81,7 @@ int main(int argc, char** argv)
         const HandState state = hand.get_state();
         const auto* setpoint =
             std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-        std::printf("\r\033[K  asked %+7.1f  ->  setpoint %+7.1f  |  %8.0f cnt  %+7.1f rpm  %+7.1f mA",
+        std::printf("\r\033[K  [example] asked %+7.1f  ->  setpoint %+7.1f  |  %8.0f cnt  %+7.1f rpm  %+7.1f mA",
                     effort, setpoint != nullptr ? setpoint->target_effort_pct[kActuator] : 0.0,
                     state.actuators.position_count[kActuator],
                     state.actuators.velocity_rpm[kActuator],
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
     const HandState capped = hand.get_state();
     const auto* capped_setpoint =
         std::get_if<ActuatorEffortSetpoint>(&capped.commanded.controller_output);
-    std::printf("asked for 1500 under a cap of %.0f, setpoint %+.1f\n",
+    std::printf("[example] asked for 1500 under a cap of %.0f, setpoint %+.1f\n",
                 capped.commanded.max_effort_pct[kActuator],
                 capped_setpoint != nullptr ? capped_setpoint->target_effort_pct[kActuator] : 0.0);
 
@@ -114,7 +114,7 @@ int main(int argc, char** argv)
     const HandState raised = hand.get_state();
     const auto* raised_setpoint =
         std::get_if<ActuatorEffortSetpoint>(&raised.commanded.controller_output);
-    std::printf("same command, cap raised to %.0f, setpoint %+.1f\n\n",
+    std::printf("[example] same command, cap raised to %.0f, setpoint %+.1f\n\n",
                 raised.commanded.max_effort_pct[kActuator],
                 raised_setpoint != nullptr ? raised_setpoint->target_effort_pct[kActuator] : 0.0);
 
@@ -128,9 +128,9 @@ int main(int argc, char** argv)
     //    above are not comparable term by term. The current loop that connects them belongs to
     //    the drive, and a blocked finger draws its cap while a free one draws much less.
     hand.stop();
-    std::printf("done — the cap bounds the command, and the command carries the sign\n");
+    std::printf("[example] done — the cap bounds the command, and the command carries the sign\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

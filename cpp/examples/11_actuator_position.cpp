@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     // 2) Read where the actuators are. After homing these are measured from the hard stops,
     //    so they are a reference the next run will agree with.
     const HandState homed = hand.get_state();
-    std::printf("counts after homing:  a0 %8.0f  a5 %8.0f  a8 %8.0f\n\n",
+    std::printf("[example] counts after homing:  a0 %8.0f  a5 %8.0f  a8 %8.0f\n\n",
                 homed.actuators.position_count[0], homed.actuators.position_count[kActuator],
                 homed.actuators.position_count[8]);
 
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
         const HandState state = hand.get_state();
         const auto* setpoint =
             std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
-        std::printf("\r\033[K  asked %9.0f  ->  setpoint %9.0f  reached %9.0f cnt  |  %6.1f mA",
+        std::printf("\r\033[K  [example] asked %9.0f  ->  setpoint %9.0f  reached %9.0f cnt  |  %6.1f mA",
                     command.target[kActuator],
                     setpoint != nullptr ? setpoint->target_position_cnt[kActuator] : 0.0,
                     state.actuators.position_count[kActuator],
@@ -109,7 +109,7 @@ int main(int argc, char** argv)
     // 5) The setpoint column matched the asked column on the first cycle, with none of the
     //    ramping a joint position command shows. That is the absent controller: what you send
     //    is what the drive is told.
-    std::printf("the setpoint equals the target immediately — no filter sits in between\n\n");
+    std::printf("[example] the setpoint equals the target immediately — no filter sits in between\n\n");
 
     // 6) The one check that does apply. A count outside the int32 range cannot be put in a CAN
     //    frame, so the command is dropped and the previous one keeps going out. Like a NaN, it
@@ -121,10 +121,10 @@ int main(int argc, char** argv)
     hand.set_command(too_far);          // returns normally
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    std::printf("sent 3.0e9 counts: no exception, nan_command_count %llu -> %llu\n",
+    std::printf("[example] sent 3.0e9 counts: no exception, nan_command_count %llu -> %llu\n",
                 static_cast<unsigned long long>(before),
                 static_cast<unsigned long long>(hand.get_diagnostics().nan_command_count));
-    std::printf("still holding %9.0f cnt, which is the previous command\n\n",
+    std::printf("[example] still holding %9.0f cnt, which is the previous command\n\n",
                 hand.get_state().actuators.position_count[kActuator]);
 
     // 7) A count inside the int32 range but outside the mechanical travel passes every check
@@ -132,9 +132,9 @@ int main(int argc, char** argv)
     //    workspace model applied, or keep the offsets small and measured, as above.
     hand.set_command(Idle{});
     hand.stop();
-    std::printf("done — this command is not workspace-clamped, so the limits are yours to hold\n");
+    std::printf("[example] done — this command is not workspace-clamped, so the limits are yours to hold\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

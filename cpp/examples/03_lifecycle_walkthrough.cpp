@@ -102,6 +102,10 @@ constexpr std::size_t kMaxQueuedLogs = 200;
 // Called on whichever thread logged, the control thread included, so the work here is one string
 // and one short lock. The direct branch does reach printf, which is what the SDK's own console
 // sink does from those same threads, and stdout locks per call so a line cannot come out shredded.
+//
+// The line is tagged [aidin_hand2] — the same name the console sink would have used — because
+// this is SDK content being carried through a callback, not something this example wrote. Every
+// line the example prints on its own is tagged [example] instead, so the two never look alike.
 void queue_log_line(LogLevel level, const std::string& message)
 {
   const char* tag = "log";
@@ -117,7 +121,7 @@ void queue_log_line(LogLevel level, const std::string& message)
   // Warnings and errors get a colour, since those are the ones worth looking up from the keys.
   const char* color = (level >= LogLevel::Error) ? "\033[31m" : (level == LogLevel::Warn ? "\033[33m" : "\033[90m");
 
-  const std::string line = std::string("  ") + color + "[" + tag + "] " + message + "\033[0m";
+  const std::string line = std::string("  ") + color + "[aidin_hand2] [" + tag + "] " + message + "\033[0m";
 
   std::lock_guard<std::mutex> lock(g_log_mutex);
   if (g_log_direct.load()) {
@@ -281,10 +285,10 @@ int main(int argc, char** argv)
     JointPositionCommand zero;
     zero.target.fill(0.0);
 
-    std::printf("\nEvery number is accepted whatever the state is. What the SDK does with it —\n");
-    std::printf("the transition or the refusal — is printed above the block below, which keeps\n");
-    std::printf("the keys and the live state in view. One keypress is enough; no Enter.\n");
-    std::printf("0 leaves, and so does Ctrl-C.\n\n");
+    std::printf("\n[example] Every number is accepted whatever the state is. What the SDK does with it —\n");
+    std::printf("[example] the transition or the refusal — is printed above the block below, which keeps\n");
+    std::printf("[example] the keys and the live state in view. One keypress is enough; no Enter.\n");
+    std::printf("[example] 0 leaves, and so does Ctrl-C.\n\n");
 
     const RawKeys raw_keys;
 
@@ -403,18 +407,19 @@ int main(int argc, char** argv)
       } catch (const Exception& error) {
         // This is the interesting half. The code says what kind of failure it is and the
         // message says why, and the SDK has already logged both at error level — which is why
-        // the same text comes out just above this line, tagged [error], from the callback.
+        // the same text comes out just above this line, tagged [aidin_hand2] [error], from the
+        // callback.
         outcome = std::string("refused — ") + to_string(error.code()) + ": " + error.what();
       }
 
       flush_queued_logs(status_drawn);  // whatever the SDK logged while the call was running
-      std::printf("  %s\n", outcome.c_str());
+      std::printf("  [example] %s\n", outcome.c_str());
       std::printf("\n");  // a blank line between this round and the block that returns below
     }
 
     flush_queued_logs(status_drawn);
     erase_status(status_drawn);
-    std::printf("leaving — the manager destructor stops the hand and closes the link\n");
+    std::printf("[example] leaving — the manager destructor stops the hand and closes the link\n");
 
     // The block is down for good, so the console sink can have the terminal back. It has to
     // get it back before this scope ends: the manager is destroyed on the way out and logs
@@ -425,7 +430,7 @@ int main(int argc, char** argv)
   } catch (const Exception& error) {
     // Only create() throws out here. Everything inside the loop is caught above so that a
     // refusal does not end the session.
-    std::printf("\nfailed to start: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed to start: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

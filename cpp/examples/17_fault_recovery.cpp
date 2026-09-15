@@ -122,11 +122,11 @@ int main(int argc, char** argv)
         // From here on run(), home() and set_command() all refuse, and the refusal does
         // not come back as WrongCallOrder: it carries the cause that stopped the hand,
         // CommunicationLost for a dead link or ControlLoopFault for a dead loop
-        std::printf("[%3d] Faulted, homing_state=%s, recovering\n", tick,
+        std::printf("[%3d] [example] Faulted, homing_state=%s, recovering\n", tick,
                     to_string(diag.homing_state));
 
         if (++attempts > kMaxRecoveryAttempts) {
-          std::printf("giving up after %d recovery attempts, the hand stays Faulted\n",
+          std::printf("[example] giving up after %d recovery attempts, the hand stays Faulted\n",
                       kMaxRecoveryAttempts);
           flush_log();
           return 1;
@@ -142,7 +142,7 @@ int main(int argc, char** argv)
           //    not enabled and homing_state is back to NotRun, because a new link may mean
           //    a rebooted drive and the old zero cannot be trusted
           const Diagnostics after = hand.get_diagnostics();
-          std::printf("      reconnect ok, lifecycle=%s homing_state=%s\n",
+          std::printf("      [example] reconnect ok, lifecycle=%s homing_state=%s\n",
                       to_string(after.lifecycle), to_string(after.homing_state));
 
           // c) Enable the drives again
@@ -156,12 +156,12 @@ int main(int argc, char** argv)
           //    input back to Idle, so without this the hand would sit at its home hold
           hand.set_command(cmd);
 
-          std::printf("      recovered on attempt %d of %d\n", attempts, kMaxRecoveryAttempts);
+          std::printf("      [example] recovered on attempt %d of %d\n", attempts, kMaxRecoveryAttempts);
         } catch (const Exception& error) {
           // A failed recovery stays Faulted, so the next tick tries reconnect() again
-          std::printf("      attempt %d failed, %s: %s\n", attempts, to_string(error.code()),
+          std::printf("      [example] attempt %d failed, %s: %s\n", attempts, to_string(error.code()),
                       error.what());
-          std::printf("      check %s\n", what_to_check(error.code()));
+          std::printf("      [example] check %s\n", what_to_check(error.code()));
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -170,7 +170,7 @@ int main(int argc, char** argv)
 
       // Once a second, so the healthy path stays readable
       if (tick % 10 == 0) {
-        std::printf("[%3d] %s homing=%s cycles=%llu misses=%llu period=%.3fms\n", tick,
+        std::printf("[%3d] [example] %s homing=%s cycles=%llu misses=%llu period=%.3fms\n", tick,
                     to_string(diag.lifecycle), to_string(diag.homing_state),
                     static_cast<unsigned long long>(diag.control_cycles),
                     static_cast<unsigned long long>(diag.deadline_misses), diag.last_period_ms);
@@ -179,7 +179,7 @@ int main(int argc, char** argv)
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    std::printf("loop ended with %d recovery attempt(s) used\n", attempts);
+    std::printf("[example] loop ended with %d recovery attempt(s) used\n", attempts);
 
     // 6) Idle drops the torque while the drives are still enabled, then end the session
     hand.set_command(Idle{});
@@ -192,8 +192,8 @@ int main(int argc, char** argv)
   } catch (const Exception& error) {
     // Whatever failed, it arrives here as one type, and code() picks the group to check;
     // a failure this far out is either before the loop or a recovery that ran out of budget
-    std::printf("%s: %s\n", to_string(error.code()), error.what());
-    std::printf("check %s\n", what_to_check(error.code()));
+    std::printf("[example] %s: %s\n", to_string(error.code()), error.what());
+    std::printf("[example] check %s\n", what_to_check(error.code()));
     flush_log();
     return 1;
   }

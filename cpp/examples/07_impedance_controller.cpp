@@ -92,7 +92,7 @@ int main(int argc, char** argv)
       // itself — but it makes each pass start the same way.
       hand.set_command(command);
 
-      std::printf("stiffness %.3f — hold the index finger back and watch the effort\n", stiffness);
+      std::printf("[example] stiffness %.3f — hold the index finger back and watch the effort\n", stiffness);
       for (int i = 0; i < 30 && !g_shutdown.load(); ++i) {
         const HandState state = hand.get_state();
 
@@ -101,7 +101,7 @@ int main(int argc, char** argv)
         const auto* setpoint =
             std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
 
-        std::printf("\r\033[K  pos %7.0f cnt  vel %7.1f rpm  ->  effort %7.1f  |  measured %6.1f mA",
+        std::printf("\r\033[K  [example] pos %7.0f cnt  vel %7.1f rpm  ->  effort %7.1f  |  measured %6.1f mA",
                     state.actuators.position_count[kActuator],
                     state.actuators.velocity_rpm[kActuator],
                     setpoint != nullptr ? setpoint->target_effort_pct[kActuator] : 0.0,
@@ -115,11 +115,11 @@ int main(int argc, char** argv)
     // 5) Sending Idle switches controllers as much as it changes the target: the effort goes to
     //    0 while the drives stay enabled, so the finger becomes back-driveable but not limp.
     hand.set_command(Idle{});
-    std::printf("Idle — effort 0 with the drives still on\n");
+    std::printf("[example] Idle — effort 0 with the drives still on\n");
     for (int i = 0; i < 20 && !g_shutdown.load(); ++i) {
       const HandState state = hand.get_state();
       const auto* setpoint = std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  effort %7.1f  |  measured %6.1f mA",
+      std::printf("\r\033[K  [example] effort %7.1f  |  measured %6.1f mA",
                   setpoint != nullptr ? setpoint->target_effort_pct[kActuator] : 0.0,
                   state.actuators.current_mA[kActuator]);
       std::fflush(stdout);
@@ -131,9 +131,9 @@ int main(int argc, char** argv)
     //    two columns above cannot be subtracted from one another. Rated is 400 mA, which makes
     //    1000 the whole of it, but the loop between them is the drive's rather than the SDK's.
     hand.stop();
-    std::printf("done — gains are per actuator, so joint index and gain index are not the same\n");
+    std::printf("[example] done — gains are per actuator, so joint index and gain index are not the same\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

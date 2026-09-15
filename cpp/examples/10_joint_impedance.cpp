@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     JointPositionCommand position;
     position.target = target;
     hand.set_command(position);
-    std::printf("JointPositionCommand, mode = %s\n",
+    std::printf("[example] JointPositionCommand, mode = %s\n",
                 hand.get_command_mode() == CommandMode::JointPosition ? "JointPosition" : "other");
 
     for (int i = 0; i < 20 && !g_shutdown.load(); ++i) {
@@ -92,7 +92,7 @@ int main(int argc, char** argv)
           std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
       const auto* as_effort =
           std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6.1f mA",
+      std::printf("\r\033[K  [example] output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6.1f mA",
                   as_position != nullptr ? "position" : as_effort != nullptr ? "effort" : "none",
                   kActuator,
                   as_position != nullptr ? as_position->target_position_cnt[kActuator]
@@ -129,7 +129,7 @@ int main(int argc, char** argv)
     JointImpedanceCommand impedance;
     impedance.target = target;
     hand.set_command(impedance);
-    std::printf("JointImpedanceCommand with the identical target, mode = %s\n",
+    std::printf("[example] JointImpedanceCommand with the identical target, mode = %s\n",
                 hand.get_command_mode() == CommandMode::JointImpedance ? "JointImpedance" : "other");
 
     for (int i = 0; i < 30 && !g_shutdown.load(); ++i) {
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
           std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
       const auto* as_effort =
           std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6.1f mA",
+      std::printf("\r\033[K  [example] output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6.1f mA",
                   as_position != nullptr ? "position" : as_effort != nullptr ? "effort" : "none",
                   kActuator,
                   as_position != nullptr ? as_position->target_position_cnt[kActuator]
@@ -154,15 +154,15 @@ int main(int argc, char** argv)
     // 5) The reached angle is the interesting column. Under position control it converges on
     //    the target; under impedance it settles short of it, by however much friction and the
     //    object take, and the effort is what stayed constant instead.
-    std::printf("the target was the same both times, so the difference is the controller\n\n");
+    std::printf("[example] the target was the same both times, so the difference is the controller\n\n");
 
     // 6) Both command types are clamped and validated the same way — the projection into the
     //    reachable workspace applies to a joint command whichever controller consumes it.
     hand.set_command(Idle{});
     hand.stop();
-    std::printf("done — the command struct picks the controller, not a mode setting\n");
+    std::printf("[example] done — the command struct picks the controller, not a mode setting\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 
