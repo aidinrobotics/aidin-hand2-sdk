@@ -8,15 +8,8 @@ name: CI
 # 20.04 is not supported, because spdlog 1.9 is required. CAN-FD, PREEMPT_RT and the 500 Hz loop
 # are kernel-side and still need real hardware, so they are verified on-device rather than here.
 #
-# The jobs run on the GitHub-hosted runner images directly rather than in a bare distro
-# container. That costs one property worth naming: a container started from ubuntu:22.04 with
-# only the packages below installed would fail if a dependency were missing from that list,
-# whereas a runner image carries a compiler and CMake already. Run dev/ci-local.sh to get the
-# bare-distro check back.
-#
-# Actions is disabled at the repository level on the internal repo, so these triggers spend no
-# organisation minutes there; the public repository runs them for free. dev/ci-local.sh is the
-# internal equivalent.
+# The jobs run on the GitHub-hosted runner images, which carry a compiler and CMake already, so
+# a missing dependency declaration would not fail here.
 on:
   push:
     branches: [main]
@@ -26,23 +19,22 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.runner }} · lead ${{ matrix.lead }}
+    name: ${{ matrix.runner }} · type ${{ matrix.type }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        # Both thumb ball screw leads ship, so both are built and tested here. Without the 2mm
-        # half, the library that goes out for the earlier hardware would never be linked or run
-        # by CI on the architecture it runs on.
+        # Every hand type ships, so every one is built and tested here. A type that CI skipped
+        # would go out having never been linked or run on the architecture it runs on.
         runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
-        lead: ["1mm", "2mm"]
+        type: [a, b, c]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
       # The runner image already has GCC, CMake and git. spdlog is the one dependency the SDK
       # looks for, and linux-libc-dev provides linux/can.h. Eigen is deliberately absent: it is
-      # compiled into the prebuilt kinematics library and cpp/CMakeLists.txt no longer finds it.
+      # compiled into the prebuilt kinematics archive and cpp/CMakeLists.txt no longer finds it.
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -57,13 +49,24 @@ jobs:
       - name: Configure
         run: |
           cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DAIDIN_HAND2_THUMB_LEAD=${{ matrix.lead }}
+            -DAIDIN_HAND2_HAND_TYPE=${{ matrix.type }}
 
       - name: Build
         run: cmake --build build -j"$(nproc)"
 
       - name: Test
         run: ctest --test-dir build --output-on-failure --label-exclude hardware
+
+      # The kinematics archive is absorbed into the library, and none of it may reach the
+      # library's exports. The archive is compiled with hidden visibility and linked with
+      # --exclude-libs; this is what proves both worked on the artifact that ships.
+      - name: Kinematics symbols are not exported
+        run: |
+          so=$(ls build/libaidin_hand2.so.*.* | head -1)
+          n=$(nm -D --defined-only "$so" | c++filt | grep -c 'kinematics::' || true)
+          m=$(nm -D --defined-only "$so" | grep -c 'aidin_hand2_kin_' || true)
+          echo "$so: kinematics:: $n, aidin_hand2_kin_ $m"
+          [ "$n" = "0" ] && [ "$m" = "0" ]
 
   docs:
     name: docs regression (ko/en)
