@@ -132,7 +132,7 @@ int main(int argc, char** argv)
 
   const int listener = open_listener(port);
   if (listener < 0) {
-    std::fprintf(stderr, "cannot listen on port %d\n", port);
+    std::fprintf(stderr, "[example] cannot listen on port %d\n", port);
     return 1;
   }
   int client = -1;
@@ -150,7 +150,7 @@ int main(int argc, char** argv)
     auto last_lifecycle = HandLifecycle::Disconnected;
     auto last_homing    = HomingState::NotRun;
 
-    std::printf("listening on 127.0.0.1:%d\n", port);
+    std::printf("[example] listening on 127.0.0.1:%d\n", port);
 
     bool greet_client = false;
 

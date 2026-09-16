@@ -41,7 +41,7 @@ int main(int argc, char** argv)
   config.control_rate = 500;    // Hz
   config.auto_home    = false;  // nothing here asks for control, so homing never comes up
 
-  std::printf("config: interface=%s  side=%s  control_rate=%d Hz\n\n",
+  std::printf("[example] config: interface=%s  side=%s  control_rate=%d Hz\n\n",
               config.interface_name.c_str(),
               side == HandSide::Left ? "Left" : "Right",
               config.control_rate);
@@ -51,13 +51,13 @@ int main(int argc, char** argv)
     HandManager manager;
 
     Hand hand = manager.create(config);
-    std::printf("create() returned a handle, lifecycle = %s\n",
+    std::printf("[example] create() returned a handle, lifecycle = %s\n",
                 to_string(hand.get_diagnostics().lifecycle));
 
     // 3) A copy is a second handle to the same HandCore. There is no second hand and no
     //    second control loop — both names read the same state.
     Hand copy = hand;
-    std::printf("copied the handle, and both read lifecycle = %s / %s\n",
+    std::printf("[example] copied the handle, and both read lifecycle = %s / %s\n",
                 to_string(hand.get_diagnostics().lifecycle),
                 to_string(copy.get_diagnostics().lifecycle));
 
@@ -65,26 +65,26 @@ int main(int argc, char** argv)
     //    would confirm the quick stop and close the link first, so a disconnect() beforehand
     //    is never required.
     manager.destroy(hand);
-    std::printf("\ndestroy() released the HandCore\n");
+    std::printf("\n[example] destroy() released the HandCore\n");
 
     // 5) Both handles are stale now, the copy included. A method on either one throws instead
     //    of touching freed resources.
     try {
       (void)copy.get_diagnostics();
-      std::printf("the copy still answered, which the SDK is not supposed to allow\n");
+      std::printf("[example] the copy still answered, which the SDK is not supposed to allow\n");
     } catch (const Exception& error) {
-      std::printf("the copy is invalid too — %s: %s\n", to_string(error.code()), error.what());
+      std::printf("[example] the copy is invalid too — %s: %s\n", to_string(error.code()), error.what());
     }
 
     // 6) destroy_all() is the same for everything the manager owns, and the destructor does
     //    it anyway. Calling it with nothing left is harmless.
     manager.destroy_all();
-    std::printf("\ndestroy_all() on an empty manager is a no-op\n");
+    std::printf("\n[example] destroy_all() on an empty manager is a no-op\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 
-  std::printf("done — the manager went out of scope with nothing left to release\n");
+  std::printf("[example] done — the manager went out of scope with nothing left to release\n");
   return 0;
 }

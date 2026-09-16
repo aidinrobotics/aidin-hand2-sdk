@@ -56,7 +56,7 @@ int main(int argc, char** argv)
   //    into a CAN frame, and there are 16 of them — one per actuator.
   const std::array<int, kActuatorCount> encoder = ik_joint_to_actuator(pose);
 
-  std::printf("ik_joint_to_actuator, %zu counts:\n ", kActuatorCount);
+  std::printf("[example] ik_joint_to_actuator, %zu counts:\n ", kActuatorCount);
   for (std::size_t a = 0; a < kActuatorCount; ++a) {
     std::printf(" a%zu %7d", a, encoder[a]);
     if (a == 3 || a == 6 || a == 9 || a == 12) std::printf("\n ");
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
   //    of each digit comes out too, and it was never an input.
   const std::array<double, kJointCount> joints = fk_actuator_to_joint(encoder);
 
-  std::printf("fk_actuator_to_joint, %zu angles in rad:\n ", kJointCount);
+  std::printf("[example] fk_actuator_to_joint, %zu angles in rad:\n ", kJointCount);
   for (std::size_t j = 0; j < kJointCount; ++j) {
     std::printf(" j%zu %+.4f", j, joints[j]);
     if (j % 5 == 4) std::printf("\n ");
@@ -90,7 +90,7 @@ int main(int argc, char** argv)
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
     worst = std::fmax(worst, std::fabs(joints[active_to_joint[j]] - pose[j]));
   }
-  std::printf("round trip through the mapping, worst deviation %.2e rad\n", worst);
+  std::printf("[example] round trip through the mapping, worst deviation %.2e rad\n", worst);
 
   // 6) The same comparison made the tempting way, against the first 16 entries. It is wrong
   //    from the index finger onwards, and the number says how wrong: this is what truncating
@@ -99,19 +99,19 @@ int main(int argc, char** argv)
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
     truncated_worst = std::fmax(truncated_worst, std::fabs(joints[j] - pose[j]));
   }
-  std::printf("round trip against the first %zu entries, worst deviation %.2e rad — wrong\n\n",
+  std::printf("[example] round trip against the first %zu entries, worst deviation %.2e rad — wrong\n\n",
               kActiveJointCount, truncated_worst);
 
   // 7) The passive angles, which have no input to come back to. They follow from the four-bar
   //    linkage of each digit, so they are output only.
-  std::printf("passive joints:");
+  std::printf("[example] passive joints:");
   for (const std::size_t j : {4u, 8u, 12u, 16u, 20u}) std::printf("  j%zu %+.4f", j, joints[j]);
   std::printf("\n\n");
 
   // 8) So a forward result cannot fill a command target. The compiler stops the assignment
   //    because 21 and 16 differ, and copying the first 16 compiles while shifting every joint
   //    after the thumb — pick the entries out by index, as step 5 did.
-  std::printf("drop the passive entries by index, do not truncate the array\n\n");
+  std::printf("[example] drop the passive entries by index, do not truncate the array\n\n");
 
   // 9) Now the same conversion inside the SDK, if a hand is there to ask. This half needs a
   //    connection but still moves nothing: no run(), no home(), no set_command().
@@ -139,18 +139,18 @@ int main(int argc, char** argv)
 
     // 11) The SDK filled state.joints with this call, so the two columns agree except where a
     //     cycle landed between the read and the rounding.
-    std::printf("SDK joints against the same call made here:\n");
+    std::printf("[example] SDK joints against the same call made here:\n");
     for (std::size_t j = 0; j < 5; ++j) {
       std::printf("  j%zu  state %+.6f   computed %+.6f   diff %+.2e rad\n",
                   j, state.joints.position_rad[j], computed[j],
                   computed[j] - state.joints.position_rad[j]);
     }
-    std::printf("\ndone — the functions are the same ones the control loop uses\n");
+    std::printf("\n[example] done — the functions are the same ones the control loop uses\n");
   } catch (const Exception& error) {
     // No hand attached is the ordinary case for this half, so it is reported and not treated
     // as a failure of the example.
-    std::printf("no hand to compare against — %s: %s\n", to_string(error.code()), error.what());
-    std::printf("the conversion half above needed no connection\n");
+    std::printf("[example] no hand to compare against — %s: %s\n", to_string(error.code()), error.what());
+    std::printf("[example] the conversion half above needed no connection\n");
   }
 
   return 0;

@@ -65,7 +65,7 @@ int main(int argc, char** argv)
         0.00, 0.60, 0.50};        // baby
 
     for (int cycle = 0; cycle < 5 && !g_shutdown.load(); ++cycle) {
-      std::printf("cycle %d/5\n", cycle + 1);
+      std::printf("[example] cycle %d/5\n", cycle + 1);
       hand.set_command(close);
       std::this_thread::sleep_for(std::chrono::seconds(1));
       hand.set_command(open);
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     }
 
     // Ctrl-C is not a failure, so the exit code stays 0; the run simply ended early
-    if (g_shutdown.load()) std::printf("interrupted, leaving through the destructor\n");
+    if (g_shutdown.load()) std::printf("[example] interrupted, leaving through the destructor\n");
   } catch (const Exception&) {
     exit_code = 1;   // the SDK logged the cause before throwing
   }

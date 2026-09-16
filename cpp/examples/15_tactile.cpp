@@ -61,20 +61,20 @@ int main(int argc, char** argv)
 
     // 1) One snapshot, to show what the numbers look like before anything is subtracted.
     const HandState first = hand.get_state();
-    std::printf("raw counts, %s fingertip taxels 0-5:", finger_name[1]);
+    std::printf("[example] raw counts, %s fingertip taxels 0-5:", finger_name[1]);
     for (std::size_t t = 0; t < 6; ++t) {
       std::printf(" %7.0f", first.tactile.fingers[1][t]);
     }
     std::printf("\n");
-    std::printf("raw counts, palm taxels 0-5:        ");
+    std::printf("[example] raw counts, palm taxels 0-5:        ");
     for (std::size_t t = 0; t < 6; ++t) {
       std::printf(" %7.0f", first.tactile.palm[t]);
     }
-    std::printf("\n\nnone of those say whether anything is touching the hand\n\n");
+    std::printf("\n\n[example] none of those say whether anything is touching the hand\n\n");
 
     // 2) The baseline. A second of averaging at 20 Hz, with nothing in contact, so a slow
     //    drift or an offset per taxel is folded in rather than showing up later as contact.
-    std::printf("taking the baseline — keep your hands off the hand\n");
+    std::printf("[example] taking the baseline — keep your hands off the hand\n");
     std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount> finger_baseline{};
     std::array<double, kPalmTactileCount> palm_baseline{};
 
@@ -91,15 +91,15 @@ int main(int argc, char** argv)
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-    std::printf("baseline taken\n\n");
+    std::printf("[example] baseline taken\n\n");
 
     // 3) The threshold is a choice, not a constant the SDK provides. This one is loose enough
     //    to ignore the noise on a resting taxel and tight enough to catch a light touch; the
     //    right value for an application comes from watching its own hand at rest.
     constexpr double kContactThreshold = 200.0;
 
-    std::printf("touch a fingertip or the palm — Ctrl-C to finish\n");
-    std::printf("each column is one finger: peak deviation, then which taxel, then contact\n\n");
+    std::printf("[example] touch a fingertip or the palm — Ctrl-C to finish\n");
+    std::printf("[example] each column is one finger: peak deviation, then which taxel, then contact\n\n");
 
     while (!g_shutdown.load()) {
       const HandState state = hand.get_state();
@@ -107,7 +107,7 @@ int main(int argc, char** argv)
       // 4) Per finger, the taxel that moved furthest from its baseline. Which taxel it is
       //    matters as much as how far: the taxels are spread over the fingertip and the pad,
       //    so the index says roughly where the contact is.
-      std::printf("\r\033[K");
+      std::printf("\r\033[K[example] ");
       for (std::size_t f = 0; f < kFingerCount; ++f) {
         double      peak       = 0.0;
         std::size_t peak_taxel = 0;
@@ -147,9 +147,9 @@ int main(int argc, char** argv)
 
     // 6) A baseline taken once goes stale. Temperature and a long grasp both move it, so an
     //    application that runs for a while re-takes it whenever the hand is known to be free.
-    std::printf("done — re-take the baseline whenever nothing is in contact\n");
+    std::printf("[example] done — re-take the baseline whenever nothing is in contact\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

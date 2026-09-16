@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     Hand hand = manager.create(config);
     hand.connect();
 
-    std::printf("monitoring — pull the CAN cable to watch the lifecycle fault. Ctrl-C to finish.\n\n");
+    std::printf("[example] monitoring — pull the CAN cable to watch the lifecycle fault. Ctrl-C to finish.\n\n");
 
     // Previous totals, so the miss rate below is over the last interval rather than over the
     // whole session. A rate computed from the totals hides a burst that has since stopped.
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
       previous_misses = diagnostics.deadline_misses;
 
       // 3) The loop's four fields, plus the timestamp that should be advancing with them.
-      std::printf("\r\033[K%-12s %-10s | cycles %10llu  miss %8llu (%.2f%% now)"
+      std::printf("\r\033[K[example] %-12s %-10s | cycles %10llu  miss %8llu (%.2f%% now)"
                   "  period %5.3f ms  compute %5.3f ms  ts %s",
                   to_string(diagnostics.lifecycle), to_string(diagnostics.homing_state),
                   static_cast<unsigned long long>(diagnostics.control_cycles),
@@ -96,7 +96,7 @@ int main(int argc, char** argv)
       for (std::size_t a = 0; a < kActuatorCount; ++a) {
         const ActuatorFault fault = diagnostics.actuator_health.fault[a];
         if (fault != ActuatorFault::None) {
-          std::printf("\n  actuator %2zu: %s, enabled = %s\n", a, to_string(fault),
+          std::printf("\n  [example] actuator %2zu: %s, enabled = %s\n", a, to_string(fault),
                       diagnostics.actuator_health.enabled[a] ? "yes" : "no");
         }
       }
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
             std::chrono::steady_clock::now().time_since_epoch())
             .count();
 
-    std::printf("diagnostic record\n");
+    std::printf("[example] diagnostic record\n");
     std::printf("  monotonic_ns     %lld\n", static_cast<long long>(monotonic_ns));
     std::printf("  state.timestamp  %lld\n", static_cast<long long>(state.timestamp));
     std::printf("  lifecycle        %s\n", to_string(diagnostics.lifecycle));
@@ -175,9 +175,9 @@ int main(int argc, char** argv)
     // 10) disabled_actuators belongs in the record too: an actuator on that list reports no
     //     fault because it is not reported on at all, which reads exactly like a healthy one.
     std::printf("  disabled_actuators none\n");
-    std::printf("\ndone\n");
+    std::printf("\n[example] done\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 
