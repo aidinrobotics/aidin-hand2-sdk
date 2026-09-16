@@ -125,4 +125,4 @@ The AIDIN Hand Gen2 SDK is licensed under the [Apache License 2.0](LICENSE). [NO
 
 The SDK also includes and links third-party software. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists each component with its license and where its source can be obtained, and [licenses/](licenses) holds the full license texts.
 
-`cpp/prebuilt/<arch>/libaidin_hand2_kinematics.so.<version>` is covered by the same Apache License 2.0 as the rest of the repository. It ships as a binary because the kinematics equations and the hand geometry constants are not published, and the license permits distribution in object form.
+`cpp/prebuilt/<arch>/libaidin_hand2_kinematics_type_<t>.a` is covered by the same Apache License 2.0 as the rest of the repository. It ships as a binary because the kinematics equations and the hand geometry constants are not published, and the license permits distribution in object form. The build absorbs the archive into `libaidin_hand2.so`, so it is not installed.

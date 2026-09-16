@@ -8,6 +8,29 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+### Changed
+
+- **The build selects a hand type instead of a thumb screw lead.** `-DAIDIN_HAND2_HAND_TYPE=a`,
+  `b` or `c` replaces `-DAIDIN_HAND2_THUMB_LEAD=1mm|2mm`, and `a` is the default. AIDIN tells you
+  the type when it delivers the robot hand. A build command that still passes the old option
+  stops at configure time with a message naming the new one.
+
+- **The kinematics library is absorbed into `libaidin_hand2.so`.** It arrives as a static archive
+  and is linked in, so the SDK installs one library rather than two and a consumer links one
+  name. The public C++ API does not change and the soname stays `libaidin_hand2.so.0.5`, so a
+  program already built against 0.5.x keeps running without a rebuild.
+
+  > [!NOTE]
+  > A private implementation detail was being installed into a shared directory, which is how
+  > a 0.5.0 library and a 0.5.1 one came to sit in one process. Naming the file after the
+  > release, in 0.5.2, treated the symptom. Not installing it at all removes the situation.
+
+### Removed
+
+- **`libaidin_hand2_kinematics.so` is no longer installed.** Nothing linked it by name — it was
+  reached through `libaidin_hand2.so` — so a rebuild needs no change. Remove the file left behind
+  by 0.5.2 and older; section 5 of Build & install says how.
+
 ## [0.5.2] - 2026-09-10
 
 Both thumb hardware generations are supported from one release, and the prebuilt kinematics

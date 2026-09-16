@@ -2,9 +2,13 @@
 
 #include <array>
 
-// Declaration-only on purpose. This header ships with the public SDK, while the hand geometry
-// constants (hand_kinematics_constants.hpp) and the equations stay in the internal repo and
-// reach the public SDK only as prebuilt/<arch>/libaidin_hand2_kinematics.so
+// Declaration-only on purpose. The equations live in the private aidin-hand2-kinematics
+// repository and reach this tree as prebuilt/<arch>/libaidin_hand2_kinematics_type_<t>.a, which
+// the build absorbs into libaidin_hand2.so.
+//
+// The archive is linked by whatever compiler builds this SDK, so its boundary is C. The inline
+// adapters below restore the array-taking signatures the rest of the tree calls, and cost
+// nothing at runtime — each one forwards a pointer.
 
 // Flat-array gen2 kinematics core
 // The long fingers use the hand1 equations, and the thumb is a separate 4-actuator,
@@ -38,27 +42,55 @@ constexpr int TASK_NUM          = 15;
 constexpr int ORIENTED_TASK_NUM = 18;
 
 
+}  // namespace aidin_hand2::kinematics
+
+// ---- The archive's C boundary ----
+
+extern "C" {
+
+void aidin_hand2_kin_fk_actuator_to_joint(const int* encoder, double* joint, double* task);
+void aidin_hand2_kin_ik_joint_to_actuator(const double* active_joint, int* encoder);
+void aidin_hand2_kin_ik_task_to_joint(const double* task, double* active_joint);
+void aidin_hand2_kin_ik_oriented_task_to_joint(const double* task, double* active_joint);
+
+}  // extern "C"
+
 // ---- Internal interface, used by HandCore and never shipped in include/ ----
 
+namespace aidin_hand2::kinematics
+{
+
 // Encoder to joint angles and fingertip task
-void fk_actuator_to_joint(
+inline void fk_actuator_to_joint(
   const std::array<int, ACTUATOR_NUM>& encoder,
   std::array<double, JOINT_NUM>& joint,
-  std::array<double, TASK_NUM>& task);
+  std::array<double, TASK_NUM>& task)
+{
+  aidin_hand2_kin_fk_actuator_to_joint(encoder.data(), joint.data(), task.data());
+}
 
 // Active joint angles in rad to actuator encoders
-void ik_joint_to_actuator(
+inline void ik_joint_to_actuator(
   const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
-  std::array<int, ACTUATOR_NUM>& encoder);
+  std::array<int, ACTUATOR_NUM>& encoder)
+{
+  aidin_hand2_kin_ik_joint_to_actuator(active_joint.data(), encoder.data());
+}
 
 // task xyz → active joint (Newton-Raphson IK).
-void ik_task_to_joint(
+inline void ik_task_to_joint(
   const std::array<double, TASK_NUM>& task,
-  std::array<double, ACTIVE_JOINT_NUM>& active_joint);
+  std::array<double, ACTIVE_JOINT_NUM>& active_joint)
+{
+  aidin_hand2_kin_ik_task_to_joint(task.data(), active_joint.data());
+}
 
 // Oriented form of ik_task_to_joint, taking a 6-D thumb pose and xyz for the long fingers
-void ik_oriented_task_to_joint(
+inline void ik_oriented_task_to_joint(
   const std::array<double, ORIENTED_TASK_NUM>& task,
-  std::array<double, ACTIVE_JOINT_NUM>& active_joint);
+  std::array<double, ACTIVE_JOINT_NUM>& active_joint)
+{
+  aidin_hand2_kin_ik_oriented_task_to_joint(task.data(), active_joint.data());
+}
 
 }  // namespace aidin_hand2::kinematics
