@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/). The interface covered by that
 versioning is the public C++ API — the headers under `include/aidin_hand2/` and the CMake package.
 
+## [Unreleased]
+
 ## [0.5.2] - 2026-09-10
 
 Both thumb hardware generations are supported from one release, and the prebuilt kinematics
@@ -35,8 +37,6 @@ library is named after the SDK release so a library from one release can no long
 > diagnostic of any kind. Installing two releases into different prefixes — `/usr/local` and
 > `~/.local`, say — was enough to trigger it. A mismatch now fails to load and names the file it
 > wanted.
-
-### Documentation
 
 - **Installing into a second prefix now carries a warning.** Build & install offered
   `--prefix <prefix>` as the way to avoid `sudo` without saying that an SDK left behind in an
@@ -77,13 +77,13 @@ same release. The public API is unchanged.
 > [2. Build](docs/en/06_sdk_build_and_install.md#2-build). Building for the wrong one moves those
 > two actuators twice or half as far as asked.
 
-### Documentation
+### Fixed
 
-- The `CPR` constant is documented as counts per millimetre of screw travel rather than counts per
-  motor revolution. One motor revolution is 1024 counts and the lead is what turns that into a
+- **The `CPR` constant is documented as counts per millimetre of screw travel, not counts per
+  motor revolution.** One motor revolution is 1024 counts and the lead is what turns that into a
   distance, which is exactly what this release changes. An example comment stated the old reading.
 
-## [0.5.0] - 2026-09-10
+## 0.5.0 - 2026-09-10
 
 This release makes the lifecycle report what the hand actually did rather than what was asked of
 it. Several calls that used to return early now block until the drives confirm, so a call that
@@ -118,6 +118,9 @@ upgrading.
   license and source, and `licenses/` holds the full texts. Public headers and examples carry an
   SPDX identifier.
 
+- **Every chapter of the C++ guide ends with the examples that run it.** The introduction says
+  where the executables are built and what the two arguments are, and each chapter closes with the
+  files for that chapter and what each one prints.
 ### Changed
 
 - **Breaking: request the new minor version.** Use `find_package(aidin_hand2 0.5 REQUIRED)`. The
@@ -166,22 +169,19 @@ upgrading.
 - **`JointPositionController` defaults changed:** `cutoff_freq` is `10.0` Hz instead of `50.0`, and
   `deadband` is `0.000873` rad instead of `0.0`. The old defaults let input noise cross the
   backlash band repeatedly.
-- **The rejection message for `connect()` in `Running` or `Stopped` pointed at a dead end.** It
-  read `already connected — use reconnect() to rebuild`, but `reconnect()` is allowed only in
-  `Faulted`. It now reads `already connected — call disconnect() first to rebuild the link`.
-
-### Documentation
-
 - **The C++ guide is reorganized around what you configure and when.** Control settings and
   commands are separate chapters, `HandState` and `Diagnostics` each have their own, and error
   handling ends with three recovery patterns that the new examples mirror. The lifecycle diagram is
   replaced.
-- **Every chapter of the C++ guide ends with the examples that run it.** The introduction says
-  where the executables are built and what the two arguments are, and each chapter closes with the
-  files for that chapter and what each one prints.
 - **The API reference is split into one file per header** under `08_cpp_api_reference/`, with an
   index that lists every public function and type by the file that declares it. Both languages
   changed; the single-file version is gone.
+- **The rejection message for `connect()` in `Running` or `Stopped` pointed at a dead end.** It
+  read `already connected — use reconnect() to rebuild`, but `reconnect()` is allowed only in
+  `Faulted`. It now reads `already connected — call disconnect() first to rebuild the link`.
+
+### Fixed
+
 - **The English documentation is synchronized with the Korean.** Chapter structure, section
   numbers, tables and symbol links now match across `07`, `08`, `09` and `15`. Eight API reference
   entries regained notes that were shorter than the Korean, and three error messages in `15` were
@@ -195,7 +195,7 @@ upgrading.
   scope is settled: `start_homing()`, `is_homing()` and the three unused kinematics functions stay
   out of the reference on purpose.
 
-## [0.4.0] - 2026-08-26
+## 0.4.0 - 2026-08-26
 
 ### Added
 
@@ -205,6 +205,13 @@ upgrading.
 - `void Hand::set_controller_config(const ControllerConfig&)` — callable at any time, applied from
   the next cycle. There is no create-time field on `HandConfig` and no getter.
 
+### Changed
+
+- JointPosition shapes a target with a trailing deadband and a 3rd-order low-pass instead of a
+  speed rate limit. Re-entry still starts from the measured pose.
+- Command validation covers only the targets. The finite and non-negative checks for the filter
+  values and the gains moved to `set_controller_config()`.
+
 ### Removed
 
 - `JointPositionCommand::speed_rad_s`. Bandwidth now comes from
@@ -213,21 +220,14 @@ upgrading.
   `kDefaultDamping` constants. Gains now come from
   `ControllerConfig::JointImpedanceController`, whose member defaults carry the same values.
 
-### Changed
-
-- JointPosition shapes a target with a trailing deadband and a 3rd-order low-pass instead of a
-  speed rate limit. Re-entry still starts from the measured pose.
-- Command validation covers only the targets. The finite and non-negative checks for the filter
-  values and the gains moved to `set_controller_config()`.
-
-## [0.3.1] - 2026-08-26
+## 0.3.1 - 2026-08-26
 
 ### Changed
 
 - `run()` after `stop()` commands the observed pose once instead of leaving the
   stored command at `Idle`, so the hand holds its place until the next command.
 
-## [0.3.0] - 2026-08-24
+## 0.3.0 - 2026-08-24
 
 ### Changed
 
@@ -247,17 +247,17 @@ upgrading.
 - `HandSide` moved from `types/config.hpp` to `types/description.hpp`.
 - `ErrorCode::ControlLoopFailure` renamed to `ControlLoopFault`.
 
+### Removed
+
+- FK LUT tables. `init_kinematics_lut()` remains as a no-op.
+
 ### Fixed
 
 - A failed homing no longer leaves the previous command driving the hand.
 - The first command after an `Idle` interval no longer ignores `speed_rad_s`.
 - `start_homing()` failures now log the step, the reason and the actuators involved.
 
-### Removed
-
-- FK LUT tables. `init_kinematics_lut()` remains as a no-op.
-
-## [0.2.0]
+## 0.2.0 - 2026-08-07
 
 ### Changed
 
@@ -272,6 +272,11 @@ upgrading.
   The compatibility policy is `SameMinorVersion`, so a 0.1 consumer no longer
   configures against 0.2.
 
+### Removed
+
+- `web_bridge` and the GUI moved to the `aidin-hand2-gui` repository. The
+  `AIDIN_HAND2_BUILD_WEB_BRIDGE` CMake option is gone.
+
 ### Fixed
 
 - Thumb task-IK used a sign opposite to the forward transform, and the thumb q1
@@ -279,11 +284,10 @@ upgrading.
 - `RealtimeBuffer` had a data race: the writer could reuse a slot while the
   reader was still in it.
 
-### Removed
-
-- `web_bridge` and the GUI moved to the `aidin-hand2-gui` repository. The
-  `AIDIN_HAND2_BUILD_WEB_BRIDGE` CMake option is gone.
-
-## [0.1.0]
+## 0.1.0 - 2026-08-07
 
 - Initial release.
+
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...dev
+[0.5.2]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/releases/tag/v0.5.1
