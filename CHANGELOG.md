@@ -8,6 +8,13 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+### Added
+
+- **`21_motion_sequence` plays a recorded motion through the joint position controller.** The
+  examples stopped at one command per run, so none of them showed how to feed a stream of targets
+  at the control rate. This one interpolates between keyframes and swings every finger through
+  most of its range.
+
 ### Changed
 
 - **The build selects a hand type instead of a thumb screw lead.** `-DAIDIN_HAND2_HAND_TYPE=a`,
@@ -24,6 +31,12 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   > A private implementation detail was being installed into a shared directory, which is how
   > a 0.5.0 library and a 0.5.1 one came to sit in one process. Naming the file after the
   > release, in 0.5.2, treated the symptom. Not installing it at all removes the situation.
+
+- **The examples are easier to read while they run.** Every example prefixes its own lines with
+  `[example]`, which used to be indistinguishable from the SDK's log lines on a shared terminal;
+  `03_lifecycle_walkthrough` tags the SDK lines it relays as `[aidin_hand2]`, takes single
+  keypresses without Enter and pins its status block to the bottom of the terminal; and
+  `04_homing` prints all 16 actuator counts on either side of `home()`, aligned in two rows.
 
 ### Removed
 
