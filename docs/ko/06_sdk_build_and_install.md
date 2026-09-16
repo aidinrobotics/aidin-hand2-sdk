@@ -34,28 +34,33 @@ cd aidin-hand2-sdk
 ```
 
 > [!IMPORTANT]
-> **thumb의 actuator 두 개는 하드웨어 세대에 따라 ball screw의 lead가 1 mm 또는 2 mm입니다.**
-> lead가 actuator 1 mm 이동당 encoder count를 결정하므로, 하드웨어와 맞지 않는 쪽으로 빌드하면
-> 그 두 actuator가 **두 배 또는 절반으로 움직입니다.** 빌드 전에 어느 하드웨어인지 확인하고,
-> 확인이 어려우면 [issue](https://github.com/aidinrobotics/aidin-hand2-sdk/issues)로
-> 문의하십시오.
+> **AIDIN Hand Gen2에는 hand type A·B·C가 있고, 빌드할 때 type을 선택합니다.** type에 따라
+> kinematics가 다르게 계산됩니다. type은 로봇 핸드 전달과 함께 알려드립니다.
 
-아래 두 가지 중 해당하는 쪽만 실행하십시오.
+아래 셋 중 해당하는 쪽만 실행하십시오.
 
-**a) lead 1 mm**
+**a) type A**
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#   -- aidin_hand2: thumb lead = 1mm
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics.so.0.5.2
+#   -- aidin_hand2: hand type = a
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_a.a
 ```
 
-**b) lead 2 mm**
+**b) type B**
 
 ```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_THUMB_LEAD=2mm
-#   -- aidin_hand2: thumb lead = 2mm
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics.so.0.5.2-2mm
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=b
+#   -- aidin_hand2: hand type = b
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_b.a
+```
+
+**c) type C**
+
+```bash
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=c
+#   -- aidin_hand2: hand type = c
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_c.a
 ```
 
 출력 두 줄로 선택된 값을 확인한 뒤 빌드합니다.
@@ -193,8 +198,15 @@ build tree가 없다면 경로로 지웁니다. `<prefix>`는 install할 때 쓴
 ```bash
 sudo rm -rf <prefix>/include/aidin_hand2 \
             <prefix>/lib/cmake/aidin_hand2 \
-            <prefix>/lib/libaidin_hand2.so* \
-            <prefix>/lib/libaidin_hand2_kinematics.so*
+            <prefix>/lib/libaidin_hand2.so*
+sudo ldconfig
+```
+
+0.5.2 이하를 쓰다가 올라온 경우에는 그때 설치된 kinematics 라이브러리가 남아 있습니다. 0.5.3
+부터는 설치되지 않으므로 함께 지웁니다.
+
+```bash
+sudo rm -f <prefix>/lib/libaidin_hand2_kinematics.so*
 sudo ldconfig
 ```
 

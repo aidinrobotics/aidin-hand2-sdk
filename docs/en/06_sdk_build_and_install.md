@@ -34,28 +34,34 @@ cd aidin-hand2-sdk
 ```
 
 > [!IMPORTANT]
-> **Two of the thumb actuators have a ball screw whose lead is either 1 mm or 2 mm, depending on
-> the hardware generation.** The lead decides how many encoder counts one millimetre of actuator
-> travel takes, so building for the wrong one makes those two actuators move **twice or half as
-> far as asked.** Identify your hardware before you build, and if you cannot, ask on the
-> [issue tracker](https://github.com/aidinrobotics/aidin-hand2-sdk/issues).
+> **The AIDIN Hand Gen2 comes in hand types A, B and C, and you select the type at build time.**
+> The kinematics computes differently for each type. AIDIN tells you the type when it delivers
+> the robot hand.
 
 Run only the one below that matches your hand.
 
-**a) 1 mm lead**
+**a) type A**
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#   -- aidin_hand2: thumb lead = 1mm
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics.so.0.5.2
+#   -- aidin_hand2: hand type = a
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_a.a
 ```
 
-**b) 2 mm lead**
+**b) type B**
 
 ```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_THUMB_LEAD=2mm
-#   -- aidin_hand2: thumb lead = 2mm
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics.so.0.5.2-2mm
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=b
+#   -- aidin_hand2: hand type = b
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_b.a
+```
+
+**c) type C**
+
+```bash
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=c
+#   -- aidin_hand2: hand type = c
+#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_c.a
 ```
 
 Confirm the selection from those two lines, then build.
@@ -193,8 +199,15 @@ or `/usr/local` if you named none.
 ```bash
 sudo rm -rf <prefix>/include/aidin_hand2 \
             <prefix>/lib/cmake/aidin_hand2 \
-            <prefix>/lib/libaidin_hand2.so* \
-            <prefix>/lib/libaidin_hand2_kinematics.so*
+            <prefix>/lib/libaidin_hand2.so*
+sudo ldconfig
+```
+
+If you are upgrading from 0.5.2 or older, the kinematics library that those releases installed is
+still there. 0.5.3 and later do not install it, so remove it as well.
+
+```bash
+sudo rm -f <prefix>/lib/libaidin_hand2_kinematics.so*
 sudo ldconfig
 ```
 

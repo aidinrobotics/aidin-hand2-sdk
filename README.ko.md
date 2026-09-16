@@ -125,4 +125,4 @@ AIDIN Hand Gen2 SDK는 [Apache License 2.0](LICENSE)으로 배포됩니다. 라�
 
 SDK는 서드파티 소프트웨어를 포함하고 링크합니다. 구성 요소별 라이센스와 소스 입수 경로는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 정리했고, 라이센스 전문은 [licenses/](licenses) 디렉터리에 두었습니다.
 
-`cpp/prebuilt/<arch>/libaidin_hand2_kinematics.so.<version>` 파일에도 repo의 나머지와 동일하게 Apache License 2.0이 적용됩니다. kinematics 방정식과 핸드 기하 상수를 공개하지 않기 때문에 바이너리로 배포하며, Apache License 2.0은 object 형태의 배포를 허용합니다.
+`cpp/prebuilt/<arch>/libaidin_hand2_kinematics_type_<t>.a` 파일에도 repo의 나머지와 동일하게 Apache License 2.0이 적용됩니다. kinematics 방정식과 핸드 기하 상수를 공개하지 않기 때문에 바이너리로 배포하며, Apache License 2.0은 object 형태의 배포를 허용합니다. 빌드가 이 아카이브를 `libaidin_hand2.so`에 흡수하므로 따로 설치되지 않습니다.
