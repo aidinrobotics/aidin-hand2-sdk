@@ -107,7 +107,7 @@ application의 CMakeLists.txt는 두 줄입니다. 버전을 반드시 지정하
 호환되지 않는데, 지정하지 않으면 CMake가 버전 검사를 건너뜁니다.
 
 ```cmake
-find_package(aidin_hand2 0.5 REQUIRED)
+find_package(aidin_hand2 0.6 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -124,7 +124,7 @@ application의 CMakeLists.txt에 prefix를 알려 줍니다.
 
 ```cmake
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
-find_package(aidin_hand2 0.5 REQUIRED)
+find_package(aidin_hand2 0.6 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -202,7 +202,7 @@ sudo rm -rf <prefix>/include/aidin_hand2 \
 sudo ldconfig
 ```
 
-0.5.2 이하를 쓰다가 올라온 경우에는 그때 설치된 kinematics 라이브러리가 남아 있습니다. 0.5.3
+0.5.2 이하를 쓰다가 올라온 경우에는 그때 설치된 kinematics 라이브러리가 남아 있습니다. 0.6.0
 부터는 설치되지 않으므로 함께 지웁니다.
 
 ```bash

@@ -108,7 +108,7 @@ Your application's CMakeLists.txt is two lines. Always request the version: a di
 not compatible, and CMake skips the version check when none is requested.
 
 ```cmake
-find_package(aidin_hand2 0.5 REQUIRED)
+find_package(aidin_hand2 0.6 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -125,7 +125,7 @@ Tell your application's CMakeLists.txt where the prefix is.
 
 ```cmake
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
-find_package(aidin_hand2 0.5 REQUIRED)
+find_package(aidin_hand2 0.6 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -204,7 +204,7 @@ sudo ldconfig
 ```
 
 If you are upgrading from 0.5.2 or older, the kinematics library that those releases installed is
-still there. 0.5.3 and later do not install it, so remove it as well.
+still there. 0.6.0 and later do not install it, so remove it as well.
 
 ```bash
 sudo rm -f <prefix>/lib/libaidin_hand2_kinematics.so*
