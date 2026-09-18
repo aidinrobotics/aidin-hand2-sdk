@@ -80,7 +80,7 @@ void send_line(int fd, const std::string& text)
 // One status line, redrawn in place
 void redraw(const std::string& state, double grip, const std::string& note)
 {
-  std::printf("\r\033[K[%s]  grip=%.2f rad  %s", state.c_str(), grip, note.c_str());
+  std::printf("\r\033[K[example] [%s]  grip=%.2f rad  %s", state.c_str(), grip, note.c_str());
   std::fflush(stdout);
 }
 
@@ -115,16 +115,16 @@ int main(int argc, char** argv)
 
   const int server = connect_to(host, port);
   if (server < 0) {
-    std::fprintf(stderr, "cannot reach %s:%d — start 19_external_server first\n", host, port);
+    std::fprintf(stderr, "[example] cannot reach %s:%d — start 19_external_server first\n", host, port);
     return 1;
   }
   if (!enter_raw_mode()) {
-    std::fprintf(stderr, "cannot switch the terminal to raw mode\n");
+    std::fprintf(stderr, "[example] cannot switch the terminal to raw mode\n");
     ::close(server);
     return 1;
   }
 
-  std::printf("c connect  d disconnect  r run  s stop  h home  n reconnect  [ / ] grip  q quit\n");
+  std::printf("[example] c connect  d disconnect  r run  s stop  h home  n reconnect  [ / ] grip  q quit\n");
 
   std::string state = "unknown";
   std::string note;

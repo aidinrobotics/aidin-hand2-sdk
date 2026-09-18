@@ -56,9 +56,9 @@ int main(int argc, char** argv)
     //    for an effort of 0 to mean anything.
     try {
       hand.set_command(Idle{});
-      std::printf("Idle was accepted in Connected, which the SDK is not supposed to allow\n");
+      std::printf("[example] Idle was accepted in Connected, which the SDK is not supposed to allow\n");
     } catch (const Exception& error) {
-      std::printf("in Connected — %s: %s\n\n", to_string(error.code()), error.what());
+      std::printf("[example] in Connected — %s: %s\n\n", to_string(error.code()), error.what());
     }
 
     // 2) In Running it goes through even before homing. Every other command needs
@@ -66,17 +66,17 @@ int main(int argc, char** argv)
     //    asks for no position, so it needs none.
     hand.run();
     hand.set_command(Idle{});
-    std::printf("in Running before homing — accepted, mode = %s\n\n",
+    std::printf("[example] in Running before homing — accepted, mode = %s\n\n",
                 hand.get_command_mode() == CommandMode::Idle ? "Idle" : "not Idle");
 
     // 3) Idle produces an effort setpoint of 0 rather than no setpoint at all. The distinction
     //    matters when reading state back: the variant holds ActuatorEffortSetpoint, and
     //    selected_source stays Controller, so the SDK is still commanding the hand.
-    std::printf("Idle with the drives on — push a finger and it resists\n");
+    std::printf("[example] Idle with the drives on — push a finger and it resists\n");
     for (int i = 0; i < 25 && !g_shutdown.load(); ++i) {
       const HandState state = hand.get_state();
       const auto* setpoint = std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  source %-10s  effort a0 %6.1f  |  measured a0 %6.1f mA  vel %6.1f rpm",
+      std::printf("\r\033[K  [example] source %-10s  effort a0 %6.1f  |  measured a0 %6.1f mA  vel %6.1f rpm",
                   state.commanded.selected_source == CommandSource::Controller ? "Controller" : "other",
                   setpoint != nullptr ? setpoint->target_effort_pct[0] : 0.0,
                   state.actuators.current_mA[0], state.actuators.velocity_rpm[0]);
@@ -89,10 +89,10 @@ int main(int argc, char** argv)
     //    drives go to quick stop, so nothing is being commanded any more: selected_source
     //    changes and the finger goes slack.
     hand.stop();
-    std::printf("after stop() — push the same finger and it moves freely\n");
+    std::printf("[example] after stop() — push the same finger and it moves freely\n");
     for (int i = 0; i < 25 && !g_shutdown.load(); ++i) {
       const HandState state = hand.get_state();
-      std::printf("\r\033[K  source %-10s  |  measured a0 %6.1f mA  vel %6.1f rpm",
+      std::printf("\r\033[K  [example] source %-10s  |  measured a0 %6.1f mA  vel %6.1f rpm",
                   state.commanded.selected_source == CommandSource::QuickStop ? "QuickStop"
                   : state.commanded.selected_source == CommandSource::Controller ? "Controller"
                                                                                  : "other",
@@ -109,7 +109,7 @@ int main(int argc, char** argv)
     //    Homing is one such path, and it lands on an ActuatorPositionCommand of all zeros —
     //    the pose it just finished defining.
     hand.home();
-    std::printf("back in Running by homing, mode = %s\n",
+    std::printf("[example] back in Running by homing, mode = %s\n",
                 hand.get_command_mode() == CommandMode::ActuatorPosition ? "ActuatorPosition"
                                                                          : "something else");
 
@@ -121,7 +121,7 @@ int main(int argc, char** argv)
     flex.target[5] = 30.0 * 3.14159265358979323846 / 180.0;  // rad
     hand.set_command(flex);
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-    std::printf("sent a joint target, mode = %s\n",
+    std::printf("[example] sent a joint target, mode = %s\n",
                 hand.get_command_mode() == CommandMode::JointPosition ? "JointPosition"
                                                                       : "something else");
 
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
     //    not — send the pose you want again after every return to Running.
     hand.stop();
     hand.run();
-    std::printf("stopped and ran again, mode = %s — the joint target is gone\n\n",
+    std::printf("[example] stopped and ran again, mode = %s — the joint target is gone\n\n",
                 hand.get_command_mode() == CommandMode::ActuatorPosition ? "ActuatorPosition"
                 : hand.get_command_mode() == CommandMode::Idle           ? "Idle"
                                                                          : "something else");
@@ -139,9 +139,9 @@ int main(int argc, char** argv)
     //    zero effort with the drives on rather than a pose to hold.
     hand.set_command(Idle{});
     hand.stop();
-    std::printf("done — Idle keeps the drives on, stop() does not\n");
+    std::printf("[example] done — Idle keeps the drives on, stop() does not\n");
   } catch (const Exception& error) {
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

@@ -76,7 +76,7 @@ warning log가 남으므로 감지는
 Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_state.md#enum-handlifecycle) enum의 값이고, 상태 전이 함수가
 어느 상태에서 허용되는지는 [C++ guide](07_cpp_usage_guide.md#22-state-transition-calls)에 표로 정리돼 있습니다.
 
-아래 표의 Reason 열은 `Cannot <동작>: ` 뒤에 붙는 이유입니다. 현재 lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.lifecycle`로 확인합니다.
+아래 표의 Reason 열은 `Cannot <동작>: ` 뒤에 붙는 이유입니다. 현재 lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.lifecycle` 필드로 확인합니다.
 
 | Reason | Situation | Remedy |
 |---|---|---|
@@ -93,7 +93,7 @@ Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_s
 | `Cannot home hand: interrupted during homing — call run() and home() again` | homing 중 `Running`에서 벗어남 | 원인을 확인한 뒤 다시 수행합니다 |
 | `CAN transport already open: <이름> — close it before reopening` | 같은 handle이 이미 열려 있음 | `disconnect()` 후 다시 연결합니다 |
 
-`Faulted`에서 거부되면 `WrongCallOrder` 예외가 아니라 멈춘 원인을 담은 예외를 던집니다.
+`Faulted` 상태에서 거부되면 `WrongCallOrder` 예외가 아니라 멈춘 원인을 담은 예외를 던집니다.
 [10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.
 
 ## 5. `InterfaceUnavailable`
@@ -125,7 +125,7 @@ Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_s
 | `Cannot enable hand: interface <이름> was re-created — recover with reconnect() once the hand faults` | 같은 이름으로 재생성되어 기존 socket이 무효 | 수신이 끊겼으므로 `lifecycle` 값이 곧 `Faulted`로 전이합니다. 전이한 뒤에 `reconnect()`를 호출합니다 |
 | `Cannot enable hand: communication not restored (no RX on <이름>) — restore CAN link and hand power, then recover with reconnect()` | 아직 수신이 없음 | 통신과 전원을 복구하면 `lifecycle` 값이 `Faulted`로 전이하므로, 전이한 뒤에 `reconnect()`를 호출합니다 |
 
-`Faulted`에서 호출이 거부되면 message가 이 표의 문구가 아니라 `hand faulted (<원인>)` 형태입니다 —
+`Faulted` 상태에서 호출이 거부되면 message가 이 표의 문구가 아니라 `hand faulted (<원인>)` 형태입니다 —
 [10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.
 
 SDK는 RX가 약 100 ms 없으면 통신 오류로 판정합니다. 송신 큐가 일시적으로 가득 찬 경우(`EAGAIN`·`EWOULDBLOCK`·
@@ -168,7 +168,7 @@ homing 실패 문구는 모두 ` — retry home(), or check actuator faults via 
 | `Cannot connect hand: failed to start SDK threads (<사유>)` | thread 생성 실패 | 자원 한도와 권한을 확인합니다 |
 | `hand faulted (control loop terminated at cycle <n>) — call reconnect()` | 제어·통신 루프가 예외로 종료 | [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect)로 복구하고, 재현 조건과 log를 SDK에 보고합니다 |
 
-`Faulted`에서 호출이 거부되면 `hand faulted (<원인>)` 형태입니다 —
+`Faulted` 상태에서 호출이 거부되면 `hand faulted (<원인>)` 형태입니다 —
 [10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.
 
 `auto_reconnect` 값은 호출이 거부된 경우에는 동작하지 않습니다. 조건과 동작은
@@ -183,7 +183,7 @@ homing 실패 문구는 모두 ` — retry home(), or check actuator faults via 
 
 ## 10. Faulted 원인 문구
 
-`Faulted`에서 호출이 거부되면 `Cannot <동작>: hand faulted (<원인>)<안내>` 형태이고, error code는
+`Faulted` 상태에서 호출이 거부되면 `Cannot <동작>: hand faulted (<원인>)<안내>` 형태이고, error code는
 `<원인>`에 따라 갈립니다.
 
 | `<원인>` | Meaning | [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) |

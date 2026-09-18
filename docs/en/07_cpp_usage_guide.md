@@ -799,7 +799,7 @@ is. Check whether the `selected_source` value is `Controller` as well.
 ### 7.3 Tactile
 
 The `state.tactile` field holds the taxel values of the fingers and the palm. It holds the raw
-16-bit counts that the sensor sends, so it carries no unit and no normalization.
+16-bit values that the sensor sends, so it carries no unit and no normalization.
 
 | Field | Size | Description |
 |---|---|---|

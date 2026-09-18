@@ -4,9 +4,9 @@
 
 ```cpp
 inline constexpr int kVersionMajor = 0;
-inline constexpr int kVersionMinor = 5;
+inline constexpr int kVersionMinor = 6;
 inline constexpr int kVersionPatch = 0;
-inline constexpr const char* kVersionString = "0.5.0";   // 빌드한 SDK의 버전
+inline constexpr const char* kVersionString = "0.6.0";   // 빌드한 SDK의 버전
 ```
 
 이 header는 빌드할 때 `cmake/version.hpp.in`에서 생성되며, 값의 출처는 `cpp/CMakeLists.txt`의
@@ -16,7 +16,7 @@ application에서는 버전을 명시해 찾으십시오. 호환 정책이 `Same
 configure 단계에서 걸립니다.
 
 ```cmake
-find_package(aidin_hand2 0.5 REQUIRED)
+find_package(aidin_hand2 0.6 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 

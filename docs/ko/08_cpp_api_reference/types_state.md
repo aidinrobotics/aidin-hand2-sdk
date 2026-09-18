@@ -144,7 +144,7 @@ velocity와 effort의 `0`은 측정값이 아닙니다.
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger). 값은 16-bit 원시 count |
+| `fingers` | `std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger). 값은 16-bit raw value |
 | `palm` | `std::array<double, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
 
 ---

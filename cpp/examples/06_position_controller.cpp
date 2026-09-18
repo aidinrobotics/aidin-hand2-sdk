@@ -100,7 +100,7 @@ int main(int argc, char** argv)
       command.target[kJoint] = 30.0 * kDegToRad;
       hand.set_command(command);
 
-      std::printf("%s setpoint cnt:", setting.label);
+      std::printf("[example] %s setpoint cnt:", setting.label);
       for (int i = 0; i < 12 && !g_shutdown.load(); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(40));
         const HandState state = hand.get_state();
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
     // 4) Walk the target up in 0.3 deg steps against a 1.0 deg deadband. Each step alone is
     //    too small to pass, and the comparison is against the last target that did pass, so
     //    the setpoint holds for three steps and then moves once.
-    std::printf("deadband 1.0 deg, target in 0.3 deg steps\n");
+    std::printf("[example] deadband 1.0 deg, target in 0.3 deg steps\n");
     for (int step = 1; step <= 8 && !g_shutdown.load(); ++step) {
       command.target[kJoint] = step * 0.3 * kDegToRad;
       hand.set_command(command);
@@ -141,7 +141,7 @@ int main(int argc, char** argv)
       const HandState state = hand.get_state();
       const auto* setpoint =
           std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
-      std::printf("  target %4.1f deg  ->  setpoint %6.0f cnt\n", step * 0.3,
+      std::printf("  [example] target %4.1f deg  ->  setpoint %6.0f cnt\n", step * 0.3,
                   setpoint != nullptr ? setpoint->target_position_cnt[kActuator] : 0.0);
     }
     std::printf("\n");
@@ -151,11 +151,11 @@ int main(int argc, char** argv)
     //    from how much noise the input carries, not from how precise the joint has to be.
     hand.set_command(Idle{});
     hand.stop();
-    std::printf("done — the config stays until the next set_controller_config()\n");
+    std::printf("[example] done — the config stays until the next set_controller_config()\n");
   } catch (const Exception& error) {
     // An InvalidArgument here is a negative or non-finite field in the config, and the previous
     // config stays in force when that happens.
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

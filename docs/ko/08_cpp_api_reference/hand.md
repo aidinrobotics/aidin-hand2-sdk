@@ -85,7 +85,7 @@ fault 뒤 통신을 재연결합니다. 되돌리는 것은 `homing_state` 필�
 **Preconditions**  ｜ `Faulted`<br>
 **Postconditions** ｜ `Connected`<br>
 **Notes**          ｜ 재연결을 한 번만 시도하고, 첫 state가 올 때까지 최대 300 ms 기다립니다. 실패하면
-`Faulted`로 남습니다
+`Faulted` 상태로 남습니다
 
 ---
 
@@ -106,7 +106,7 @@ actuator를 enable하고, fault가 없는 actuator가 모두 Operation Enabled�
 **Postconditions** ｜ `Running`<br>
 **Notes**          ｜ actuator enable 확인까지 최대 4000 ms 기다리고, homing을 하는 경로에서는 homing 완료까지
 기다립니다. 확인하지 못하면 command를 [`Idle`](types_command.md#idle)로 지우고 actuator에 quick stop을
-요구한 뒤 예외를 던지므로, 도달이 확인되면 `Stopped`가 됩니다. `Stopped`에서 재개하면 재개 시점의 자세를 유지하는
+요구한 뒤 예외를 던지므로, 도달이 확인되면 `Stopped` 상태가 됩니다. `Stopped` 상태에서 재개하면 재개 시점의 자세를 유지하는
 command를 한 번 넣습니다
 
 ---
@@ -124,7 +124,7 @@ quick stop을 요청하고 actuator가 quick stop 상태에 도달한 것을 확
 `ControlLoopFault` · `WrongCallOrder`<br>
 **Preconditions**  ｜ `Running` · `Stopped`(no-op)<br>
 **Postconditions** ｜ `Stopped`<br>
-**Notes**          ｜ 확인까지 최대 500 ms 기다립니다. 확인하지 못하면 예외를 던지고 `Running`으로 남으므로
+**Notes**          ｜ 확인까지 최대 500 ms 기다립니다. 확인하지 못하면 예외를 던지고 `Running` 상태로 남으므로
 actuator가 마지막 command를 유지하고 있을 수 있습니다. 다시 호출하면 재호출 시점의 상태를 기준으로 다시
 판정합니다. 도달을 확인하는 동안 fault가 발생하면 제한 시간을 기다리지 않고 그 fault의 원인을
 예외로 돌려줍니다
@@ -163,7 +163,7 @@ workspace 안으로 자동 투영됩니다. 범위 모델은 [Workspace limits](
 
 **Parameters**     ｜ `command` — command 5종 중 하나<br>
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
-`WrongCallOrder`(`Running`이 아니거나 `homing_state != Succeeded`. [`Idle`](types_command.md#idle)은 후자에서 예외)<br>
+`WrongCallOrder`(`Running` 상태가 아니거나 `homing_state != Succeeded`. [`Idle`](types_command.md#idle)은 후자에서 예외)<br>
 **Preconditions**  ｜ `Running` — actuator enable이 확인된 상태여야 하므로 [`run()`](#handrun)이 성공한 뒤입니다<br>
 **Notes**          ｜ 값이 잘못돼도 예외를 던지지 않습니다. 직전 command가 유지되고
 `Diagnostics::nan_command_count`가 늘며 warning log가 남습니다. 조건은 [Validation](types_command.md#validation) 참조

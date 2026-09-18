@@ -54,14 +54,14 @@ int main(int argc, char** argv)
     Hand left  = manager.create(left_config);
     Hand right = manager.create(right_config);
 
-    std::printf("created two hands: %s (left) and %s (right)\n\n",
+    std::printf("[example] created two hands: %s (left) and %s (right)\n\n",
                 left_interface.c_str(), right_interface.c_str());
 
     // 3) Each connect() starts that hand's own loop. Bringing one up does not touch the other,
     //    which is why the counters below do not stay in step.
     left.connect();
     right.connect();
-    std::printf("both connected\n\n");
+    std::printf("[example] both connected\n\n");
 
     // 4) Poll for 3 s. Each hand answers from its own buffers.
     for (int i = 0; i < 30 && !g_shutdown.load(); ++i) {
@@ -70,7 +70,7 @@ int main(int argc, char** argv)
       const HandState   left_state        = left.get_state();
       const HandState   right_state       = right.get_state();
 
-      std::printf("\r\033[K left %s cycles %llu  |  right %s cycles %llu"
+      std::printf("\r\033[K[example] left %s cycles %llu  |  right %s cycles %llu"
                   "  |  thumb a0 %.0f / %.0f cnt",
                   to_string(left_diagnostics.lifecycle),
                   static_cast<unsigned long long>(left_diagnostics.control_cycles),
@@ -85,15 +85,15 @@ int main(int argc, char** argv)
 
     // 5) A fault on one hand is that hand's fault. The other keeps running, so an application
     //    driving a pair has to read both lifecycles rather than one.
-    std::printf("left lifecycle  = %s\n", to_string(left.get_diagnostics().lifecycle));
-    std::printf("right lifecycle = %s\n\n", to_string(right.get_diagnostics().lifecycle));
+    std::printf("[example] left lifecycle  = %s\n", to_string(left.get_diagnostics().lifecycle));
+    std::printf("[example] right lifecycle = %s\n\n", to_string(right.get_diagnostics().lifecycle));
 
     // 6) destroy_all() confirms the quick stop on each hand and closes both links.
     manager.destroy_all();
-    std::printf("destroy_all() released both hands\n");
+    std::printf("[example] destroy_all() released both hands\n");
   } catch (const Exception& error) {
     // The message names the interface that failed, which is what tells the two apart here.
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

@@ -127,7 +127,7 @@ The `0` in velocity and effort is not a measurement.
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger). Values are raw 16-bit counts |
+| `fingers` | `std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger). Raw 16-bit values |
 | `palm` | `std::array<double, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
 
 ## `CommandedState`

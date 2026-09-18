@@ -91,7 +91,7 @@ int main(int argc, char** argv)
         hand.set_command(*pose);
         for (int i = 0; i < 15 && !g_shutdown.load(); ++i) {
           const HandState state = hand.get_state();
-          std::printf("\r\033[K  active 5 asked %+.3f reached %+.3f  |  active 8 asked %+.3f reached %+.3f rad",
+          std::printf("\r\033[K  [example] active 5 asked %+.3f reached %+.3f  |  active 8 asked %+.3f reached %+.3f rad",
                       pose->target[5], state.joints.position_rad[active_to_joint[5]],
                       pose->target[8], state.joints.position_rad[active_to_joint[8]]);
           std::fflush(stdout);
@@ -108,9 +108,9 @@ int main(int argc, char** argv)
     over.target.fill(3.0);  // rad, far past every joint limit
     const std::array<double, kActiveJointCount> asked = over.target;
     over.clamp();
-    std::printf("clamp() on a target of 3.0 rad everywhere, first 8 active joints:\n ");
+    std::printf("[example] clamp() on a target of 3.0 rad everywhere, first 8 active joints:\n ");
     for (std::size_t j = 0; j < 8; ++j) std::printf("  %zu %+.3f", j, over.target[j]);
-    std::printf("\n  asked for %+.3f, and no exception was thrown\n\n", asked[0]);
+    std::printf("\n  [example] asked for %+.3f, and no exception was thrown\n\n", asked[0]);
 
     // 5) Sending the unclamped target does the same thing without telling you. The pose the
     //    hand takes is the clamped one, so a target past the limits is not an error to handle
@@ -120,7 +120,7 @@ int main(int argc, char** argv)
     hand.set_command(unclamped);
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     const HandState clamped_state = hand.get_state();
-    std::printf("sent 3.0 rad unclamped, active 5 reached %+.3f rad\n\n",
+    std::printf("[example] sent 3.0 rad unclamped, active 5 reached %+.3f rad\n\n",
                 clamped_state.joints.position_rad[active_to_joint[5]]);
 
     // 6) The value check. A NaN in the target is not clamped and does not throw: the command is
@@ -135,12 +135,12 @@ int main(int argc, char** argv)
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     const Diagnostics diagnostics = hand.get_diagnostics();
-    std::printf("sent a NaN target: no exception, nan_command_count %llu -> %llu\n",
+    std::printf("[example] sent a NaN target: no exception, nan_command_count %llu -> %llu\n",
                 static_cast<unsigned long long>(before),
                 static_cast<unsigned long long>(diagnostics.nan_command_count));
-    std::printf("the hand still holds the previous pose, active 5 at %+.3f rad\n",
+    std::printf("[example] the hand still holds the previous pose, active 5 at %+.3f rad\n",
                 hand.get_state().joints.position_rad[active_to_joint[5]]);
-    std::printf("so check a computed target for finiteness, or watch that counter\n\n");
+    std::printf("[example] so check a computed target for finiteness, or watch that counter\n\n");
 
     // 7) The clamp is a reachability check and nothing more. Self-collision, the objects
     //    around the hand, the cable and the payload are all the application's to check.
@@ -148,10 +148,10 @@ int main(int argc, char** argv)
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     hand.set_command(Idle{});
     hand.stop();
-    std::printf("done — of the three checks, only the state check throws\n");
+    std::printf("[example] done — of the three checks, only the state check throws\n");
   } catch (const Exception& error) {
     // A WrongCallOrder here is the state check: not Running, or not homed.
-    std::printf("\nfailed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
     return 1;
   }
 

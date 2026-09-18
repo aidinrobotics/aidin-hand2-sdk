@@ -15,6 +15,11 @@ Postconditions → Notes**, skipping whatever does not apply.
 
 ## Contents
 
+&nbsp;&nbsp;[**1. Function index**](#1-function-index)<br>
+&nbsp;&nbsp;[**2. Type index**](#2-type-index)
+
+The documents for each header file are below.
+
 &nbsp;&nbsp;[**`hand/hand_manager.hpp`**](08_cpp_api_reference/hand_manager.md) — `HandManager`<br>
 &nbsp;&nbsp;[**`hand/hand.hpp`**](08_cpp_api_reference/hand.md) — `Hand`<br>
 &nbsp;&nbsp;[**`hand/hand_kinematics.hpp`**](08_cpp_api_reference/hand_kinematics.md) — FK / IK<br>
@@ -29,7 +34,7 @@ Postconditions → Notes**, skipping whatever does not apply.
 
 ---
 
-## Function index
+## 1. Function index
 
 Every public function, grouped by the file that declares it. The names are in normalized form: one
 with `::` is a member of that class or struct, and one without `::` is a free function at the
@@ -115,7 +120,7 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 | [`set_log_callback()`](08_cpp_api_reference/logging.md#set_log_callback) | Relay to an application logger |
 | [`flush_log()`](08_cpp_api_reference/logging.md#flush_log) | Send out the log that remains |
 
-## Type index
+## 2. Type index
 
 Every enum, struct, class and alias, grouped by the file that declares it. A nested type carries
 `::`.

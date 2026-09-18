@@ -65,7 +65,7 @@ int main(int argc, char** argv)
       std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
       const HandState state = hand.get_state();
-      std::printf("joint %2zu: 50deg hold -> 0 | actuator %.0f cnt, %.0f mA\n",
+      std::printf("[example] joint %2zu: 50deg hold -> 0 | actuator %.0f cnt, %.0f mA\n",
                   j, state.actuators.position_count[j], state.actuators.current_mA[j]);
     }
 
@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     unsigned faulted = 0;
     for (std::size_t i = 0; i < kActuatorCount; ++i)
       if (diag.actuator_health.fault[i] != ActuatorFault::None) ++faulted;
-    std::printf("diagnostics: lifecycle=%s faulted=%u cycles=%llu misses=%llu period=%.3fms\n",
+    std::printf("[example] diagnostics: lifecycle=%s faulted=%u cycles=%llu misses=%llu period=%.3fms\n",
                 to_string(diag.lifecycle), faulted,
                 static_cast<unsigned long long>(diag.control_cycles),
                 static_cast<unsigned long long>(diag.deadline_misses), diag.last_period_ms);

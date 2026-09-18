@@ -14,6 +14,11 @@ namespace ah2 = aidin_hand2;             // 이 문서의 예제 alias
 
 ## Contents
 
+&nbsp;&nbsp;[**1. Function index**](#1-function-index)<br>
+&nbsp;&nbsp;[**2. Type index**](#2-type-index)
+
+header 파일별 문서는 다음과 같습니다.
+
 &nbsp;&nbsp;[**`hand/hand_manager.hpp`**](08_cpp_api_reference/hand_manager.md) — `HandManager`<br>
 &nbsp;&nbsp;[**`hand/hand.hpp`**](08_cpp_api_reference/hand.md) — `Hand`<br>
 &nbsp;&nbsp;[**`hand/hand_kinematics.hpp`**](08_cpp_api_reference/hand_kinematics.md) — FK / IK<br>
@@ -28,7 +33,7 @@ namespace ah2 = aidin_hand2;             // 이 문서의 예제 alias
 
 ---
 
-## 함수 인덱스
+## 1. Function index
 
 public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은 정규화 표기이며,
 `::`가 붙은 것은 그 클래스·struct의 멤버, `::`가 없는 것은 `aidin_hand2` namespace 수준의 자유 함수입니다.
@@ -113,7 +118,7 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 | [`set_log_callback()`](08_cpp_api_reference/logging.md#set_log_callback) | application logger로 중계 |
 | [`flush_log()`](08_cpp_api_reference/logging.md#flush_log) | 남은 log 내보내기 |
 
-## 타입 인덱스
+## 2. Type index
 
 enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중첩 타입은 `::`로 밝힙니다.
 
