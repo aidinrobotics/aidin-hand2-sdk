@@ -8,6 +8,13 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-18
+
+The build selects a hand type, the constants that convert encoder counts for types A and B are
+re-derived so a homed hand reads zero at every joint, and the kinematics library is absorbed into
+`libaidin_hand2.so`. The minor version moves with those constants: request 0.6, rebuild, and
+re-record any joint pose you stored from an earlier release.
+
 ### Added
 
 - **`21_motion_sequence` plays a recorded motion through the joint position controller.** The
@@ -16,6 +23,14 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   most of its range.
 
 ### Changed
+
+- **Breaking: request the new minor version and rebuild.** Use
+  `find_package(aidin_hand2 0.6 REQUIRED)`. The compatibility policy is `SameMinorVersion`, so a
+  0.5 consumer stops at configure time, and the soname moves to `libaidin_hand2.so.0.6`, so a
+  binary that was not rebuilt fails to load. Both boundaries are there because this release
+  re-derives the constants that turn encoder counts into joint angles: the four signatures the
+  library exports are unchanged, but what they compute is not, and a mismatch that loaded
+  silently would drive the hand to the wrong pose.
 
 - **Hand types A and B match the thumb they ship with, and every joint reads 0 at the homed
   pose.** Type A drives its thumb d1 and d2 screws through a 1 mm lead, both types carry new link
@@ -32,8 +47,8 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 - **The kinematics library is absorbed into `libaidin_hand2.so`.** It arrives as a static archive
   and is linked in, so the SDK installs one library rather than two and a consumer links one
-  name. The public C++ API does not change and the soname stays `libaidin_hand2.so.0.5`, so a
-  program already built against 0.5.x keeps running without a rebuild.
+  name. The public C++ API does not change, so beyond the version it requests a consumer's
+  CMakeLists.txt stays as it was.
 
   > [!NOTE]
   > A private implementation detail was being installed into a shared directory, which is how
@@ -332,6 +347,7 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...develop
+[0.6.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/releases/tag/v0.5.1

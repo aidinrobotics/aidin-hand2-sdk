@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(aidin_hand2 VERSION 0.5.2 LANGUAGES CXX)
+project(aidin_hand2 VERSION 0.6.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
