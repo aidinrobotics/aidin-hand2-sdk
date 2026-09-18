@@ -17,6 +17,14 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ### Changed
 
+- **Hand types A and B match the thumb they ship with, and every joint reads 0 at the homed
+  pose.** Type A drives its thumb d1 and d2 screws through a 1 mm lead, both types carry new link
+  lengths, and the constants that turn encoder counts into joint angles were re-derived from that
+  hardware. Each calibrated offset is the angle the equations give at encoder 0, which is what
+  makes a homed hand report zero across all 21 joints. A joint angle recorded from an earlier
+  release maps to different encoder counts, so re-record any pose you had stored. Type C is
+  unchanged.
+
 - **The build selects a hand type instead of a thumb screw lead.** `-DAIDIN_HAND2_HAND_TYPE=a`,
   `b` or `c` replaces `-DAIDIN_HAND2_THUMB_LEAD=1mm|2mm`, and `a` is the default. AIDIN tells you
   the type when it delivers the robot hand. A build command that still passes the old option
