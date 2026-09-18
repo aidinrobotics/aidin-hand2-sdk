@@ -22,7 +22,7 @@
 | `actuator_health` | [`ActuatorHealth`](types_state.md#actuatorhealth) | fault 없음 | actuator별 enable·fault |
 
 `lifecycle` 필드는 요구가 아니라 관측 결과입니다. [`stop()`](hand.md#handstop)이 예외를 던진 뒤에도
-`Running`으로 남아 있으면 actuator가 quick stop에 도달했음을 확인하지 못한 것이므로, 마지막
+`Running` 상태로 남아 있으면 actuator가 quick stop에 도달했음을 확인하지 못한 것이므로, 마지막
 command를 그대로 물고 있을 수 있습니다.
 
 error message, 예외 이력, reconnect 횟수는 들어 있지 않습니다. 원인을 볼 때는 log와 application

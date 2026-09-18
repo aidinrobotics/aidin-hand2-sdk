@@ -204,10 +204,10 @@ lifecycle은 `get_diagnostics()`로 확인합니다.</br></br>
 이미 postcondition을 만족하는 state에서 같은 함수를 호출하는 경우에는 별도의 동작 없이 성공하고
 로그만 남깁니다.
 
-- `Connected`에서 `connect()`
-- `Disconnected`에서 `disconnect()`
-- `Running`에서 `run()`
-- `Stopped`에서 `stop()`
+- `Connected` 상태에서 `connect()`
+- `Disconnected` 상태에서 `disconnect()`
+- `Running` 상태에서 `run()`
+- `Stopped` 상태에서 `stop()`
 
 단, postcondition이 이미 **확인된 경우**에만 즉시 성공합니다. state 값은 해당 postcondition이지만
 아직 전이 완료가 확인되지 않은 경우에는 확인을 계속 대기합니다.
@@ -249,7 +249,7 @@ lifecycle은 `get_diagnostics()`로 확인합니다.</br></br>
 - `disabled_actuators` 필드에 지정된 actuator와 fault가 발생한 actuator는 확인 대상에서 제외합니다.
 - 제외 후 남은 actuator가 하나 이상이어야 하며, 남은 actuator가 모두 enable되어야 확인에
   성공합니다.
-- 따라서 일부 actuator에 fault가 발생하더라도 나머지 actuator가 모두 enable되면 `Running`으로
+- 따라서 일부 actuator에 fault가 발생하더라도 나머지 actuator가 모두 enable되면 `Running` 상태로
   전이할 수 있습니다.
 
 ▪ **quick stop**
@@ -304,9 +304,9 @@ try {
 ```
 
 - `Running`이 아닌 상태에서 호출하면 homing이 actuator를 enable하고, enable이 확인된 시점에
-  `Running`이 됩니다. 그래서 [`run()`](08_cpp_api_reference/hand.md#handrun)을 먼저 호출할 필요가 없습니다.
+  `Running` 상태가 됩니다. 그래서 [`run()`](08_cpp_api_reference/hand.md#handrun)을 먼저 호출할 필요가 없습니다.
 - `auto_home=true`이면 `run()`이 homing을 자동으로 진행합니다. `homing_state` 값이 `Succeeded`가
-  아니면 `Running`에서 호출한 `run()`도 homing을 시작하므로, finger가 hard stop까지 이동합니다.
+  아니면 `Running` 상태에서 호출한 `run()`도 homing을 시작하므로, finger가 hard stop까지 이동합니다.
 - 성공하면 원점 자세를 유지하는 command가 적용됩니다. 이어서 필요한 command를 전송하십시오.
   자세한 내용은 [5.3 Command lifetime](#53-command-lifetime)에 있습니다.
 - 실패하면 `HardwareFault` 예외를 던지고 message에 실패한 actuator index가 포함됩니다.
@@ -564,7 +564,7 @@ joint command인 경우 target을 도달 범위로 투영한 뒤 command를 적�
 
 state 조건은 `lifecycle` 값이 `Running`이면서 `homing_state` 값이 `Succeeded`라는 두 가지입니다.
 만족하지 않으면 command가 적용되지 않고 `WrongCallOrder` 예외를 던집니다.
-`Idle`만 `homing_state` 조건에서 제외되어 `Running`이면 통과합니다.
+`Idle`만 `homing_state` 조건에서 제외되어 `Running` 상태이면 통과합니다.
 
 #### 5.2.2 Rejected by value
 
@@ -597,9 +597,9 @@ command.clamp();                    // 투영만 미리 확인합니다
 
 ### 5.3 Command lifetime
 
-command는 다음 `set_command()`까지 유지되지만, `Running`을 벗어나면 무효가 됩니다.
-`set_command()`를 받는 state가 `Running`뿐이기 때문입니다. 다시 `Running`이 될 때는 아래 표의
-command에서 시작하므로, 필요한 자세는 `Running`으로 복귀한 뒤 다시 전송해야 합니다.
+command는 다음 `set_command()`까지 유지되지만, `Running` 상태를 벗어나면 무효가 됩니다.
+`set_command()`를 받는 state가 `Running`뿐이기 때문입니다. 다시 `Running` 상태가 될 때는 아래 표의
+command에서 시작하므로, 필요한 자세는 `Running` 상태로 복귀한 뒤 다시 전송해야 합니다.
 
 | Path back to `Running` | First command applied |
 |---|---|
@@ -614,7 +614,7 @@ command에서 시작하므로, 필요한 자세는 `Running`으로 복귀한 뒤
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다. command 종류마다 파일이 하나씩입니다.
 >
 > - [`08_idle.cpp`](../../cpp/examples/08_idle.cpp) — `Idle`과 `stop()`을 차례로 실행해 측정 전류와
->   속도의 차이를 출력하고, `Running`을 벗어났다 복귀할 때 어느 command에서 시작하는지 확인합니다.
+>   속도의 차이를 출력하고, `Running` 상태를 벗어났다 복귀할 때 어느 command에서 시작하는지 확인합니다.
 > - [`09_joint_position.cpp`](../../cpp/examples/09_joint_position.cpp) — 정상 target, 도달 범위를
 >   벗어난 target, NaN이 섞인 target을 차례로 전송해 세 검사 중 예외를 던지는 것이 하나뿐임을
 >   확인합니다.
@@ -934,18 +934,18 @@ code는 log에 기록하고 사람이 원인을 특정할 때 사용하는 값�
 | 예외 | application이 호출한 함수가 실패한 경우 |
 | [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)의 `lifecycle` | 제어·통신 루프가 스스로 정지한 경우 |
 
-`Faulted`로의 전이는 제어·통신 루프만 수행합니다. 로봇 핸드가 자세를 유지하는 동안 통신이
+`Faulted` 상태로의 전이는 제어·통신 루프만 수행합니다. 로봇 핸드가 자세를 유지하는 동안 통신이
 끊기면 다음 호출 전까지 예외가 발생하지 않으므로, `lifecycle` 필드를 주기적으로 읽어야 제때
-감지합니다. [`get_state()`](08_cpp_api_reference/hand.md#handget_state)와 `get_diagnostics()`는 `Faulted`에서도 예외를 던지지 않으므로
+감지합니다. [`get_state()`](08_cpp_api_reference/hand.md#handget_state)와 `get_diagnostics()`는 `Faulted` 상태에서도 예외를 던지지 않으므로
 감시에 사용할 수 있습니다.
 
-반대로 예외가 발생했다고 `Faulted`가 된 것도 아닙니다. [`connect()`](08_cpp_api_reference/hand.md#handconnect)가 실패하면
-`Disconnected`로 되돌아가고, [`run()`](08_cpp_api_reference/hand.md#handrun)·[`stop()`](08_cpp_api_reference/hand.md#handstop)·[`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect)가 확인에 실패하면
+반대로 예외가 발생했다고 `Faulted` 상태가 된 것도 아닙니다. [`connect()`](08_cpp_api_reference/hand.md#handconnect)가 실패하면
+`Disconnected` 상태로 되돌아가고, [`run()`](08_cpp_api_reference/hand.md#handrun)·[`stop()`](08_cpp_api_reference/hand.md#handstop)·[`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect)가 확인에 실패하면
 lifecycle은 유지됩니다. 자세한 내용은 [2.3 Transition confirmation](#23-transition-confirmation)에 있습니다.
 
 예외 없이 lifecycle이 바뀌는 경우도 있습니다. `auto_reconnect` 값이 `true`이면 복구하는 동안
-`Faulted`에서 `Connected`를 지나 `Running`까지 자동으로 복귀하고, 다른 경로가 `stop()`을 호출하면
-`Stopped`가 됩니다. 어느 쪽도 호출이 실패한 것이 아니므로 예외는 발생하지 않습니다. 그래서
+`Faulted` 상태에서 `Connected` 상태를 지나 `Running` 상태까지 자동으로 복귀하고, 다른 경로가 `stop()`을 호출하면
+`Stopped` 상태가 됩니다. 어느 쪽도 호출이 실패한 것이 아니므로 예외는 발생하지 않습니다. 그래서
 `lifecycle` 필드를 매 주기 확인하는 9.3.1 구조가 예외 없는 lifecycle 변화까지 반영합니다.
 
 ### 9.3 Recovery patterns
@@ -984,7 +984,7 @@ config는 구조를 바꾸지 않습니다. `auto_reconnect`와 `auto_home` 값�
 #### 9.3.1 Self-managed lifecycle
 
 self-managed 구조는 매 주기 lifecycle을 확인해 미완료 단계를 수행한 뒤 command를 전송합니다. 첫
-주기에는 `Disconnected`이므로 같은 switch가 초기 연결까지 처리합니다.
+주기에는 `Disconnected` 상태가므로 같은 switch가 초기 연결까지 처리합니다.
 
 루프가 담당하는 것은 lifecycle을 `Running`으로 유지하는 일이고, command의 출처는 무관합니다.
 `next_command()`는 코드에 고정한 궤적일 수도, 파일에서 읽은 기록일 수도, 상위 제어기가 전송한
@@ -1069,10 +1069,10 @@ try가 둘이지만 역할이 다릅니다. 바깥은 시작하지 못한 경우
 다음 주기로 이어갑니다.
 
 switch를 catch가 아니라 try 안에 배치한 이유는 셋입니다. `reconnect()` 같은 복구 호출도
-실패할 수 있으므로 복구 실패까지 같은 catch가 잡아야 하고, 첫 주기가 `Disconnected`라 초기
+실패할 수 있으므로 복구 실패까지 같은 catch가 잡아야 하고, 첫 주기가 `Disconnected` 상태라 초기
 연결까지 같은 코드가 처리하며, 예외 없이 lifecycle이 바뀌는
 상황([9.2](#92-detecting-a-failure))도 반영하기 때문입니다. `get_diagnostics()`는 lock-free
-buffer를 읽을 뿐이고 `Running`이면 switch가 곧바로 끝나므로 매 주기 확인해도 부담이 없습니다.
+buffer를 읽을 뿐이고 `Running` 상태이면 switch가 곧바로 끝나므로 매 주기 확인해도 부담이 없습니다.
 
 #### 9.3.2 Externally managed lifecycle
 
@@ -1231,7 +1231,7 @@ int main()
 
 ### 9.4 Recovering from Faulted
 
-`Faulted`에서 벗어나는 public 수단은 [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) 하나입니다. 물리적 원인을 제거한 뒤에도 계속
+`Faulted` 상태에서 벗어나는 public 수단은 [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) 하나입니다. 물리적 원인을 제거한 뒤에도 계속
 실패하면 해당 hand를 파기하고 새로 생성하는 방법이 있습니다. [`destroy()`](08_cpp_api_reference/hand_manager.md#handmanagerdestroy)는 어느 상태에서든
 호출할 수 있으므로 [`create()`](08_cpp_api_reference/hand_manager.md#handmanagercreate)로 재시작합니다.
 
@@ -1244,7 +1244,7 @@ int main()
 
 #### 9.4.1 Manual recovery
 
-수동 복구는 `Faulted`를 확인한 application이 `reconnect()`부터 순서대로 호출하는 절차입니다.
+수동 복구는 `Faulted` 상태를 확인한 application이 `reconnect()`부터 순서대로 호출하는 절차입니다.
 
 ```cpp
 hand.reconnect();   // 성공하면 Connected
@@ -1257,7 +1257,7 @@ hand.run();         // auto_home=true이면 homing까지 여기서 끝납니다
 
 - `auto_home=true`(기본) → 이어지는 `run()`이 homing부터 수행합니다.
   [`home()`](08_cpp_api_reference/hand.md#handhome)을 따로 호출할 필요가 없습니다.
-- `auto_home=false` → `run()`이 곧바로 `Running`이 되지만 command가 [`Idle`](08_cpp_api_reference/types_command.md#idle)이라
+- `auto_home=false` → `run()`이 곧바로 `Running` 상태가 되지만 command가 [`Idle`](08_cpp_api_reference/types_command.md#idle)이라
   actuator가 무토크 상태로 남습니다. `home()`이 성공하기 전에는 `Idle`이 아닌 command가 거부되므로
   `home()`을 호출하십시오.
 
@@ -1273,7 +1273,7 @@ hand.run();         // auto_home=true이면 homing까지 여기서 끝납니다
 [Error messages](15_error_messages.md#10-faulted-원인-문구)에 있습니다.
 
 자동 복구는 [9.4.1](#941-manual-recovery)의 수동 절차와 **동작이 다릅니다.** 제어를 스스로 다시
-요구하므로, `run()`을 따로 호출하지 않아도 actuator enable이 확인되는 시점에 `Running`으로
+요구하므로, `run()`을 따로 호출하지 않아도 actuator enable이 확인되는 시점에 `Running` 상태로
 복귀합니다.
 `auto_reconnect_home=true`이면 재개 전에 homing도 수행합니다.
 
@@ -1284,13 +1284,13 @@ hand.run();         // auto_home=true이면 homing까지 여기서 끝납니다
 
 `auto_reconnect_timeout_ms` 값이 `0`이면 제한이 없으므로, 오래 복구 중인 상태를 정상 운전으로
 오해하지 않도록 `lifecycle`과 `control_cycles` 필드를 따로 감시하십시오. 시한을 넘기면 자동 복구를 포기하고
-`Faulted`로 남으므로 `reconnect()`를 직접 호출해야 합니다.
+`Faulted` 상태로 남으므로 `reconnect()`를 직접 호출해야 합니다.
 
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다. 뒤의 세 항목이 9.3의 세 구조에 각각 대응합니다.
 >
 > - [`17_fault_recovery.cpp`](../../cpp/examples/17_fault_recovery.cpp) — 예외를 처리하며 `code()`로
->   점검 대상을 구분하고, `Faulted`에서 복구해 command를 다시 전송합니다. 복구 시도 횟수에 상한을
+>   점검 대상을 구분하고, `Faulted` 상태에서 복구해 command를 다시 전송합니다. 복구 시도 횟수에 상한을
 >   둡니다.
 > - [`18_self_managed.cpp`](../../cpp/examples/18_self_managed.cpp) — 9.3.1의 구조입니다. 매 cycle
 >   lifecycle을 읽어 빠진 단계를 채우므로 첫 cycle이 초기 연결을 수행합니다.
