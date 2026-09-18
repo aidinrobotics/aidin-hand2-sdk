@@ -199,7 +199,7 @@ lifecycle은 `get_diagnostics()`로 확인합니다.</br></br>
 경우 `run()`에도 `home()`과 같은 제한 시간이 적용됩니다.
 
 `home()`의 제한 시간은 homing 단계별 cycle 예산의 합으로 결정되므로 `control_rate` 값에 따라
-달라집니다. 나머지 상태 전이 함수의 제한 시간은 `control_rate`와 무관합니다.
+달라집니다. 나머지 상태 전이 함수의 제한 시간은 `control_rate` 값과 무관합니다.
 
 이미 postcondition을 만족하는 state에서 같은 함수를 호출하는 경우에는 별도의 동작 없이 성공하고
 로그만 남깁니다.
@@ -537,7 +537,7 @@ actuator_position.target = {
 hand.set_command(actuator_position);
 ```
 
-`ActuatorEffortCommand`의 target은 정격 전류의 0.1% 단위입니다. 부호가 방향을 나타내며 ±`max_effort`로
+`ActuatorEffortCommand`의 target은 정격 전류의 0.1% 단위입니다. 부호가 방향을 나타내며 ±`max_effort` 값으로
 제한된 뒤 전송됩니다. `300`은 30%에 해당하는 예시입니다.
 
 ```cpp
@@ -648,7 +648,7 @@ const auto encoder = ah2::ik_joint_to_actuator(command.target);
 const auto joints  = ah2::fk_actuator_to_joint(encoder);
 ```
 
-`get_state().joints.position_rad`는 SDK가 `fk_actuator_to_joint()`로 채운 값입니다. 같은 encoder
+`get_state().joints.position_rad` 필드는 SDK가 `fk_actuator_to_joint()`로 채운 값입니다. 같은 encoder
 값을 직접 전달하면 같은 결과를 얻습니다. `actuators.position_count` 필드는 `double`이므로 정수
 count로 반올림해 전달하십시오.
 
@@ -744,7 +744,7 @@ if (const auto* out =
 }
 ```
 
-추종을 확인할 때는 같은 공간끼리 비교하십시오. `target_position_cnt`와
+추종을 확인할 때는 같은 공간끼리 비교하십시오. `target_position_cnt` 필드와
 `state.actuators.position_count` 필드가 짝입니다. rad `target` 값에서 encoder count를 빼면 의미가 없습니다.
 
 effort 계열은 짝이 없습니다. `target_effort_pct` 필드는 정격 전류의 0.1% 단위이고 측정값

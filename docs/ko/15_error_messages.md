@@ -76,7 +76,7 @@ warning log가 남으므로 감지는
 Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_state.md#enum-handlifecycle) enum의 값이고, 상태 전이 함수가
 어느 상태에서 허용되는지는 [C++ guide](07_cpp_usage_guide.md#22-state-transition-calls)에 표로 정리돼 있습니다.
 
-아래 표의 Reason 열은 `Cannot <동작>: ` 뒤에 붙는 이유입니다. 현재 lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.lifecycle`로 확인합니다.
+아래 표의 Reason 열은 `Cannot <동작>: ` 뒤에 붙는 이유입니다. 현재 lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.lifecycle` 필드로 확인합니다.
 
 | Reason | Situation | Remedy |
 |---|---|---|
