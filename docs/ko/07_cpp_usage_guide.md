@@ -755,7 +755,7 @@ effort 계열은 짝이 없습니다. `target_effort_pct` 필드는 정격 전�
 
 ### 7.3 Tactile
 
-`state.tactile` 필드는 finger와 palm의 taxel 값입니다. 센서가 전송한 16-bit 원시 count를
+`state.tactile` 필드는 finger와 palm의 taxel 값입니다. 센서가 전송한 16-bit raw value를
 그대로 담은 값이라 단위도 정규화도 없습니다.
 
 | Field | Size | Description |

@@ -3,14 +3,14 @@
 
 // AIDIN Hand Gen2 SDK, tactile readings and the baseline you have to build yourself
 //
-// The taxel values are raw 16-bit counts as the sensors sent them. There is no unit, no
+// The taxel values are raw 16-bit values as the sensors sent them. There is no unit, no
 // normalization, and no contact threshold: the SDK does not offer one, because the resting
 // value of a taxel depends on the sensor. So a reading on its own says very little, and the
 // difference from a resting value says a great deal.
 //
 // This example takes that resting value first — a second of averaging with nothing touching
 // the hand — and then displays every taxel as its deviation from it. Touch a fingertip and its
-// column moves; let go and it returns. The raw counts are printed alongside, so the size of
+// column moves; let go and it returns. The raw values are printed alongside, so the size of
 // the deviation against the size of the number is visible.
 //
 // Reading tactile needs no torque, so this example never leaves Connected. Nothing moves: no
@@ -61,12 +61,12 @@ int main(int argc, char** argv)
 
     // 1) One snapshot, to show what the numbers look like before anything is subtracted.
     const HandState first = hand.get_state();
-    std::printf("[example] raw counts, %s fingertip taxels 0-5:", finger_name[1]);
+    std::printf("[example] raw values, %s fingertip taxels 0-5:", finger_name[1]);
     for (std::size_t t = 0; t < 6; ++t) {
       std::printf(" %7.0f", first.tactile.fingers[1][t]);
     }
     std::printf("\n");
-    std::printf("[example] raw counts, palm taxels 0-5:        ");
+    std::printf("[example] raw values, palm taxels 0-5:        ");
     for (std::size_t t = 0; t < 6; ++t) {
       std::printf(" %7.0f", first.tactile.palm[t]);
     }
