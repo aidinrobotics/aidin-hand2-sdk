@@ -332,6 +332,6 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...dev
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...develop
 [0.5.2]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/releases/tag/v0.5.1
