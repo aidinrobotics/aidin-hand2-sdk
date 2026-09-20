@@ -26,6 +26,15 @@ flowchart LR
 
 lifecycle과 명령·상태 API는 [C++ guide](docs/ko/07_cpp_usage_guide.md)를 참고하십시오.
 
+
+문서에서 쓰는 관절 이름과 회전 방향은 아래 뷰어에서 직접 움직여 확인할 수 있습니다.
+
+<div align="center">
+
+<a href="https://aidinrobotics.github.io/aidin-hand2-ros2/"><img src="docs/assets/viewer_preview.webp" alt="AIDIN Hand Gen2 joint viewer"></a>
+
+</div>
+
 ## System Requirements
 
 아래는 SDK 빌드·실행이 검증된 구성입니다.

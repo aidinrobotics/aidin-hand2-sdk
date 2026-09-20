@@ -26,6 +26,16 @@ flowchart LR
 
 For the lifecycle and the command/state API, see the [C++ guide](docs/en/07_cpp_usage_guide.md).
 
+
+The joint names this documentation uses and each joint's rotation direction can be
+checked by moving them in the viewer below.
+
+<div align="center">
+
+<a href="https://aidinrobotics.github.io/aidin-hand2-ros2/"><img src="docs/assets/viewer_preview.webp" alt="AIDIN Hand Gen2 joint viewer"></a>
+
+</div>
+
 ## System Requirements
 
 The configuration below is verified for building and running the SDK.
