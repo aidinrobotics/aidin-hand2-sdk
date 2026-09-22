@@ -4,9 +4,9 @@
 
 ```cpp
 inline constexpr int kVersionMajor = 0;
-inline constexpr int kVersionMinor = 6;
+inline constexpr int kVersionMinor = 7;
 inline constexpr int kVersionPatch = 0;
-inline constexpr const char* kVersionString = "0.6.0";   // the version you built
+inline constexpr const char* kVersionString = "0.7.0";   // the version you built
 ```
 
 CMake generates this header at build time from `cmake/version.hpp.in`, and the values come from
@@ -16,7 +16,7 @@ Ask for the version explicitly in your application. The compatibility policy is
 `SameMinorVersion`, so a different minor fails at configure time.
 
 ```cmake
-find_package(aidin_hand2 0.6 REQUIRED)
+find_package(aidin_hand2 0.7 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 

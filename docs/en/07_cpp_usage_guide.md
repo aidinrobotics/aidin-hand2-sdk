@@ -688,8 +688,7 @@ const auto joints  = ah2::fk_actuator_to_joint(encoder);
 ```
 
 The SDK fills `get_state().joints.position_rad` with `fk_actuator_to_joint()`. If you pass the same
-encoder values yourself, you get the same result. The `actuators.position_count` field is a
-`double`, so round it to an integer count before you pass it.
+encoder values yourself, you get the same result.
 
 ### 6.2 Active and passive joints
 
@@ -743,19 +742,13 @@ result of converting the actuator values through forward kinematics.
 
 | Field | Type | Unit |
 |---|---|---|
-| `actuators.position_count` | `std::array<double, kActuatorCount>` | encoder count |
-| `actuators.velocity_rpm` | `std::array<double, kActuatorCount>` | rpm |
-| `actuators.current_mA` | `std::array<double, kActuatorCount>` | mA |
+| `actuators.position_count` | `std::array<std::int32_t, kActuatorCount>` | encoder count |
+| `actuators.velocity_rpm` | `std::array<std::int32_t, kActuatorCount>` | rpm |
+| `actuators.current_mA` | `std::array<std::int16_t, kActuatorCount>` | mA |
 | `joints.position_rad` | `std::array<double, kJointCount>` | rad |
-| `joints.velocity_rad_s` | `std::array<double, kJointCount>` | rad/s |
-| `joints.effort_Nm` | `std::array<double, kJointCount>` | N·m |
 
 The `joints` field holds 21 entries including the passive joints, and the `actuators` field holds
 16. [6. Kinematics](#6-kinematics) covers the conversion between the two spaces.
-
-> [!WARNING]
-> The `joints.velocity_rad_s` and `joints.effort_Nm` fields are still `0` placeholders. They are not
-> measurements, so do not label them as measurements in a recorder schema.
 
 ### 7.2 Applied command
 

@@ -649,8 +649,7 @@ const auto joints  = ah2::fk_actuator_to_joint(encoder);
 ```
 
 `get_state().joints.position_rad` 필드는 SDK가 `fk_actuator_to_joint()`로 채운 값입니다. 같은 encoder
-값을 직접 전달하면 같은 결과를 얻습니다. `actuators.position_count` 필드는 `double`이므로 정수
-count로 반올림해 전달하십시오.
+값을 직접 전달하면 같은 결과를 얻습니다.
 
 ### 6.2 Active and passive joints
 
@@ -703,19 +702,13 @@ application이 함께 기록해야 경과 시간을 판단할 수 있습니다. 
 
 | Field | Type | Unit |
 |---|---|---|
-| `actuators.position_count` | `std::array<double, kActuatorCount>` | encoder count |
-| `actuators.velocity_rpm` | `std::array<double, kActuatorCount>` | rpm |
-| `actuators.current_mA` | `std::array<double, kActuatorCount>` | mA |
+| `actuators.position_count` | `std::array<std::int32_t, kActuatorCount>` | encoder count |
+| `actuators.velocity_rpm` | `std::array<std::int32_t, kActuatorCount>` | rpm |
+| `actuators.current_mA` | `std::array<std::int16_t, kActuatorCount>` | mA |
 | `joints.position_rad` | `std::array<double, kJointCount>` | rad |
-| `joints.velocity_rad_s` | `std::array<double, kJointCount>` | rad/s |
-| `joints.effort_Nm` | `std::array<double, kJointCount>` | N·m |
 
 `joints` 필드는 passive를 포함해 21개이고 `actuators` 필드는 16개입니다. 두 공간의 변환은
 [6. Kinematics](#6-kinematics)에 있습니다.
-
-> [!WARNING]
-> `joints.velocity_rad_s`와 `joints.effort_Nm` 필드는 아직 `0` placeholder입니다. 측정값이 아니므로
-> recorder schema에 측정값으로 표시하지 마십시오.
 
 ### 7.2 Applied command
 
