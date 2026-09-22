@@ -122,21 +122,17 @@ enum class CommandSource {
 
 | Field | Type | Unit |
 |---|---|---|
-| `position_count` | `std::array<double, kActuatorCount>` | encoder count |
-| `velocity_rpm` | `std::array<double, kActuatorCount>` | rpm |
-| `current_mA` | `std::array<double, kActuatorCount>` | mA |
+| `position_count` | `std::array<std::int32_t, kActuatorCount>` | encoder count |
+| `velocity_rpm` | `std::array<std::int32_t, kActuatorCount>` | rpm |
+| `current_mA` | `std::array<std::int16_t, kActuatorCount>` | mA |
 
 ---
 
 ## `JointState`
 
-| Field | Type | Unit | Status |
-|---|---|---|---|
-| `position_rad` | `std::array<double, kJointCount>` | rad | FK 결과 |
-| `velocity_rad_s` | `std::array<double, kJointCount>` | rad/s | `0` placeholder |
-| `effort_Nm` | `std::array<double, kJointCount>` | N·m | `0` placeholder |
-
-velocity와 effort의 `0`은 측정값이 아닙니다.
+| Field | Type | Unit |
+|---|---|---|
+| `position_rad` | `std::array<double, kJointCount>` | rad |
 
 ---
 
@@ -144,8 +140,8 @@ velocity와 effort의 `0`은 측정값이 아닙니다.
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger). 값은 16-bit raw value |
-| `palm` | `std::array<double, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
+| `fingers` | `std::array<std::array<std::uint16_t, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger) |
+| `palm` | `std::array<std::uint16_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
 
 ---
 

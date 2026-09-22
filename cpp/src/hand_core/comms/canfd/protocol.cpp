@@ -52,11 +52,6 @@ void write_int8_array(std::uint8_t* b, const std::array<std::int8_t, N>& v) {
   for (std::size_t i = 0; i < N; ++i) b[i] = static_cast<std::uint8_t>(v[i]);
 }
 
-template <std::size_t N>
-void cast_to_double(std::array<double, N>& dst, const std::array<std::uint16_t, N>& src) {
-  for (std::size_t i = 0; i < N; ++i) dst[i] = static_cast<double>(src[i]);
-}
-
 // Minimum payload the protocol promises for each state frame, in bytes
 // CAN-FD pads to a valid DLC, so decode rejects only what is shorter, never what is longer
 constexpr std::size_t kLenPosition = kActuatorCount * sizeof(std::int32_t);             // 64
@@ -234,28 +229,26 @@ void Protocol::encode(const CommandFrames& frames, TxFrames& tx) const
 
 void Protocol::frames_to_hand_state(const StateFrames& frames, HandState& state) const
 {
-  // decode already put these in SDK index order, so this only converts types
+  // decode already put these in SDK index order, so this only moves them across
   auto& act = state.actuators;
-  for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    act.position_count[i] = static_cast<double>(frames.actual_position[i]);
-    act.velocity_rpm[i] = static_cast<double>(frames.actual_velocity[i]);
-    act.current_mA[i]   = static_cast<double>(frames.actual_current[i]);
-  }
+  act.position_count = frames.actual_position;
+  act.velocity_rpm   = frames.actual_velocity;
+  act.current_mA     = frames.actual_current;
 
   // Five fingers of 17 taxels, in order
-  cast_to_double(state.tactile.fingers[0], frames.tactile_thumb);
-  cast_to_double(state.tactile.fingers[1], frames.tactile_index);
-  cast_to_double(state.tactile.fingers[2], frames.tactile_middle);
-  cast_to_double(state.tactile.fingers[3], frames.tactile_ring);
-  cast_to_double(state.tactile.fingers[4], frames.tactile_baby);
+  state.tactile.fingers[0] = frames.tactile_thumb;
+  state.tactile.fingers[1] = frames.tactile_index;
+  state.tactile.fingers[2] = frames.tactile_middle;
+  state.tactile.fingers[3] = frames.tactile_ring;
+  state.tactile.fingers[4] = frames.tactile_baby;
 
   // Three palm pads flattened into 58 cells: 20 upper, 20 lower, 18 palm2
   for (std::size_t i = 0; i < kPalm1UpperCount; ++i)
-    state.tactile.palm[i] = static_cast<double>(frames.palm1_upper[i]);
+    state.tactile.palm[i] = frames.palm1_upper[i];
   for (std::size_t i = 0; i < kPalm1LowerCount; ++i)
-    state.tactile.palm[kPalm1UpperCount + i] = static_cast<double>(frames.palm1_lower[i]);
+    state.tactile.palm[kPalm1UpperCount + i] = frames.palm1_lower[i];
   for (std::size_t i = 0; i < kPalm2Count; ++i)
-    state.tactile.palm[kPalm1UpperCount + kPalm1LowerCount + i] = static_cast<double>(frames.palm2[i]);
+    state.tactile.palm[kPalm1UpperCount + kPalm1LowerCount + i] = frames.palm2[i];
 }
 
 void Protocol::frames_to_actuator_health(const StateFrames& frames, ActuatorHealth& health) const

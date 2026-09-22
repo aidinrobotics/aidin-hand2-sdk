@@ -30,7 +30,7 @@ class JointImpedanceController
   const double dt_seconds_;
 
   // The velocity term differentiates the encoder against the previous cycle
-  std::array<double, kActuatorCount> previous_position_count_{};
+  std::array<std::int32_t, kActuatorCount> previous_position_count_{};
   bool have_previous_ = false;
 };
 

@@ -42,7 +42,7 @@ struct SizeLock {
 
 #define AIDIN_ABI_SIZE_LOCK(T, expected) template struct SizeLock<T, sizeof(T), expected>
 
-AIDIN_ABI_SIZE_LOCK(HandState,               2448);
+AIDIN_ABI_SIZE_LOCK(HandState,               1032);
 AIDIN_ABI_SIZE_LOCK(Diagnostics,               96);
 AIDIN_ABI_SIZE_LOCK(HandConfig,                88);
 AIDIN_ABI_SIZE_LOCK(ControllerConfig,         280);

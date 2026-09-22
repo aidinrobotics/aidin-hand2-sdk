@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     // 2) Read where the actuators are. After homing these are measured from the hard stops,
     //    so they are a reference the next run will agree with.
     const HandState homed = hand.get_state();
-    std::printf("[example] counts after homing:  a0 %8.0f  a5 %8.0f  a8 %8.0f\n\n",
+    std::printf("[example] counts after homing:  a0 %8d  a5 %8d  a8 %8d\n\n",
                 homed.actuators.position_count[0], homed.actuators.position_count[kActuator],
                 homed.actuators.position_count[8]);
 
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
         const HandState state = hand.get_state();
         const auto* setpoint =
             std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
-        std::printf("\r\033[K  [example] asked %9.0f  ->  setpoint %9.0f  reached %9.0f cnt  |  %6.1f mA",
+        std::printf("\r\033[K  [example] asked %9.0f  ->  setpoint %9.0f  reached %9d cnt  |  %6d mA",
                     command.target[kActuator],
                     setpoint != nullptr ? setpoint->target_position_cnt[kActuator] : 0.0,
                     state.actuators.position_count[kActuator],
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
     std::printf("[example] sent 3.0e9 counts: no exception, nan_command_count %llu -> %llu\n",
                 static_cast<unsigned long long>(before),
                 static_cast<unsigned long long>(hand.get_diagnostics().nan_command_count));
-    std::printf("[example] still holding %9.0f cnt, which is the previous command\n\n",
+    std::printf("[example] still holding %9d cnt, which is the previous command\n\n",
                 hand.get_state().actuators.position_count[kActuator]);
 
     // 7) A count inside the int32 range but outside the mechanical travel passes every check

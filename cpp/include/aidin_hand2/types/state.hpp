@@ -116,9 +116,9 @@ enum class ActuatorFault : std::uint16_t {
 
 // Index is actuator 0..15
 struct ActuatorState {
-  std::array<double, kActuatorCount> position_count{};
-  std::array<double, kActuatorCount> velocity_rpm{};
-  std::array<double, kActuatorCount> current_mA{};
+  std::array<std::int32_t, kActuatorCount> position_count{};
+  std::array<std::int32_t, kActuatorCount> velocity_rpm{};
+  std::array<std::int16_t, kActuatorCount> current_mA{};
 };
 
 // Straight from the drive statusword and error code, exposed through Diagnostics
@@ -127,16 +127,15 @@ struct ActuatorHealth {
   std::array<ActuatorFault, kActuatorCount> fault{};
 };
 
-// FK output, velocity and effort stay 0 until the Jacobian lands
+// FK output
 struct JointState {
   std::array<double, kJointCount> position_rad{};
-  std::array<double, kJointCount> velocity_rad_s{};
-  std::array<double, kJointCount> effort_Nm{};
 };
 
+// Raw 16-bit readings, no unit and no normalization
 struct TactileState {
-  std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount> fingers{};
-  std::array<double, kPalmTactileCount> palm{};
+  std::array<std::array<std::uint16_t, kTactileTaxelsPerFinger>, kFingerCount> fingers{};
+  std::array<std::uint16_t, kPalmTactileCount> palm{};
 };
 
 // ------------------------------- Command echo -------------------------------
