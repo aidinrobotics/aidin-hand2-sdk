@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     // 1) Before connect() there is no loop, so the snapshot is the default one. timestamp is 0,
     //    which is how "no cycle has stamped this yet" is spelled — there is no separate flag.
     const HandState fresh = hand.get_state();
-    std::printf("[example] before connect: timestamp %lld, a0 %.0f cnt\n\n",
+    std::printf("[example] before connect: timestamp %lld, a0 %d cnt\n\n",
                 static_cast<long long>(fresh.timestamp), fresh.actuators.position_count[0]);
 
     hand.connect();
@@ -96,7 +96,7 @@ int main(int argc, char** argv)
     std::printf("[example] actuators (%zu) and joints (%zu), live:\n", kActuatorCount, kJointCount);
     for (int i = 0; i < 25 && !g_shutdown.load(); ++i) {
       const HandState state = hand.get_state();
-      std::printf("\r\033[K  [example] actuator %zu %8.0f cnt  %+7.1f rpm  %+7.1f mA   |   joint %zu %+.4f rad",
+      std::printf("\r\033[K  [example] actuator %zu %8d cnt  %+7d rpm  %+7d mA   |   joint %zu %+.4f rad",
                   kActuator, state.actuators.position_count[kActuator],
                   state.actuators.velocity_rpm[kActuator], state.actuators.current_mA[kActuator],
                   kJoint, state.joints.position_rad[kJoint]);
@@ -105,17 +105,9 @@ int main(int argc, char** argv)
     }
     std::printf("\n\n");
 
-    // 5) The two placeholder fields. They are 0 because nothing computes them yet, not because
-    //    the joint is still — the actuator velocity above was not 0 while this one was. Do not
-    //    record them as measurements.
     const HandState settled = hand.get_state();
-    std::printf("[example] joints.velocity_rad_s[%zu] = %.1f and joints.effort_Nm[%zu] = %.1f — placeholders\n",
-                kJoint, settled.joints.velocity_rad_s[kJoint],
-                kJoint, settled.joints.effort_Nm[kJoint]);
-    std::printf("[example] actuators.velocity_rpm[%zu] = %+.1f is the measurement to use instead\n\n",
-                kActuator, settled.actuators.velocity_rpm[kActuator]);
 
-    // 6) The command echo, now that a command is running. The three fields are the stages of
+    // 5) The command echo, now that a command is running. The three fields are the stages of
     //    one cycle: what was asked for, what came out of the controller, and which path
     //    actually reached the motors.
     if (const auto* input = std::get_if<JointPositionCommand>(&settled.commanded.controller_input)) {
@@ -126,7 +118,7 @@ int main(int argc, char** argv)
             std::get_if<ActuatorPositionSetpoint>(&settled.commanded.controller_output)) {
       // Compare like against like: this setpoint is in counts, so its partner is
       // actuators.position_count, and subtracting the rad target from it would mean nothing.
-      std::printf("[example] controller_output: actuator %zu target %8.0f cnt, measured %8.0f cnt, error %+.0f\n",
+      std::printf("[example] controller_output: actuator %zu target %8.0f cnt, measured %8d cnt, error %+.0f\n",
                   kActuator, output->target_position_cnt[kActuator],
                   settled.actuators.position_count[kActuator],
                   output->target_position_cnt[kActuator] - settled.actuators.position_count[kActuator]);
@@ -138,12 +130,12 @@ int main(int argc, char** argv)
                                                                                 : "None",
                 kActuator, settled.commanded.max_effort_pct[kActuator]);
 
-    // 7) A setpoint being present does not mean it reached the motors. Homing and the quick
+    // 6) A setpoint being present does not mean it reached the motors. Homing and the quick
     //    stop both take the path over, so check selected_source before reading the output as
     //    what the hand is doing.
     std::printf("[example] a setpoint with selected_source other than Controller did not reach the motors\n\n");
 
-    // 8) The two reads are separate. Each returns the latest of its own buffer, so a cycle can
+    // 7) The two reads are separate. Each returns the latest of its own buffer, so a cycle can
     //    land between them: read each once, then work from those two copies rather than
     //    calling again inside the arithmetic.
     const HandState      state       = hand.get_state();
@@ -154,7 +146,7 @@ int main(int argc, char** argv)
                 static_cast<unsigned long long>(diagnostics.control_cycles),
                 diagnostics.last_period_ms, static_cast<long long>(state.timestamp));
 
-    // 9) timestamp is CLOCK_REALTIME, for lining up with a recording. How stale a snapshot is
+    // 8) timestamp is CLOCK_REALTIME, for lining up with a recording. How stale a snapshot is
     //    is the application's to track, with its own monotonic clock, as here: nothing in
     //    HandState answers that question.
     std::this_thread::sleep_for(std::chrono::milliseconds(250));

@@ -65,7 +65,7 @@ int main(int argc, char** argv)
       std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
       const HandState state = hand.get_state();
-      std::printf("[example] joint %2zu: 50deg hold -> 0 | actuator %.0f cnt, %.0f mA\n",
+      std::printf("[example] joint %2zu: 50deg hold -> 0 | actuator %d cnt, %d mA\n",
                   j, state.actuators.position_count[j], state.actuators.current_mA[j]);
     }
 

@@ -695,7 +695,9 @@ void HandCore::set_command_to_home_hold()
 void HandCore::set_command_to_position_hold(const HandState& hand_state)
 {
   ActuatorPositionCommand hold{};
-  hold.target = hand_state.actuators.position_count;
+  for (std::size_t i = 0; i < kActuatorCount; ++i) {
+    hold.target[i] = hand_state.actuators.position_count[i];
+  }
   std::lock_guard<std::mutex> lock(staging_mutex_);
   staging_command_.controller = hold;
   command_buffer_.write(staging_command_);

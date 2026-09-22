@@ -63,12 +63,12 @@ int main(int argc, char** argv)
     const HandState first = hand.get_state();
     std::printf("[example] raw values, %s fingertip taxels 0-5:", finger_name[1]);
     for (std::size_t t = 0; t < 6; ++t) {
-      std::printf(" %7.0f", first.tactile.fingers[1][t]);
+      std::printf(" %7d", first.tactile.fingers[1][t]);
     }
     std::printf("\n");
     std::printf("[example] raw values, palm taxels 0-5:        ");
     for (std::size_t t = 0; t < 6; ++t) {
-      std::printf(" %7.0f", first.tactile.palm[t]);
+      std::printf(" %7d", first.tactile.palm[t]);
     }
     std::printf("\n\n[example] none of those say whether anything is touching the hand\n\n");
 
@@ -83,11 +83,11 @@ int main(int argc, char** argv)
       const HandState state = hand.get_state();
       for (std::size_t f = 0; f < kFingerCount; ++f) {
         for (std::size_t t = 0; t < kTactileTaxelsPerFinger; ++t) {
-          finger_baseline[f][t] += state.tactile.fingers[f][t] / kSamples;
+          finger_baseline[f][t] += static_cast<double>(state.tactile.fingers[f][t]) / kSamples;
         }
       }
       for (std::size_t t = 0; t < kPalmTactileCount; ++t) {
-        palm_baseline[t] += state.tactile.palm[t] / kSamples;
+        palm_baseline[t] += static_cast<double>(state.tactile.palm[t]) / kSamples;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

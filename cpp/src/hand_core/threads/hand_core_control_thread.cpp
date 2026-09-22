@@ -467,7 +467,7 @@ void HandCore::fill_joint_state(HandState& hand_state)
 {
   std::array<int, kActuatorCount> encoder{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    encoder[i] = static_cast<int>(std::lround(hand_state.actuators.position_count[i]));
+    encoder[i] = static_cast<int>(hand_state.actuators.position_count[i]);
   }
   std::array<double, kinematics::JOINT_NUM> joint_rad{};
 
@@ -529,7 +529,7 @@ canfd::CommandFrames HandCore::command_to_frames(const HandCommand& command,
     const bool masked = actuator_health.fault[i] != ActuatorFault::None || !actuator_health.enabled[i];
     if (!masked) continue;
     if (frames.mode_of_operation[i] == canfd::mode_of_operation::kCSP) {
-      frames.target_position[i] = static_cast<std::int32_t>(std::lround(hand_state.actuators.position_count[i]));
+      frames.target_position[i] = hand_state.actuators.position_count[i];
     } else {
       frames.target_effort[i] = 0;
     }

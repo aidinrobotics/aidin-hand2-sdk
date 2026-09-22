@@ -92,7 +92,7 @@ int main(int argc, char** argv)
           std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
       const auto* as_effort =
           std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  [example] output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6.1f mA",
+      std::printf("\r\033[K  [example] output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6d mA",
                   as_position != nullptr ? "position" : as_effort != nullptr ? "effort" : "none",
                   kActuator,
                   as_position != nullptr ? as_position->target_position_cnt[kActuator]
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
           std::get_if<ActuatorPositionSetpoint>(&state.commanded.controller_output);
       const auto* as_effort =
           std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  [example] output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6.1f mA",
+      std::printf("\r\033[K  [example] output %-9s  actuator %zu %8.0f  |  active %zu reached %+.3f rad  %6d mA",
                   as_position != nullptr ? "position" : as_effort != nullptr ? "effort" : "none",
                   kActuator,
                   as_position != nullptr ? as_position->target_position_cnt[kActuator]

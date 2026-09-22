@@ -71,7 +71,7 @@ int main(int argc, char** argv)
       const HandState   right_state       = right.get_state();
 
       std::printf("\r\033[K[example] left %s cycles %llu  |  right %s cycles %llu"
-                  "  |  thumb a0 %.0f / %.0f cnt",
+                  "  |  thumb a0 %d / %d cnt",
                   to_string(left_diagnostics.lifecycle),
                   static_cast<unsigned long long>(left_diagnostics.control_cycles),
                   to_string(right_diagnostics.lifecycle),
