@@ -8,6 +8,13 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-22
+
+`HandState` carries every observation at the width the wire delivers it, which takes the struct from
+2448 bytes to 1032, and the two joint fields that nothing ever filled are gone. Request 0.7 and
+rebuild. The part to watch is quiet: arithmetic on a reading now follows integer rules, so a
+division that used to produce a fraction truncates and no compiler reports it.
+
 ### Changed
 
 - **Breaking: request the new minor version and rebuild.** Use
@@ -380,7 +387,8 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...develop
+[0.7.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/releases/tag/v0.5.1
