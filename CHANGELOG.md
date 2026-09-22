@@ -8,6 +8,46 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-22
+
+`HandState` carries every observation at the width the wire delivers it, which takes the struct from
+2448 bytes to 1032, and the two joint fields that nothing ever filled are gone. Request 0.7 and
+rebuild. The part to watch is quiet: arithmetic on a reading now follows integer rules, so a
+division that used to produce a fraction truncates and no compiler reports it.
+
+### Changed
+
+- **Breaking: request the new minor version and rebuild.** Use
+  `find_package(aidin_hand2 0.7 REQUIRED)`. The compatibility policy is `SameMinorVersion`, so a
+  0.6 consumer stops at configure time, and the soname moves to `libaidin_hand2.so.0.7`, so a
+  binary that was not rebuilt fails to load. `HandState` changed size, and a consumer that keeps
+  the old layout would overrun its own return slot.
+
+- **Breaking: `HandState` carries its readings at the width the wire carries them.**
+  `TactileState` is `std::uint16_t`, and `ActuatorState` holds `std::int32_t` position and
+  velocity with `std::int16_t` current. The SDK converts none of these values, so `double` added
+  no precision while it added 1416 bytes: the struct was 2448 and is now 1032. `JointState`
+  stays `double`, because forward kinematics computes it rather than reading it.
+
+  > [!IMPORTANT]
+  > Arithmetic on a reading now follows integer rules. Dividing one to take an average truncates
+  > instead of producing a fraction, and a compiler reports nothing, because assigning an `int` to
+  > a `double` is ordinary code. Cast before dividing:
+  >
+  > ```cpp
+  > baseline[t] += static_cast<double>(state.tactile.palm[t]) / kSamples;
+  > ```
+  >
+  > `printf` needs its format changed too: `%d` for the actuator fields and the taxels, not `%f`.
+  > `15_tactile.cpp` and `14_read_state.cpp` show both corrections in place.
+
+### Removed
+
+- **Breaking: `JointState::velocity_rad_s` and `JointState::effort_Nm` are gone.** Nothing in the
+  SDK ever wrote them, so every consumer that read them received zeros and could not tell that
+  apart from a joint at rest. Use `ActuatorState::velocity_rpm`, which the drives actually report.
+  Joint-space velocity returns when the Jacobian lands.
+
 ## [0.6.0] - 2026-09-18
 
 The build selects a hand type, the constants that convert encoder counts for types A and B are
@@ -347,7 +387,8 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...develop
+[0.7.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/releases/tag/v0.5.1

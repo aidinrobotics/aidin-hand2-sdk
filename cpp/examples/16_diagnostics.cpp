@@ -132,7 +132,7 @@ int main(int argc, char** argv)
     // 6) The measurements, per actuator, with the joint angle beside them for the first 16.
     std::printf("  actuators        idx  position_cnt  velocity_rpm   current_mA  en fault\n");
     for (std::size_t a = 0; a < kActuatorCount; ++a) {
-      std::printf("                   %3zu  %12.0f  %12.1f  %11.1f  %2s %s\n", a,
+      std::printf("                   %3zu  %12d  %12d  %11d  %2s %s\n", a,
                   state.actuators.position_count[a], state.actuators.velocity_rpm[a],
                   state.actuators.current_mA[a],
                   diagnostics.actuator_health.enabled[a] ? "y" : "n",

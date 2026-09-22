@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
-project(aidin_hand2 VERSION 0.6.0 LANGUAGES CXX)
+project(aidin_hand2 VERSION 0.7.0 LANGUAGES CXX)
+
+# A printf format that no longer matches its argument is otherwise silent.
+add_compile_options(-Wall -Wextra)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

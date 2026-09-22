@@ -109,7 +109,7 @@ int main(int argc, char** argv)
       // the next cycle but the current needs a moment to get there.
       for (int i = 0; i < 25 && !g_shutdown.load(); ++i) {
         const HandState state = hand.get_state();
-        std::printf("\r\033[K[example] cap %6.0f  |  measured mA: a0 %7.1f  a4 %7.1f  a7 %7.1f",
+        std::printf("\r\033[K[example] cap %6.0f  |  measured mA: a0 %7d  a4 %7d  a7 %7d",
                     cap, state.actuators.current_mA[0], state.actuators.current_mA[4],
                     state.actuators.current_mA[7]);
         std::fflush(stdout);

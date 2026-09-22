@@ -81,7 +81,7 @@ int main(int argc, char** argv)
         const HandState state = hand.get_state();
         const auto* setpoint =
             std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-        std::printf("\r\033[K  [example] asked %+7.1f  ->  setpoint %+7.1f  |  %8.0f cnt  %+7.1f rpm  %+7.1f mA",
+        std::printf("\r\033[K  [example] asked %+7.1f  ->  setpoint %+7.1f  |  %8d cnt  %+7d rpm  %+7d mA",
                     effort, setpoint != nullptr ? setpoint->target_effort_pct[kActuator] : 0.0,
                     state.actuators.position_count[kActuator],
                     state.actuators.velocity_rpm[kActuator],

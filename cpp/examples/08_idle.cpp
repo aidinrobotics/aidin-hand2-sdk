@@ -76,7 +76,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < 25 && !g_shutdown.load(); ++i) {
       const HandState state = hand.get_state();
       const auto* setpoint = std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output);
-      std::printf("\r\033[K  [example] source %-10s  effort a0 %6.1f  |  measured a0 %6.1f mA  vel %6.1f rpm",
+      std::printf("\r\033[K  [example] source %-10s  effort a0 %6.1f  |  measured a0 %6d mA  vel %6d rpm",
                   state.commanded.selected_source == CommandSource::Controller ? "Controller" : "other",
                   setpoint != nullptr ? setpoint->target_effort_pct[0] : 0.0,
                   state.actuators.current_mA[0], state.actuators.velocity_rpm[0]);
@@ -92,7 +92,7 @@ int main(int argc, char** argv)
     std::printf("[example] after stop() — push the same finger and it moves freely\n");
     for (int i = 0; i < 25 && !g_shutdown.load(); ++i) {
       const HandState state = hand.get_state();
-      std::printf("\r\033[K  [example] source %-10s  |  measured a0 %6.1f mA  vel %6.1f rpm",
+      std::printf("\r\033[K  [example] source %-10s  |  measured a0 %6d mA  vel %6d rpm",
                   state.commanded.selected_source == CommandSource::QuickStop ? "QuickStop"
                   : state.commanded.selected_source == CommandSource::Controller ? "Controller"
                                                                                  : "other",

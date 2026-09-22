@@ -107,7 +107,7 @@ application의 CMakeLists.txt는 두 줄입니다. 버전을 반드시 지정하
 호환되지 않는데, 지정하지 않으면 CMake가 버전 검사를 건너뜁니다.
 
 ```cmake
-find_package(aidin_hand2 0.6 REQUIRED)
+find_package(aidin_hand2 0.7 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -124,7 +124,7 @@ application의 CMakeLists.txt에 prefix를 알려 줍니다.
 
 ```cmake
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
-find_package(aidin_hand2 0.6 REQUIRED)
+find_package(aidin_hand2 0.7 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 

@@ -109,26 +109,22 @@ enum class CommandSource {
 
 | Field | Type | Unit |
 |---|---|---|
-| `position_count` | `std::array<double, kActuatorCount>` | encoder count |
-| `velocity_rpm` | `std::array<double, kActuatorCount>` | rpm |
-| `current_mA` | `std::array<double, kActuatorCount>` | mA |
+| `position_count` | `std::array<std::int32_t, kActuatorCount>` | encoder count |
+| `velocity_rpm` | `std::array<std::int32_t, kActuatorCount>` | rpm |
+| `current_mA` | `std::array<std::int16_t, kActuatorCount>` | mA |
 
 ## `JointState`
 
-| Field | Type | Unit | Status |
-|---|---|---|---|
-| `position_rad` | `std::array<double, kJointCount>` | rad | FK output |
-| `velocity_rad_s` | `std::array<double, kJointCount>` | rad/s | `0` placeholder |
-| `effort_Nm` | `std::array<double, kJointCount>` | N·m | `0` placeholder |
-
-The `0` in velocity and effort is not a measurement.
+| Field | Type | Unit |
+|---|---|---|
+| `position_rad` | `std::array<double, kJointCount>` | rad |
 
 ## `TactileState`
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<double, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger). Raw 16-bit values |
-| `palm` | `std::array<double, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
+| `fingers` | `std::array<std::array<std::uint16_t, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger) |
+| `palm` | `std::array<std::uint16_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
 
 ## `CommandedState`
 

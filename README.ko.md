@@ -6,7 +6,7 @@
 
 촉각 센서가 통합된 로봇 핸드 AIDIN Hand Gen2용 SDK입니다. C++와 Python API를 제공합니다.
 
-[![version](https://img.shields.io/badge/version-0.6.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.7.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
 
 [Build](#build-from-source) | [Documentation](#documentation) | [Changelog](CHANGELOG.md) | [Official Site](https://www.aidinrobotics.co.kr/) | [English](README.md) | 한국어
 
