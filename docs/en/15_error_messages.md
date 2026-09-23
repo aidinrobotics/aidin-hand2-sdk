@@ -210,7 +210,7 @@ reception simply stopped without an error.
 
 | Suffix | Check first |
 |---|---|
-| `, last RX error: bus off` | Clear the physical bus cause, then confirm the kernel recovery with `restart-ms` and `ip -details link show` ([CAN-FD setup](05_can_fd_setup.md)) |
+| `, last RX error: bus off` | Clear the physical bus cause, bring the interface up again ([CAN-FD setup](05_can_fd_setup.md)), then check the state with `ip -details link show` |
 | `, last RX error: bus error (no ACK)` | Check whether power is off or the robot hand is unplugged |
 | `, last RX error: bus error` | Check termination, noise, and bit timing |
 | `, last RX error: malformed data` | Check the bit rate and CAN-FD support |

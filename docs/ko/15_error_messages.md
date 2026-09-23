@@ -207,7 +207,7 @@ homing 실패 문구는 모두 ` — retry home(), or check actuator faults via 
 
 | Suffix | Check first |
 |---|---|
-| `, last RX error: bus off` | 물리 bus 원인을 제거한 뒤 [CAN-FD setup](05_can_fd_setup.md)의 `restart-ms`와 `ip -details link show`로 kernel 복구를 확인합니다 |
+| `, last RX error: bus off` | 물리 bus 원인을 제거한 뒤 [CAN-FD setup](05_can_fd_setup.md)으로 interface를 다시 올리고, `ip -details link show`로 state를 확인합니다 |
 | `, last RX error: bus error (no ACK)` | 전원이 꺼졌거나 hand가 분리됐는지 확인합니다 |
 | `, last RX error: bus error` | termination·noise·bit timing을 확인합니다 |
 | `, last RX error: malformed data` | bit rate와 CAN-FD 지원을 확인합니다 |
