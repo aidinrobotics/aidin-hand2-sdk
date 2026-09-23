@@ -64,7 +64,7 @@ sudo ip link set can0 down 2>/dev/null || true
 sudo ip link set can0 type can \
   bitrate 1000000 sample-point 0.875 sjw 10 \
   dbitrate 5000000 dsample-point 0.875 dsjw 2 \
-  fd on restart-ms 100
+  fd on
 sudo ip link set can0 up
 sudo ip link set can0 txqueuelen 1000
 ```
@@ -76,15 +76,10 @@ sudo ip link set can1 down 2>/dev/null || true
 sudo ip link set can1 type can \
   bitrate 1000000 sample-point 0.875 sjw 10 \
   dbitrate 5000000 dsample-point 0.875 dsjw 2 \
-  fd on restart-ms 100
+  fd on
 sudo ip link set can1 up
 sudo ip link set can1 txqueuelen 1000
 ```
-
-> [!NOTE]
-> `restart-ms` is the delay (ms) before automatic recovery after a bus-off. If 0, auto-recovery is
-> off, so a momentary power drop leaves the controller stuck in bus-off and the SDK's auto-reconnect
-> cannot recover from it either.
 
 ### 1.4 Verify the link
 
@@ -104,7 +99,7 @@ Confirm the lines and values below in the output.
 
 ```text
 # <FD> = CAN-FD, ERROR-ACTIVE = normal bus, berr-counter 0 = error not climbing
-can <FD> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 100
+can <FD> state ERROR-ACTIVE (berr-counter tx 0 rx 0)
 # nominal: bitrate 1 Mbit/s, sample-point 0.875
   bitrate 1000000 sample-point 0.875
 # data phase: bitrate 5 Mbit/s, sample-point 0.875
