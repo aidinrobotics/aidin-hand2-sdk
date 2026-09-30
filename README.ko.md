@@ -126,7 +126,7 @@ sudo ldconfig
 ## Related repositories
 
 - [aidin-hand2-ros2](https://github.com/aidinrobotics/aidin-hand2-ros2) — ROS 2 wrapper
-- Web GUI (예정) — 브라우저 GUI와 WebSocket bridge
+- [aidin-hand2-gui](https://github.com/aidinrobotics/aidin-hand2-gui) — GUI
 
 ## License
 
