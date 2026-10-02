@@ -8,6 +8,13 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+### Changed
+
+- **The workspace clamp follows the workspace of the new mechanical design, for hand types a and
+  b.** The workspace was measured again after the mechanical design change, and the clamp limits
+  now match it. A `JointPositionCommand` or `JointImpedanceCommand` target that passed before can
+  now be clamped. The ranges are in the workspace limits document.
+
 ## [0.7.0] - 2026-09-22
 
 `HandState` carries every observation at the width the wire delivers it, which takes the struct from

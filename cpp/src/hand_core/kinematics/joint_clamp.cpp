@@ -4,7 +4,8 @@
 // line and arc pieces. Inside is left alone, outside is projected to the nearest point
 // Past the last knot the boundary is a zero-abduction floor up to the flexion limit
 // Abduction is symmetric, handled as an absolute value with the sign put back
-// The uncoupled joints, long j3 and thumb j0 and j3, get a constant limit
+// Thumb j0 and j3 get a constant limit, and so does the long j3 at its top
+// The long j3 floor is a closed form of the clamped pair, the formula docs 14 section 3.2 gives
 //
 // Slots: long finger abduction 0, flexion 1, thumb abduction 2, flexion 1
 // `ctest -R joint_clamp` checks the seams and the projection after a table change
@@ -28,11 +29,13 @@ constexpr double kToleranceDeg = 1e-9;
 // One boundary piece, the two knots being its end points
 //   Line  the segment between them, arc fields 0
 //   Arc   y = arc_center_abduction_deg + sign(R)*sqrt(R^2 - (x - arc_center_flexion_deg)^2)
-// Rounding the arc coefficients to four digits misses the tabled knot by 1e-4 deg, which
-// reads a target on the boundary as outside
+// The centre follows from the knots and R, and keeps ten digits: at four it misses a knot by up to
+// 6e-4 deg, far more where an arc meets its knot near vertical, and a target on the boundary
+// then reads as outside
 enum class PieceKind { Line, Arc };
-// Both boundaries have four pieces, so extending a table means changing this too
-constexpr std::size_t kPieceCount = 4;
+// The piece count is part of each table's type, so adding a piece means raising its count too
+constexpr std::size_t kLongPieceCount  = 5;
+constexpr std::size_t kThumbPieceCount = 4;
 
 struct BoundaryPiece
 {
@@ -47,38 +50,63 @@ struct BoundaryPiece
   double arc_signed_radius_deg;
 };
 
-// Shared by index, middle, ring and baby, tuned on the 2026-07-30 left hand
-constexpr std::array<BoundaryPiece, kPieceCount> kLongBoundary{{
+// Shared by index, middle, ring and baby, tuned on the 2026-10-01 right hand (hand type a)
+constexpr std::array<BoundaryPiece, kLongPieceCount> kLongBoundary{{
     // kind            flexion lo    hi   abduction lo   hi    arc centre flexion  centre abduction  signed radius
-    {PieceKind::Arc,    0.00,  10.60,    0.40,  27.50, -117.5448848530,   62.0000287617, -132.7078125000},
-    {PieceKind::Line,  10.60,  54.60,   27.50,  27.50,    0.0,             0.0,             0.0         },
-    {PieceKind::Arc,   54.60,  92.68,   27.50,  13.25,  -71.1198326410, -366.4639071557,  413.5372250000},
-    {PieceKind::Arc,   92.68,  95.46,   13.25,   0.00,  143.6789848190,   17.0335266262,  -51.1391388889},
+    {PieceKind::Arc,    0.00,  11.84,    0.00,  31.00, -142.7432481848,   72.2797696293, -160.0},
+    {PieceKind::Line,  11.84,  48.50,   31.00,  31.00,    0.0,             0.0,               0.0},
+    {PieceKind::Arc,   48.50,  87.50,   31.00,  18.50,  104.0890439315,  137.3478170664, -120.0},
+    {PieceKind::Arc,   87.50,  93.20,   18.50,  12.40,   76.0586998853,    2.0958343191,   20.0},
+    {PieceKind::Arc,   93.20,  96.20,   12.40,   0.00,  121.1992042337,   12.6110977985,  -28.0},
 }};
-// Same tuning round
-// The plateau reaches 45.1 deg, past the nominal URDF limit, because the measured range is
-// wider than the nominal one and the measurement is what the boundary follows
-constexpr std::array<BoundaryPiece, kPieceCount> kThumbBoundary{{
-    {PieceKind::Arc,    0.00,   9.00,    0.60,  29.60, -425.8806321979,  148.6664030959, -450.8857644759},
-    {PieceKind::Arc,    9.00,  50.00,   29.60,  45.10,  -55.2563274548,  261.5441564934, -240.6802180268},
-    {PieceKind::Arc,   50.00,  65.00,   45.10,  37.30,   30.1694515845,  -11.3587469529,   59.8401266539},
-    {PieceKind::Arc,   65.00,  76.23,   37.30,   0.00,  251.7767940919,   73.1928136100, -190.1942819332},
+// Same tuning round, measured with the thumb j0 at 93 deg
+// The last piece is all but vertical: flexion ends at 59 deg whatever the abduction
+constexpr std::array<BoundaryPiece, kThumbPieceCount> kThumbBoundary{{
+    {PieceKind::Arc,    0.00,   9.40,    0.00,  29.50, -423.8055121749,  151.2907394727, -450.0},
+    {PieceKind::Arc,    9.40,  48.00,   29.50,  44.50,  -61.5421725476,  269.2231906892, -250.0},
+    {PieceKind::Arc,   48.00,  58.40,   44.50,  39.43,   27.0303586384,  -11.7163156136,   60.0},
+    {PieceKind::Line,  58.40,  59.00,   39.43,   0.00,    0.0,             0.0,               0.0},
 }};
 
 // The flexion limit is the last knot itself, so nothing is allowed past what was measured
 // That leaves the zero-abduction floor with no length, and the knot as the projection candidate
-constexpr double kLongFlexionMaxDeg  = 95.46;
-constexpr double kThumbFlexionMaxDeg = 76.23;
+constexpr double kLongFlexionMaxDeg  = 96.20;
+constexpr double kThumbFlexionMaxDeg = 59.00;
 
-// Constant limits in degrees for the uncoupled joints
-constexpr double kLongDistalMaxDeg = 90.0;   // long finger j3, URDF 89
-constexpr double kThumbJ3MaxDeg    = 70.0;   // thumb j3, URDF 70.53
-constexpr double kThumbJ0MaxDeg    = 110.0;  // thumb j0 CMC, URDF 111.5
+// Upper limits in degrees for the joints outside the coupled pairs, the lower being 0
+// Each is the stop found by bending that joint by hand, on the right hand the tables were tuned on
+// The long j3 stop held within 0.1 deg at every abduction, so it is the joint's own stop and stays
+// constant, where the floor below follows the pose
+constexpr double kLongDistalMaxDeg = 80.0;   // long finger j3
+constexpr double kThumbJ3MaxDeg    = 75.0;   // thumb j3
+constexpr double kThumbJ0MaxDeg    = 108.8;  // thumb j0 CMC
+
+// Long finger slots, as (abduction, flexion, j3)
+struct LongDistal
+{
+  int abduction_slot;
+  int flexion_slot;
+  int distal_slot;
+};
+constexpr std::array<LongDistal, 4> kLongDistals{{
+    {4, 5, 6}, {7, 8, 9}, {10, 11, 12}, {13, 14, 15},   // index, middle, ring, baby
+}};
+
+// Long j3 floor constants, a0..a10 and b0..b8 of docs 14 section 3.2, printed there to the same digits
+// They fold the long finger linkage of hand type a, which type b shares, into ratios; the formula
+// matches the angle at which the j3 actuator meets its home stop within 0.0004 deg
+constexpr std::array<double, 11> kDistalFloorA{{
+    0.819728, 1.79827, 0.287368, 0.142105, 0.371072, 0.34125, 0.16875, 1.02019, 0.0825804, 0.574736, 0.28421,
+}};
+constexpr std::array<double, 9> kDistalFloorB{{
+    -3.26693, -2.91243, -1.56229, -2.13874, 2.10835, 3.93041, 11.923, -3.12458, -5.82487,
+}};
 
 // Clamps one finger's coupled pair, the table starting at flexion 0 with no gap between pieces
+template <std::size_t PieceCount>
 void clamp_finger_workspace(std::array<double, kActiveJointCount>& target_rad,
                             int abduction_slot, int flexion_slot,
-                            const std::array<BoundaryPiece, kPieceCount>& boundary,
+                            const std::array<BoundaryPiece, PieceCount>& boundary,
                             double flexion_max_deg)
 {
   const double flexion_deg = std::max(0.0, target_rad[flexion_slot] / kDeg2Rad);
@@ -88,7 +116,7 @@ void clamp_finger_workspace(std::array<double, kActiveJointCount>& target_rad,
   const double abduction_sign = commanded_abduction_deg < 0.0 ? -1.0 : 1.0;
 
   // Past the last knot no piece matches, and the projection below takes over
-  for (std::size_t index = 0; index < kPieceCount; ++index) {
+  for (std::size_t index = 0; index < PieceCount; ++index) {
     const BoundaryPiece& piece = boundary[index];
     if (flexion_deg > piece.flexion_hi_deg + kToleranceDeg) continue;
 
@@ -118,13 +146,13 @@ void clamp_finger_workspace(std::array<double, kActiveJointCount>& target_rad,
   }
 
   // The floor comes first, and being horizontal it only clamps the flexion
-  double nearest_flexion_deg = std::clamp(flexion_deg, boundary[kPieceCount - 1].flexion_hi_deg,
+  double nearest_flexion_deg = std::clamp(flexion_deg, boundary[PieceCount - 1].flexion_hi_deg,
                                           flexion_max_deg);
   double nearest_abduction_deg = 0.0;
   double nearest_distance = (flexion_deg - nearest_flexion_deg) * (flexion_deg - nearest_flexion_deg)
                           + abduction_deg * abduction_deg;
 
-  for (std::size_t index = 0; index < kPieceCount; ++index) {
+  for (std::size_t index = 0; index < PieceCount; ++index) {
     const BoundaryPiece& piece = boundary[index];
     double candidate_flexion_deg = 0.0;
     double candidate_abduction_deg = 0.0;
@@ -188,6 +216,28 @@ void clamp_finger_workspace(std::array<double, kActiveJointCount>& target_rad,
   target_rad[abduction_slot] = abduction_sign * nearest_abduction_deg * kDeg2Rad;
 }
 
+// The long j3 floor in rad at flexion x and abduction y in rad, the docs formula term by term:
+// beta and lambda as written there, phi the floor before max(0, phi)
+// Below the floor the j3 actuator would have to pass its home stop, so a smaller j3 never reaches
+// the hand. Abduction enters only through cos y, so the sign of y does not matter
+double long_distal_floor_rad(double x, double y)
+{
+  const std::array<double, 11>& a = kDistalFloorA;
+  const std::array<double, 9>& b = kDistalFloorB;
+  const double beta = a[0] - x;
+  const double sin_beta = std::sin(beta), cos_beta = std::cos(beta), cos_y = std::cos(y);
+  const double lambda = a[1] + x + std::atan2(sin_beta + a[2] * cos_y, cos_beta + a[3])
+      - std::acos(std::clamp((a[4] + a[5] * sin_beta * cos_y + a[6] * cos_beta)
+                                 / std::sqrt(a[7] + a[8] * cos_y * cos_y + a[9] * sin_beta * cos_y + a[10] * cos_beta),
+                             -1.0, 1.0));
+  const double sin_lambda = std::sin(lambda), cos_lambda = std::cos(lambda);
+  const double phi = b[0] - std::atan2(sin_lambda + b[1], cos_lambda + b[2])
+      + std::acos(std::clamp((b[3] + b[4] * cos_lambda + b[5] * sin_lambda)
+                                 / std::sqrt(b[6] + b[7] * cos_lambda + b[8] * sin_lambda),
+                             -1.0, 1.0));
+  return std::max(0.0, phi);
+}
+
 // JointPosition and JointImpedance share the target space, so they share this
 void clamp_active_joint_targets(std::array<double, kActiveJointCount>& target)
 {
@@ -198,13 +248,19 @@ void clamp_active_joint_targets(std::array<double, kActiveJointCount>& target)
   clamp_finger_workspace(target, 10, 11, kLongBoundary,  kLongFlexionMaxDeg);    // ring
   clamp_finger_workspace(target, 13, 14, kLongBoundary,  kLongFlexionMaxDeg);    // baby
 
-  // Uncoupled joints, clamped to a constant range
+  // Joints outside the coupled pairs, clamped to a constant range
   target[0]  = std::clamp(target[0],  0.0, kThumbJ0MaxDeg * kDeg2Rad);      // thumb j0 CMC
   target[3]  = std::clamp(target[3],  0.0, kThumbJ3MaxDeg * kDeg2Rad);      // thumb j3
   target[6]  = std::clamp(target[6],  0.0, kLongDistalMaxDeg * kDeg2Rad);   // index j3 distal
   target[9]  = std::clamp(target[9],  0.0, kLongDistalMaxDeg * kDeg2Rad);   // middle j3
   target[12] = std::clamp(target[12], 0.0, kLongDistalMaxDeg * kDeg2Rad);   // ring j3
   target[15] = std::clamp(target[15], 0.0, kLongDistalMaxDeg * kDeg2Rad);   // baby j3
+
+  // The long j3 floor follows the pairs clamped above, so it comes last
+  for (const LongDistal& distal : kLongDistals) {
+    const double floor_rad = long_distal_floor_rad(target[distal.flexion_slot], target[distal.abduction_slot]);
+    if (target[distal.distal_slot] < floor_rad) target[distal.distal_slot] = floor_rad;
+  }
 }
 
 }  // namespace
