@@ -11,12 +11,14 @@
 //   3) 안쪽 보장   밖의 목표를 clamp 한 결과가 반드시 경계 안인지
 //   4) 최단        clamp 결과가 경계를 촘촘히 샘플링한 기준의 최단점과 같은지
 //   5) 대칭·고정점 벌림 부호 대칭, 굽힘 음수·상한 초과 처리, 몇 가지 손으로 아는 값
+//   6) long j3 하한 clamp 한 (j1, j2) 에서 d3 가 home stop 에 닿는 각도까지 올리는지 (IK 로 판정)
 
 #include <array>
 #include <cmath>
 #include <cstdio>
 #include <vector>
 
+#include <aidin_hand2/hand/hand_kinematics.hpp>
 #include <aidin_hand2/types/command.hpp>
 
 using namespace aidin_hand2;
@@ -41,8 +43,8 @@ struct FingerUnderTest
   double flexion_max_deg;
 };
 constexpr std::array<FingerUnderTest, 2> kFingers{{
-    {"thumb", 2, 1, 76.23},
-    {"long",  4, 5, 95.46},   // index (baby/middle/ring 과 같은 경계)
+    {"thumb", 2, 1, 59.00},
+    {"long",  4, 5, 96.20},   // index (baby/middle/ring 과 같은 경계)
 }};
 
 // 목표 (굽힘, 벌림) 을 clamp 한 결과 [deg].
@@ -86,18 +88,29 @@ double probe_boundary(const FingerUnderTest& finger, double flexion_deg)
 void test_joins_are_continuous(const FingerUnderTest& finger)
 {
   constexpr double kStepDeg = 0.01;
-  // 0.01° 진행에 이보다 크게 변하면 끊긴 것. 이 값은 "얼마나 가파른가"가 아니라 "끊겼는가"를
-  // 잡는 기준이다 — 경계 끝의 벌림 닫힘 구간은 정상적으로도 가파르다(2026-07-30_left 기준
-  // long seg3 이 |기울기| ≈ 13, 즉 0.01° 당 0.13°). 진짜 이음새 어긋남은 수직 점프라 자릿수가
-  // 다르므로, 정상 급경사보다 넉넉히 위에 두고 그 이상만 끊김으로 본다.
+  // 0.01° 진행에 이보다 크게 변하면 끊긴 것으로 의심한다. 경계 끝의 벌림 닫힘 구간은 정상적으로도
+  // 가파르다 — 2026-10-01 오른손 thumb 의 마지막 line 은 |기울기| ≈ 66, 즉 0.01° 당 0.66° 다.
+  // 그래서 의심 구간은 100 배 촘촘히(0.0001°) 다시 훑는다. 기울기에서 온 변화는 간격에 비례해
+  // 줄지만 수직 점프인 이음새 어긋남은 줄지 않으므로, 다시 훑어도 남는 변화만 끊김으로 본다.
   constexpr double kAllowedJumpDeg = 0.50;
+  constexpr int kRefine = 100;
   double previous_boundary_deg = probe_boundary(finger, 0.0);
   double worst_jump_deg = 0.0, worst_jump_flexion_deg = 0.0;
   int unexpected_jumps = 0;
   for (double flexion_deg = kStepDeg; flexion_deg <= finger.flexion_max_deg; flexion_deg += kStepDeg) {
     const double boundary_deg = probe_boundary(finger, flexion_deg);
     if (boundary_deg < 0.0 || previous_boundary_deg < 0.0) { previous_boundary_deg = boundary_deg; continue; }
-    const double jump_deg = std::fabs(boundary_deg - previous_boundary_deg);
+    double jump_deg = std::fabs(boundary_deg - previous_boundary_deg);
+    if (jump_deg > kAllowedJumpDeg) {
+      double fine_previous_deg = previous_boundary_deg;
+      jump_deg = 0.0;
+      for (int step = 1; step <= kRefine; ++step) {
+        const double fine_deg = probe_boundary(finger, flexion_deg - kStepDeg + step * kStepDeg / kRefine);
+        if (fine_deg >= 0.0 && fine_previous_deg >= 0.0 && fine_deg > 1e-6)
+          jump_deg = std::fmax(jump_deg, std::fabs(fine_deg - fine_previous_deg));
+        fine_previous_deg = fine_deg;
+      }
+    }
     if (jump_deg > kAllowedJumpDeg) {
       // 벌림 0 으로 떨어지는 낙하(바닥 진입)만 정상.
       if (boundary_deg > 1e-6) {
@@ -241,10 +254,10 @@ void test_independent_joint_limits()
   JointPositionCommand command;
   for (double& value : command.target) value = 200.0 * kDeg2Rad;
   command.clamp();
-  check(command.target[0] <= 110.0 * kDeg2Rad + 1e-12, "thumb j0 상한(110°) 초과");
-  check(command.target[3] <=  70.0 * kDeg2Rad + 1e-12, "thumb j3 상한(70°) 초과");
+  check(std::fabs(command.target[0] - 108.8 * kDeg2Rad) < 1e-12, "thumb j0 상한(108.8°)으로 안 붙었다");
+  check(std::fabs(command.target[3] -  75.0 * kDeg2Rad) < 1e-12, "thumb j3 상한(75°)으로 안 붙었다");
   for (int base : {4, 7, 10, 13})
-    check(command.target[base + 2] <= 90.0 * kDeg2Rad + 1e-12, "long j3 상한(90°) 초과");
+    check(std::fabs(command.target[base + 2] - 80.0 * kDeg2Rad) < 1e-12, "long j3 상한(80°)으로 안 붙었다");
 
   for (double& value : command.target) value = -50.0 * kDeg2Rad;
   command.clamp();
@@ -264,6 +277,74 @@ void test_independent_joint_limits()
           "JointImpedance 와 JointPosition 의 clamp 결과가 다르다");
 }
 
+// ── 6) long j3 하한 ────────────────────────────────────────────────────────────
+// d3 가 home stop 보다 덜 나가야 하는 j3 는 IK 가 count 0 으로 잘라 손이 가지 못한다. 그래서 clamp 는
+// j3 를 clamp 한 (j1, j2) 에서 d3 가 home stop 에 닿는 각도까지 올린다. 하한 값을 여기 적지 않고 IK 로만
+// 판정한다 — clamp 한 j3 에서 d3 는 home stop 위(count 0 근처)이고, 0.05° 더 굽히면 움직이기 시작해야
+// 한다. 하한이 0 아래인 자세에서는 j3 0 이 그대로이고, 0.05° 에서 d3 가 이미 움직인다.
+void test_long_distal_floor()
+{
+  // clamp 의 하한은 문서 14장 3.2절의 닫힌 식이다. IK 로 구한 하한과 경계 안에서 0.0004° 안으로 같고,
+  // 하한 위치의 d3 는 count 0 이었다(2026-10-02, type a). 8 count(약 0.005°)는 상수가 틀어졌을 때 잡는 여유다.
+  constexpr int kHomeStopCount = 8;
+  constexpr std::array<int, 4> kLongBases{4, 7, 10, 13};   // index, middle, ring, baby 의 j1 슬롯
+  int raised_past_floor = 0, left_below_floor = 0, fingers_differ = 0, checked = 0;
+  for (double flexion_deg = -4.0; flexion_deg <= 104.0; flexion_deg += 1.5)
+    for (double abduction_deg = -40.0; abduction_deg <= 40.0; abduction_deg += 2.5)
+      for (double distal_deg : {-20.0, 0.0}) {
+        JointPositionCommand command;
+        for (int base : kLongBases) {
+          command.target[base]     = abduction_deg * kDeg2Rad;
+          command.target[base + 1] = flexion_deg * kDeg2Rad;
+          command.target[base + 2] = distal_deg * kDeg2Rad;
+        }
+        command.clamp();
+        const std::array<int, kActuatorCount> at_clamped = ik_joint_to_actuator(command.target);
+        std::array<double, kActiveJointCount> bent_further = command.target;
+        for (int base : kLongBases) bent_further[base + 2] += 0.05 * kDeg2Rad;
+        const std::array<int, kActuatorCount> at_bent_further = ik_joint_to_actuator(bent_further);
+        for (int base : kLongBases) {
+          // 능동 슬롯과 actuator 번호가 long finger 에서는 같다(d3 = base + 2).
+          if (command.target[base + 2] > 1e-12 && at_clamped[base + 2] > kHomeStopCount) ++raised_past_floor;
+          if (at_bent_further[base + 2] <= 0) ++left_below_floor;
+          if (std::fabs(command.target[base + 2] - command.target[kLongBases[0] + 2]) > 1e-12) ++fingers_differ;
+          ++checked;
+        }
+      }
+  std::printf("  long j3 하한 검사 %d개\n", checked);
+  if (raised_past_floor) std::printf("  하한보다 높이 올린 횟수 %d\n", raised_past_floor);
+  if (left_below_floor) std::printf("  하한 아래에 남긴 횟수 %d\n", left_below_floor);
+  check(raised_past_floor == 0, "long j3 를 d3 home stop 보다 높이 올렸다");
+  check(left_below_floor == 0, "long j3 가 d3 home stop 아래에 남았다");
+  check(fingers_differ == 0, "long finger 넷의 j3 하한이 다르다");
+
+  // 손으로 아는 값: flexion 40°, abduction 0° 의 하한은 5.687°, flexion 90° 에서는 하한이 0 아래다.
+  // 범위 안의 j3 는 그대로. 상한은 자세와 무관하게 80° 다 — 손으로 굽혀 본 스톱이 모든 abduction 에서
+  // 80° ± 0.1° 였다.
+  auto clamp_distal = [](double flexion_deg, double abduction_deg, double distal_deg) {
+    JointPositionCommand command;
+    command.target[4] = abduction_deg * kDeg2Rad;
+    command.target[5] = flexion_deg * kDeg2Rad;
+    command.target[6] = distal_deg * kDeg2Rad;
+    command.clamp();
+    return command.target[6] / kDeg2Rad;
+  };
+  check(std::fabs(clamp_distal(40.0, 0.0, 0.0) - 5.687) < 0.01, "flexion 40° 에서 j3 0 이 하한 5.687° 로 안 올라갔다");
+  check(std::fabs(clamp_distal(90.0, 0.0, 0.0)) < 1e-12, "flexion 90° 에서 j3 0 이 움직였다");
+  check(std::fabs(clamp_distal(40.0, 0.0, 30.0) - 30.0) < 1e-9, "범위 안의 j3 30° 를 clamp 가 건드렸다");
+  int ceiling_moved = 0;
+  for (double flexion_deg = 0.0; flexion_deg <= 96.0; flexion_deg += 8.0)
+    for (double abduction_deg = -30.0; abduction_deg <= 30.0; abduction_deg += 10.0)
+      if (std::fabs(clamp_distal(flexion_deg, abduction_deg, 120.0) - 80.0) > 1e-9) ++ceiling_moved;
+  check(ceiling_moved == 0, "long j3 상한이 자세에 따라 80° 에서 벗어났다");
+
+  // thumb j3 는 결합이 없어 굽힘과 무관하게 0 이 그대로다.
+  JointPositionCommand thumb;
+  thumb.target[1] = 30.0 * kDeg2Rad;
+  thumb.clamp();
+  check(std::fabs(thumb.target[3]) < 1e-12, "thumb j3 0 이 움직였다");
+}
+
 }  // namespace
 
 int main()
@@ -276,6 +357,7 @@ int main()
   }
   test_symmetry_and_known_points();
   test_independent_joint_limits();
+  test_long_distal_floor();
 
   std::printf("joint_clamp test: %s\n", g_failures == 0 ? "OK" : "FAIL");
   return g_failures == 0 ? 0 : 1;
