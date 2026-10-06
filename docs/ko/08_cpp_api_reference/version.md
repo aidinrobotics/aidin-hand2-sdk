@@ -5,8 +5,8 @@
 ```cpp
 inline constexpr int kVersionMajor = 0;
 inline constexpr int kVersionMinor = 7;
-inline constexpr int kVersionPatch = 0;
-inline constexpr const char* kVersionString = "0.7.0";   // 빌드한 SDK의 버전
+inline constexpr int kVersionPatch = 1;
+inline constexpr const char* kVersionString = "0.7.1";   // 빌드한 SDK의 버전
 ```
 
 이 header는 빌드할 때 `cmake/version.hpp.in`에서 생성되며, 값의 출처는 `cpp/CMakeLists.txt`의
