@@ -28,7 +28,7 @@ Long fingers (index / middle / ring / baby).
 
 | Joint | Axis | Allowed range |
 | :--- | :--- | :--- |
-| `joint1` | MCP abduction/adduction | [−31°, 31°] (coupled) |
+| `joint1` | MCP abduction/adduction | [−30.0°, 30.0°] (coupled) |
 | `joint2` | MCP flexion/extension | [0°, 96.2°] (coupled) |
 | `joint3` | PIP flexion/extension | [0°, 80°] (lower bound depends on `joint1` and `joint2`) |
 | `joint4` | DIP flexion/extension | [0°, 90.6°] (passive) |
@@ -153,9 +153,9 @@ The long finger $y_{\max}$ consists of the following 5 segments.
 
 | Type | $\mathbf p_0$ | $\mathbf p_1$ | $\mathbf c$ | $R$ |
 | :--- | ---: | ---: | ---: | ---: |
-| Arc | (0, 0) | (11.84, 31) | (−142.7432, 72.2798) | −160 |
-| Line | (11.84, 31) | (48.5, 31) | — | — |
-| Arc | (48.5, 31) | (87.5, 18.5) | (104.0890, 137.3478) | −120 |
+| Arc | (0, 0) | (11.56, 30) | (−142.7639, 72.2389) | −160 |
+| Line | (11.56, 30) | (50.5, 30) | — | — |
+| Arc | (50.5, 30) | (87.5, 18.5) | (104.1494, 137.3394) | −120 |
 | Arc | (87.5, 18.5) | (93.2, 12.4) | (76.0587, 2.0958) | 20 |
 | Arc | (93.2, 12.4) | (96.2, 0) | (121.1992, 12.6111) | −28 |
 

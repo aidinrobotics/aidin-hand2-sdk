@@ -53,9 +53,9 @@ struct BoundaryPiece
 // Shared by index, middle, ring and baby, tuned on the 2026-10-01 right hand (hand type a)
 constexpr std::array<BoundaryPiece, kLongPieceCount> kLongBoundary{{
     // kind            flexion lo    hi   abduction lo   hi    arc centre flexion  centre abduction  signed radius
-    {PieceKind::Arc,    0.00,  11.84,    0.00,  31.00, -142.7432481848,   72.2797696293, -160.0},
-    {PieceKind::Line,  11.84,  48.50,   31.00,  31.00,    0.0,             0.0,               0.0},
-    {PieceKind::Arc,   48.50,  87.50,   31.00,  18.50,  104.0890439315,  137.3478170664, -120.0},
+    {PieceKind::Arc,    0.00,  11.56,    0.00,  30.00, -142.7639230149,   72.2389250017, -160.0},
+    {PieceKind::Line,  11.56,  50.50,   30.00,  30.00,    0.0,             0.0,               0.0},
+    {PieceKind::Arc,   50.50,  87.50,   30.00,  18.50,  104.1494008616,  137.3393766853, -120.0},
     {PieceKind::Arc,   87.50,  93.20,   18.50,  12.40,   76.0586998853,    2.0958343191,   20.0},
     {PieceKind::Arc,   93.20,  96.20,   12.40,   0.00,  121.1992042337,   12.6110977985,  -28.0},
 }};
