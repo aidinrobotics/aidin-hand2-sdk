@@ -80,22 +80,22 @@ $y$ of 0 and above.
 
 $y_{\max}$ consists of several segments, each defined between two points
 
-$$
+```math
 \mathbf p_0 = (x_0,\ y_0), \qquad \mathbf p_1 = (x_1,\ y_1)
-$$
+```
 
 as a line or an arc. Each segment is therefore valid over $x \in [x_0,\ x_1]$.
 
 A line segment is the linear interpolation between the two points; an arc segment is defined by its
 circle center $\mathbf c = (x_c,\ y_c)$ and a signed radius $R$.
 
-$$
+```math
 y_{\max}(x) =
 \begin{cases}
 y_0 + \dfrac{x - x_0}{x_1 - x_0}\,(y_1 - y_0) & \text{Line} \\[2ex]
 y_c + R\sqrt{1 - \left(\dfrac{x - x_c}{R}\right)^2} & \text{Arc}
 \end{cases}
-$$
+```
 
 $\mathbf c$ follows from the two points and $R$; the table below gives it to four decimal places.
 
@@ -130,22 +130,22 @@ $y$, so the figure shows only $y$ of 0 and above.
 
 $y_{\max}$ consists of several segments, each defined between two points
 
-$$
+```math
 \mathbf p_0 = (x_0,\ y_0), \qquad \mathbf p_1 = (x_1,\ y_1)
-$$
+```
 
 as a line or an arc. Each segment is therefore valid over $x \in [x_0,\ x_1]$.
 
 A line segment is the linear interpolation between the two points; an arc segment is defined by its
 circle center $\mathbf c = (x_c,\ y_c)$ and a signed radius $R$.
 
-$$
+```math
 y_{\max}(x) =
 \begin{cases}
 y_0 + \dfrac{x - x_0}{x_1 - x_0}\,(y_1 - y_0) & \text{Line} \\[2ex]
 y_c + R\sqrt{1 - \left(\dfrac{x - x_c}{R}\right)^2} & \text{Arc}
 \end{cases}
-$$
+```
 
 $\mathbf c$ follows from the two points and $R$; the table below gives it to four decimal places.
 
@@ -172,13 +172,13 @@ into it, taking $z_{\min}$ at $(x, y)$ after the clamp to the section 3.1 bounda
 
 All angles in the formulas below are in radians.
 
-$$
+```math
 z_{\min}(x, y) = \max\bigl(0,\ \varphi(x, y)\bigr)
-$$
+```
 
 $\varphi(x, y)$ is defined as follows.
 
-$$
+```math
 \begin{aligned}
 \beta &= a_0 - x \\[1ex]
 \lambda &= a_1 + x + \operatorname{atan2}\bigl(\sin\beta + a_2\cos y,\ \cos\beta + a_3\bigr)
@@ -188,7 +188,7 @@ $$
   + \arccos\frac{b_3 + b_4\cos\lambda + b_5\sin\lambda}
                {\sqrt{b_6 + b_7\cos\lambda + b_8\sin\lambda}}
 \end{aligned}
-$$
+```
 
 The constants are below.
 

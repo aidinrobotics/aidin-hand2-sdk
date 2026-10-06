@@ -75,22 +75,22 @@ $[-y_{\max}(x),\ y_{\max}(x)]$입니다. 경계는 $y$의 부호에 대해 대�
 
 $y_{\max}$는 여러 개의 segment로 구성되며, 각 segment는 두 점
 
-$$
+```math
 \mathbf p_0 = (x_0,\ y_0), \qquad \mathbf p_1 = (x_1,\ y_1)
-$$
+```
 
 사이에서 정의되는 line 또는 arc입니다. 따라서 각 segment의 유효 범위는 $x \in [x_0,\ x_1]$입니다.
 
 line segment는 두 점 사이의 선형 보간이고, arc segment는 원의 중심 $\mathbf c = (x_c,\ y_c)$와
 signed radius $R$로 정의됩니다.
 
-$$
+```math
 y_{\max}(x) =
 \begin{cases}
 y_0 + \dfrac{x - x_0}{x_1 - x_0}\,(y_1 - y_0) & \text{Line} \\[2ex]
 y_c + R\sqrt{1 - \left(\dfrac{x - x_c}{R}\right)^2} & \text{Arc}
 \end{cases}
-$$
+```
 
 $\mathbf c$는 두 점과 $R$로 정해지는 값이고, 아래 표에는 소수 넷째 자리까지 적었습니다.
 
@@ -125,22 +125,22 @@ $[-y_{\max}(x),\ y_{\max}(x)]$입니다. 경계는 $y$의 부호에 대해 대�
 
 $y_{\max}$는 여러 개의 segment로 구성되며, 각 segment는 두 점
 
-$$
+```math
 \mathbf p_0 = (x_0,\ y_0), \qquad \mathbf p_1 = (x_1,\ y_1)
-$$
+```
 
 사이에서 정의되는 line 또는 arc입니다. 따라서 각 segment의 유효 범위는 $x \in [x_0,\ x_1]$입니다.
 
 line segment는 두 점 사이의 선형 보간이고, arc segment는 원의 중심 $\mathbf c = (x_c,\ y_c)$와
 signed radius $R$로 정의됩니다.
 
-$$
+```math
 y_{\max}(x) =
 \begin{cases}
 y_0 + \dfrac{x - x_0}{x_1 - x_0}\,(y_1 - y_0) & \text{Line} \\[2ex]
 y_c + R\sqrt{1 - \left(\dfrac{x - x_c}{R}\right)^2} & \text{Arc}
 \end{cases}
-$$
+```
 
 $\mathbf c$는 두 점과 $R$로 정해지는 값이고, 아래 표에는 소수 넷째 자리까지 적었습니다.
 
@@ -166,13 +166,13 @@ $y$가 함께 바뀔 수 있습니다.
 
 아래 식에서 각도는 모두 rad입니다.
 
-$$
+```math
 z_{\min}(x, y) = \max\bigl(0,\ \varphi(x, y)\bigr)
-$$
+```
 
 $\varphi(x, y)$는 다음과 같이 정의됩니다.
 
-$$
+```math
 \begin{aligned}
 \beta &= a_0 - x \\[1ex]
 \lambda &= a_1 + x + \operatorname{atan2}\bigl(\sin\beta + a_2\cos y,\ \cos\beta + a_3\bigr)
@@ -182,7 +182,7 @@ $$
   + \arccos\frac{b_3 + b_4\cos\lambda + b_5\sin\lambda}
                {\sqrt{b_6 + b_7\cos\lambda + b_8\sin\lambda}}
 \end{aligned}
-$$
+```
 
 상수는 다음과 같습니다.
 
