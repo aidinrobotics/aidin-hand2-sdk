@@ -222,6 +222,19 @@ void test_frames_to_hand_state()
   check(lower_ok, "frames_to_hand_state: palm[20..39] <- palm1_lower");
   check(palm2_ok, "frames_to_hand_state: palm[40..57] <- palm2");
 
+  // 32767 을 넘는 raw 값이 int32 로 옮겨질 때 부호 확장되지 않는다 (0xFFFF -> 65535, -1 이 아님).
+  {
+    StateFrames high = sf;
+    high.tactile_baby[kTactileTaxelsPerFinger - 1] = 0xFFFF;
+    high.palm2[kPalm2Count - 1] = 0xFFFF;
+    HandState s{};
+    protocol.frames_to_hand_state(high, s);
+    check(s.tactile.fingers[4][kTactileTaxelsPerFinger - 1] == 65535,
+          "frames_to_hand_state: finger 0xFFFF -> 65535");
+    check(s.tactile.palm[kPalmTactileCount - 1] == 65535,
+          "frames_to_hand_state: palm 0xFFFF -> 65535");
+  }
+
   // actuator 수치 cast.
   check(state.actuators.position_count[7] == -777.0, "frames_to_hand_state: position_count cast");
   check(state.actuators.velocity_rpm[2] == 321.0, "frames_to_hand_state: velocity_rpm cast");

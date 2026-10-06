@@ -8,6 +8,17 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: `TactileState` holds its readings as `std::int32_t` instead of `std::uint16_t`.**
+  The values are still the raw 16-bit readings, 0 to 65535. A reading is used as a difference from
+  a baseline, and that difference has to go negative. C++ already promotes `uint16_t` to `int`
+  before subtracting, but a numpy `uint16` array or a ROS 2 `uint16[]` field turns `100 - 200` into
+  `65436` without an error, so the type changes at the source and every binding and message
+  carries a signed value. `HandState` grows from 1032 to 1320 bytes: rebuild every consumer. Code
+  that assigns a tactile array to a `std::array<std::uint16_t, N>` no longer compiles; change the
+  element type to `std::int32_t`.
+
 ## [0.7.1] - 2026-10-06
 
 The workspace clamp follows the hand after its mechanical design change, for hand types A and B,
