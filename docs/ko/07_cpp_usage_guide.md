@@ -4,7 +4,7 @@ AIDIN Hand Gen2는 5 손가락을 actuator 16개로 joint 21개(active 16 + pass
 핸드이고, 손끝, 손마디, 손바닥에 촉각 센서가 있습니다. 이 문서는 SDK를 user application에 연결해
 제어하는 방법을 설명합니다.
 </br>type 구성과 설정에서 시작해 상태 전이, homing, command, controller 설정, 한계, 관측, 오류 처리 순으로
-다룹니다. 먼저 [SDK build & install](06_sdk_build_and_install.md)을 마치십시오.
+다룹니다. 먼저 [SDK build & install](06_sdk_build_and_install.md#1-c)을 마치십시오.
 
 모든 심볼은 `aidin_hand2` namespace에 있고, 이 문서의 코드는 `ah2`를 alias로 씁니다. 심볼과 필드 목록은
 [API reference](08_cpp_api_reference.md)에 있습니다.

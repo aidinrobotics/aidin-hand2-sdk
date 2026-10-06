@@ -20,5 +20,5 @@ find_package(aidin_hand2 0.7 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
-연결 방법은 [SDK build & install](../06_sdk_build_and_install.md#3-install-and-link), 전체 흐름을
+연결 방법은 [SDK build & install](../06_sdk_build_and_install.md#13-install-and-link), 전체 흐름을
 담은 예제는 [C++ guide](../07_cpp_usage_guide.md#933-exit-on-failure)에 있습니다.

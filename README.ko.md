@@ -17,7 +17,7 @@
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear"}}}%%
 flowchart LR
-    App["<b>Application</b><br/>C++ &nbsp;&nbsp;·&nbsp;&nbsp; Python(예정)<br/>ROS 2"]
+    App["<b>Application</b><br/>C++ &nbsp;&nbsp;·&nbsp;&nbsp; Python<br/>ROS 2"]
     SDK["<b>SDK</b><br/>Control loop &nbsp;·&nbsp; CAN-FD<br/>Logging &nbsp;·&nbsp; Diagnostics"]
     Hand["<b>Hardware</b><br/>AIDIN Hand Gen2"]
     App <--> SDK
@@ -47,7 +47,7 @@ lifecycle과 명령·상태 API는 [C++ guide](docs/ko/07_cpp_usage_guide.md)를
 | CAN device | [SocketCAN](https://docs.kernel.org/networking/can.html)이 지원되는 CAN FD capable device |
 | CAN bitrate | arbitration 1 Mbit/s / data 5 Mbit/s |
 | Dependencies | spdlog ≥ 1.9, can-utils |
-| Python bindings (예정) | Python ≥ 3.10, numpy |
+| Python package | Python 3.10 ~ 3.13, x86_64 · aarch64, hand type A |
 | ROS 2 wrapper (선택) | Humble |
 
 500 Hz 실시간 제어에는 PREEMPT_RT kernel을 권장합니다. 커스텀·RT 패치 kernel(예: Jetson)은 CAN driver가 빠져 있을 수 있어 직접 켜야 합니다.
@@ -92,6 +92,18 @@ sudo cmake --install cpp/build
 sudo ldconfig
 ```
 
+## Python package
+
+Python 패키지는 SDK를 미리 빌드해 담고 있어 C++ 빌드 없이 pip으로 설치합니다. PyPI가 아니라
+AIDIN Robotics의 package index에 있으므로 index 주소를 한 번 등록합니다. hand type A만 지원하며,
+venv와 버전 맞추기를 포함한 절차는 [SDK build & install](docs/ko/06_sdk_build_and_install.md#2-python)에
+있습니다.
+
+```bash
+pip config set --user global.extra-index-url https://aidinrobotics.github.io/aidin-hand2-sdk/simple/
+pip install aidin-hand2
+```
+
 ## Documentation
 
 ### Hardware
@@ -104,7 +116,7 @@ sudo ldconfig
 
 - [Real-time kernel setup](docs/ko/04_real_time_kernel_setup.md) — PREEMPT_RT kernel과 real-time settings
 - [CAN-FD setup](docs/ko/05_can_fd_setup.md) — driver 확인과 CAN-FD interface bring-up
-- [SDK build & install](docs/ko/06_sdk_build_and_install.md) — 빌드·테스트·설치와 예제
+- [SDK build & install](docs/ko/06_sdk_build_and_install.md) — C++ 빌드·설치와 예제, Python 패키지 설치
 
 ### C++ guide
 
@@ -114,9 +126,9 @@ sudo ldconfig
 
 ### Python guide
 
-- Usage guide — lifecycle, 소유권, command mode (예정)
-- API reference — type·unit·state·diagnostics 계약 (예정)
-- Logging — log sink, callback, diagnostics (예정)
+- [Usage guide](docs/ko/10_python_usage_guide.md) — 생성과 정리, 운전, homing, command, 관측
+- [API reference](docs/ko/11_python_api_reference.md) — 주제별 심볼과 필드·dtype·계약
+- [Logging](docs/ko/12_python_logging.md) — log sink, Python `logging`으로 넘기기
 
 ### Operations
 
