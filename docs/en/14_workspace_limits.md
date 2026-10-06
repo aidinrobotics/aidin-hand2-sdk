@@ -181,10 +181,10 @@ $\varphi(x, y)$ is defined as follows.
 ```math
 \begin{aligned}
 \beta &= a_0 - x \\[1ex]
-\lambda &= a_1 + x + \operatorname{atan2}\bigl(\sin\beta + a_2\cos y,\ \cos\beta + a_3\bigr)
+\lambda &= a_1 + x + \mathrm{atan2}\bigl(\sin\beta + a_2\cos y,\ \cos\beta + a_3\bigr)
   - \arccos\frac{a_4 + a_5\sin\beta\cos y + a_6\cos\beta}
                {\sqrt{a_7 + a_8\cos^2 y + a_9\sin\beta\cos y + a_{10}\cos\beta}} \\[1ex]
-\varphi &= b_0 - \operatorname{atan2}\bigl(\sin\lambda + b_1,\ \cos\lambda + b_2\bigr)
+\varphi &= b_0 - \mathrm{atan2}\bigl(\sin\lambda + b_1,\ \cos\lambda + b_2\bigr)
   + \arccos\frac{b_3 + b_4\cos\lambda + b_5\sin\lambda}
                {\sqrt{b_6 + b_7\cos\lambda + b_8\sin\lambda}}
 \end{aligned}
