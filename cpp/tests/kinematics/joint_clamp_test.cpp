@@ -35,6 +35,18 @@ void check(bool ok, const char* what)
 
 constexpr double kDeg2Rad = 3.14159265358979323846 / 180.0;
 
+// joint_clamp.cpp 가 이 hand type 으로 빌드한 상수. type c 는 0.7.0 의 표와 상수를 쓰고 long j3 하한이
+// 없다(CMake 가 AIDIN_HAND2_HAND_TYPE_C 를 라이브러리와 이 테스트에 같이 넘긴다).
+#if defined(AIDIN_HAND2_HAND_TYPE_C)
+constexpr double kThumbFlexionMaxDeg = 76.23, kLongFlexionMaxDeg = 95.46;
+constexpr double kThumbJ0MaxDeg = 110.0, kThumbJ3MaxDeg = 70.0, kLongDistalMaxDeg = 90.0;
+constexpr bool kLongDistalFloorApplies = false;
+#else
+constexpr double kThumbFlexionMaxDeg = 59.00, kLongFlexionMaxDeg = 96.20;
+constexpr double kThumbJ0MaxDeg = 108.8, kThumbJ3MaxDeg = 75.0, kLongDistalMaxDeg = 80.0;
+constexpr bool kLongDistalFloorApplies = true;
+#endif
+
 // 검사 대상 finger — active_joint 슬롯과 굽힘 절대상한(joint_clamp.cpp 와 같은 값).
 struct FingerUnderTest
 {
@@ -43,8 +55,8 @@ struct FingerUnderTest
   double flexion_max_deg;
 };
 constexpr std::array<FingerUnderTest, 2> kFingers{{
-    {"thumb", 2, 1, 59.00},
-    {"long",  4, 5, 96.20},   // index (baby/middle/ring 과 같은 경계)
+    {"thumb", 2, 1, kThumbFlexionMaxDeg},
+    {"long",  4, 5, kLongFlexionMaxDeg},   // index (baby/middle/ring 과 같은 경계)
 }};
 
 // 목표 (굽힘, 벌림) 을 clamp 한 결과 [deg].
@@ -254,10 +266,10 @@ void test_independent_joint_limits()
   JointPositionCommand command;
   for (double& value : command.target) value = 200.0 * kDeg2Rad;
   command.clamp();
-  check(std::fabs(command.target[0] - 108.8 * kDeg2Rad) < 1e-12, "thumb j0 상한(108.8°)으로 안 붙었다");
-  check(std::fabs(command.target[3] -  75.0 * kDeg2Rad) < 1e-12, "thumb j3 상한(75°)으로 안 붙었다");
+  check(std::fabs(command.target[0] - kThumbJ0MaxDeg * kDeg2Rad) < 1e-12, "thumb j0 상한으로 안 붙었다");
+  check(std::fabs(command.target[3] - kThumbJ3MaxDeg * kDeg2Rad) < 1e-12, "thumb j3 상한으로 안 붙었다");
   for (int base : {4, 7, 10, 13})
-    check(std::fabs(command.target[base + 2] - 80.0 * kDeg2Rad) < 1e-12, "long j3 상한(80°)으로 안 붙었다");
+    check(std::fabs(command.target[base + 2] - kLongDistalMaxDeg * kDeg2Rad) < 1e-12, "long j3 상한으로 안 붙었다");
 
   for (double& value : command.target) value = -50.0 * kDeg2Rad;
   command.clamp();
@@ -284,6 +296,25 @@ void test_independent_joint_limits()
 // 한다. 하한이 0 아래인 자세에서는 j3 0 이 그대로이고, 0.05° 에서 d3 가 이미 움직인다.
 void test_long_distal_floor()
 {
+  if (!kLongDistalFloorApplies) {
+    // 하한이 없는 type c 에서는 어느 자세에서도 j3 0 이 그대로이고, 상한만 상수다.
+    int moved = 0;
+    for (double flexion_deg = -4.0; flexion_deg <= 104.0; flexion_deg += 1.5)
+      for (double abduction_deg = -40.0; abduction_deg <= 40.0; abduction_deg += 2.5) {
+        JointPositionCommand command;
+        for (int base : {4, 7, 10, 13}) {
+          command.target[base]     = abduction_deg * kDeg2Rad;
+          command.target[base + 1] = flexion_deg * kDeg2Rad;
+        }
+        command.clamp();
+        for (int base : {4, 7, 10, 13})
+          if (command.target[base + 2] != 0.0) ++moved;
+      }
+    std::printf("  long j3 하한 없음(type c), j3 0 이 움직인 횟수 %d\n", moved);
+    check(moved == 0, "하한이 없는 hand type 에서 long j3 0 이 움직였다");
+    return;
+  }
+
   // clamp 의 하한은 문서 14장 3.2절의 닫힌 식이다. IK 로 구한 하한과 경계 안에서 0.0004° 안으로 같고,
   // 하한 위치의 d3 는 count 0 이었다(2026-10-02, type a). 8 count(약 0.005°)는 상수가 틀어졌을 때 잡는 여유다.
   constexpr int kHomeStopCount = 8;
@@ -335,7 +366,7 @@ void test_long_distal_floor()
   int ceiling_moved = 0;
   for (double flexion_deg = 0.0; flexion_deg <= 96.0; flexion_deg += 8.0)
     for (double abduction_deg = -30.0; abduction_deg <= 30.0; abduction_deg += 10.0)
-      if (std::fabs(clamp_distal(flexion_deg, abduction_deg, 120.0) - 80.0) > 1e-9) ++ceiling_moved;
+      if (std::fabs(clamp_distal(flexion_deg, abduction_deg, 120.0) - kLongDistalMaxDeg) > 1e-9) ++ceiling_moved;
   check(ceiling_moved == 0, "long j3 상한이 자세에 따라 80° 에서 벗어났다");
 
   // thumb j3 는 결합이 없어 굽힘과 무관하게 0 이 그대로다.

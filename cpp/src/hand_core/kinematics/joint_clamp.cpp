@@ -6,6 +6,7 @@
 // Abduction is symmetric, handled as an absolute value with the sign put back
 // Thumb j0 and j3 get a constant limit, and so does the long j3 at its top
 // The long j3 floor is a closed form of the clamped pair, the formula docs 14 section 3.2 gives
+// Hand type c builds with the tables of 0.7.0 and no floor, see AIDIN_HAND2_HAND_TYPE_C below
 //
 // Slots: long finger abduction 0, flexion 1, thumb abduction 2, flexion 1
 // `ctest -R joint_clamp` checks the seams and the projection after a table change
@@ -33,9 +34,6 @@ constexpr double kToleranceDeg = 1e-9;
 // 6e-4 deg, far more where an arc meets its knot near vertical, and a target on the boundary
 // then reads as outside
 enum class PieceKind { Line, Arc };
-// The piece count is part of each table's type, so adding a piece means raising its count too
-constexpr std::size_t kLongPieceCount  = 5;
-constexpr std::size_t kThumbPieceCount = 4;
 
 struct BoundaryPiece
 {
@@ -49,6 +47,12 @@ struct BoundaryPiece
   double arc_center_abduction_deg;
   double arc_signed_radius_deg;
 };
+
+// The piece count is part of each table's type, so adding a piece means raising its count too
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
+constexpr bool kLongDistalFloorApplies = true;
+constexpr std::size_t kLongPieceCount  = 5;
+constexpr std::size_t kThumbPieceCount = 4;
 
 // Shared by index, middle, ring and baby, tuned on the 2026-10-01 right hand (hand type a)
 constexpr std::array<BoundaryPiece, kLongPieceCount> kLongBoundary{{
@@ -80,6 +84,38 @@ constexpr double kThumbFlexionMaxDeg = 59.00;
 constexpr double kLongDistalMaxDeg = 80.0;   // long finger j3
 constexpr double kThumbJ3MaxDeg    = 75.0;   // thumb j3
 constexpr double kThumbJ0MaxDeg    = 108.8;  // thumb j0 CMC
+#else
+// Hand type c keeps the limits of 0.7.0. Those above were measured again on a type a hand only,
+// and the long j3 floor folds the type a linkage, which type c does not share
+constexpr bool kLongDistalFloorApplies = false;
+constexpr std::size_t kLongPieceCount  = 4;
+constexpr std::size_t kThumbPieceCount = 4;
+
+// Shared by index, middle, ring and baby, tuned on the 2026-07-30 left hand
+constexpr std::array<BoundaryPiece, kLongPieceCount> kLongBoundary{{
+    // kind            flexion lo    hi   abduction lo   hi    arc centre flexion  centre abduction  signed radius
+    {PieceKind::Arc,    0.00,  10.60,    0.40,  27.50, -117.5448848530,   62.0000287617, -132.7078125000},
+    {PieceKind::Line,  10.60,  54.60,   27.50,  27.50,    0.0,             0.0,             0.0         },
+    {PieceKind::Arc,   54.60,  92.68,   27.50,  13.25,  -71.1198326410, -366.4639071557,  413.5372250000},
+    {PieceKind::Arc,   92.68,  95.46,   13.25,   0.00,  143.6789848190,   17.0335266262,  -51.1391388889},
+}};
+// Same tuning round
+constexpr std::array<BoundaryPiece, kThumbPieceCount> kThumbBoundary{{
+    {PieceKind::Arc,    0.00,   9.00,    0.60,  29.60, -425.8806321979,  148.6664030959, -450.8857644759},
+    {PieceKind::Arc,    9.00,  50.00,   29.60,  45.10,  -55.2563274548,  261.5441564934, -240.6802180268},
+    {PieceKind::Arc,   50.00,  65.00,   45.10,  37.30,   30.1694515845,  -11.3587469529,   59.8401266539},
+    {PieceKind::Arc,   65.00,  76.23,   37.30,   0.00,  251.7767940919,   73.1928136100, -190.1942819332},
+}};
+
+// The flexion limit is the last knot itself, as in the tables above
+constexpr double kLongFlexionMaxDeg  = 95.46;
+constexpr double kThumbFlexionMaxDeg = 76.23;
+
+// Upper limits in degrees for the joints outside the coupled pairs, the lower being 0
+constexpr double kLongDistalMaxDeg = 90.0;   // long finger j3
+constexpr double kThumbJ3MaxDeg    = 70.0;   // thumb j3
+constexpr double kThumbJ0MaxDeg    = 110.0;  // thumb j0 CMC
+#endif
 
 // Long finger slots, as (abduction, flexion, j3)
 struct LongDistal
@@ -257,9 +293,11 @@ void clamp_active_joint_targets(std::array<double, kActiveJointCount>& target)
   target[15] = std::clamp(target[15], 0.0, kLongDistalMaxDeg * kDeg2Rad);   // baby j3
 
   // The long j3 floor follows the pairs clamped above, so it comes last
-  for (const LongDistal& distal : kLongDistals) {
-    const double floor_rad = long_distal_floor_rad(target[distal.flexion_slot], target[distal.abduction_slot]);
-    if (target[distal.distal_slot] < floor_rad) target[distal.distal_slot] = floor_rad;
+  if constexpr (kLongDistalFloorApplies) {
+    for (const LongDistal& distal : kLongDistals) {
+      const double floor_rad = long_distal_floor_rad(target[distal.flexion_slot], target[distal.abduction_slot]);
+      if (target[distal.distal_slot] < floor_rad) target[distal.distal_slot] = floor_rad;
+    }
   }
 }
 

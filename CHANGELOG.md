@@ -10,16 +10,17 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [0.7.1] - 2026-10-06
 
-The workspace clamp follows the hand after its mechanical design change, for hand types a and b.
-The public API and the soname stay as they were, so reinstalling the library is enough: a 0.7.0
-consumer picks the new limits up without a rebuild.
+The workspace clamp follows the hand after its mechanical design change, for hand types A and B,
+and type C keeps the clamp of 0.7.0. The public API and the soname stay as they were, so
+reinstalling the library is enough: a 0.7.0 consumer picks the new limits up without a rebuild.
 
 ### Changed
 
-- **The workspace clamp follows the workspace of the new mechanical design, for hand types a and
-  b.** The workspace was measured again after the mechanical design change, and the clamp limits
+- **The workspace clamp follows the workspace of the new mechanical design, for hand types A and
+  B.** The workspace was measured again after the mechanical design change, and the clamp limits
   now match it. A `JointPositionCommand` or `JointImpedanceCommand` target that passed before can
-  now be clamped. The ranges are in the workspace limits document.
+  now be clamped. The ranges are in the workspace limits document. Type C keeps the limits of
+  0.7.0: the measurement was made on a type A hand, and type C does not share its linkage.
 
 ## [0.7.0] - 2026-09-22
 

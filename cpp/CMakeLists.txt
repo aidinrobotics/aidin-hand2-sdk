@@ -97,6 +97,13 @@ add_library(aidin_hand2 SHARED
 
 target_compile_features(aidin_hand2 PUBLIC cxx_std_17)
 
+# The workspace clamp was measured again on a type a hand only, so type c keeps the clamp tables
+# of 0.7.0. joint_clamp.cpp and its test pick their tables by this definition.
+if(_kin_type STREQUAL "c")
+  set(_clamp_type_definition AIDIN_HAND2_HAND_TYPE_C)
+  target_compile_definitions(aidin_hand2 PRIVATE ${_clamp_type_definition})
+endif()
+
 target_include_directories(aidin_hand2
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -142,6 +149,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
   add_executable(joint_clamp_test tests/kinematics/joint_clamp_test.cpp)
   target_link_libraries(joint_clamp_test PRIVATE aidin_hand2)
   target_include_directories(joint_clamp_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_compile_definitions(joint_clamp_test PRIVATE ${_clamp_type_definition})
   add_test(NAME joint_clamp COMMAND joint_clamp_test)
 
   # types: RealtimeBuffer SPSC 의미론 + tearing 부재(2-스레드).
