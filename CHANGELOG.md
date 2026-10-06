@@ -8,6 +8,12 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-06
+
+The workspace clamp follows the hand after its mechanical design change, for hand types a and b.
+The public API and the soname stay as they were, so reinstalling the library is enough: a 0.7.0
+consumer picks the new limits up without a rebuild.
+
 ### Changed
 
 - **The workspace clamp follows the workspace of the new mechanical design, for hand types a and
@@ -394,7 +400,8 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.1...develop
+[0.7.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.1...v0.5.2
