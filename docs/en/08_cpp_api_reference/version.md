@@ -5,8 +5,8 @@
 ```cpp
 inline constexpr int kVersionMajor = 0;
 inline constexpr int kVersionMinor = 7;
-inline constexpr int kVersionPatch = 0;
-inline constexpr const char* kVersionString = "0.7.0";   // the version you built
+inline constexpr int kVersionPatch = 1;
+inline constexpr const char* kVersionString = "0.7.1";   // the version you built
 ```
 
 CMake generates this header at build time from `cmake/version.hpp.in`, and the values come from

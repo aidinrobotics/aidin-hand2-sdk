@@ -1,110 +1,206 @@
 # Workspace limits
 
 joint 공간 명령([`JointPositionCommand`](08_cpp_api_reference/types_command.md#jointpositioncommand), [`JointImpedanceCommand`](08_cpp_api_reference/types_command.md#jointimpedancecommand))은 IK 전에 각 finger의 도달 가능
-workspace 안으로 투영됩니다. 그 범위와 투영 방식을 아래에서 다룹니다.
+workspace 안으로 투영됩니다. 범위 제한과 가장 가까운 자세로의 투영은 SDK가 자동으로 적용하므로,
+명령을 보낼 때 따로 할 일은 없습니다. 아래에서 그 범위와 투영 방식을 다룹니다.
+
+명령을 보내기 전에 같은 제한을 직접 계산하려면(예: 상위 제어기에서 목표를 미리 맞출 때) 이 문서의 식과
+표로 구현하십시오.
 
 ## Contents
 
 &nbsp;&nbsp;[**1. Joint limits**](#1-joint-limits)<br>
-&nbsp;&nbsp;[**2. Coupled abduction–flexion workspace**](#2-coupled-abductionflexion-workspace)<br>
-&nbsp;&nbsp;[**3. Clamping behavior**](#3-clamping-behavior)
+&nbsp;&nbsp;[**2. Thumb**](#2-thumb)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[2.1 joint0](#21-joint0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[2.2 joint1 and joint2](#22-joint1-and-joint2)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[2.3 joint3](#23-joint3)<br>
+&nbsp;&nbsp;[**3. Long finger**](#3-long-finger)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[3.1 joint1 and joint2](#31-joint1-and-joint2)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[3.2 joint3](#32-joint3)
 
 ## 1. Joint limits
 
-아래 표의 값은 degree입니다. joint command의 `target` 필드는 rad이므로 `deg * M_PI / 180.0`으로
-바꿔 비교하십시오.
+finger별 각 joint의 허용 범위입니다.
 
 long finger(index / middle / ring / baby)입니다.
 
 | Joint | Axis | Allowed range |
 | :--- | :--- | :--- |
-| `joint1` | abduction | [−27.5°, 27.5°] (coupled) |
-| `joint2` | flexion | [0°, 95.46°] (coupled) |
-| `joint3` | distal | [0°, 90°] |
+| `joint1` | MCP abduction/adduction | [−30.0°, 30.0°] (coupled) |
+| `joint2` | MCP flexion/extension | [0°, 96.2°] (coupled) |
+| `joint3` | PIP flexion/extension | [0°, 80°] (하한은 `joint1`·`joint2`에 따라) |
+| `joint4` | DIP flexion/extension | [0°, 90.6°] (passive) |
 
-thumb입니다. CMC(손목손허리관절)가 3축이라 `joint0`·`joint1`·`joint2`가 각각 다른 축을 맡습니다.
+thumb입니다. CMC(손목손허리관절)가 3축이라 `joint0`·`joint1`·`joint2`가 각각 다른 축을 맡고, long
+finger와 달리 `joint1`이 flexion, `joint2`가 abduction입니다.
 
 | Joint | Axis | Allowed range |
 | :--- | :--- | :--- |
-| `thumb_joint0` | CMC rotation | [0°, 110°] |
-| `thumb_joint1` | CMC flexion | [0°, 76.23°] (coupled) |
-| `thumb_joint2` | CMC abduction | [−45.1°, 45.1°] (coupled) |
-| `thumb_joint3` | distal | [0°, 70°] |
+| `joint0` | CMC rotation | [0°, 108.8°] |
+| `joint1` | CMC flexion/extension | [0°, 59°] (coupled) |
+| `joint2` | CMC abduction/adduction | [−44.5°, 44.5°] (coupled) |
+| `joint3` | MCP flexion/extension | [0°, 75°] |
+| `joint4` | IP flexion/extension | [0°, 84.8°] (passive) |
 
-thumb은 long finger와 축 순서가 반대입니다 — long finger는 `joint1`이 abduction, `joint2`가
-flexion입니다.
+표의 괄호는 다음을 뜻합니다.
 
-`joint0`과 `joint3`은 coupled workspace에 속하지 않습니다. 두 joint는 상대 축과 무관하게 표의
-범위를 그대로 씁니다.
+- **(coupled)**: 두 joint(abduction, flexion)가 하나의 workspace를 공유합니다. 표의 값은 그 쌍의 최대
+  도달값이고, 실제로 허용되는 최대값은 상대 joint의 각도에 따라 작아집니다. 경계는
+  [2.2 joint1 and joint2](#22-joint1-and-joint2)와
+  [3.1 joint1 and joint2](#31-joint1-and-joint2)에 있습니다.
+- **(하한은 `joint1`·`joint2`에 따라)**: long finger `joint3`의 하한은 `joint1`·`joint2`에 따라 0°에서
+  5.7° 사이로 바뀝니다. 상한 80°는 자세와 무관합니다. 식은 [3.2 joint3](#32-joint3)에 있습니다.
+- **(passive)**: joint 명령의 `target`(16개)에는 `joint4` 자리가 없어서 명령으로 지정할 수 없고,
+  각도는 `joint3`에 종속됩니다. 현재 각도는 [`JointState`](08_cpp_api_reference/types_state.md#jointstate)의
+  `position_rad`로 읽습니다. 표의 범위는 `joint3`이 0°일 때와 상한(long finger 80°, thumb 75°)일 때의
+  `joint4` 각도입니다.
 
-`(coupled)`로 표시된 abduction과 flexion은 하나의 workspace를 공유합니다. 표의 값은 그 쌍의 최대
-도달값이고, 실제로 허용되는 최대값은 상대 축의 각도에 따라 작아집니다.
+괄호가 없는 thumb의 `joint0`·`joint3`은 다른 joint와 무관하게 표의 범위를 그대로 씁니다.
 
-## 2. Coupled abduction–flexion workspace
+## 2. Thumb
 
-workspace는 (flexion, abduction) 평면의 도달 가능 영역입니다. 아래에서 경계를 정의합니다.
+### 2.1 joint0
 
-![도달 가능 workspace와 clamp 투영](../assets/workspace_clamp.webp)
+`joint0`(CMC rotation)의 범위는 [0°, 108.8°]이고, 다른 joint와 무관합니다. 범위 밖의 명령은
+이 범위 안으로 제한합니다.
 
-| Mark | Meaning |
-|---|---|
-| 파란 선 | workspace 경계 |
-| 파란 점 | segment의 끝점 |
-| 회색 점 | 측정 데이터 |
-| 주황 ✕ | workspace 밖의 명령 목표 |
-| 주황 ○ | 투영 후 손에 전달되는 값 |
+### 2.2 joint1 and joint2
 
-long finger 4개는 같은 경계를 공유하고 thumb은 별도입니다. 경계는 abduction 부호에 대해
-대칭입니다.
+`joint1`(CMC flexion/extension) 각도를 $x$, `joint2`(CMC abduction/adduction) 각도를
+$y$로 표기합니다. 두 joint는 하나의 workspace를 공유합니다. $x$의 범위는 [0°, 59°]이고, $y$의 범위는
+$[-y_{\max}(x),\ y_{\max}(x)]$입니다. 경계는 $y$의 부호에 대해 대칭이므로, 그림에는 $y$가 0 이상인
+쪽만 그렸습니다.
 
-flexion $x$에 따른 최대 허용 abduction을 $y_{\max}(x)$로 표기합니다. $x$와 $y$의 단위는 모두
-degree입니다. $y_{\max}$는 여러 개의 segment로 구성되며, 각 segment는 두 점
+![thumb workspace와 clamp 투영](../assets/workspace_clamp_thumb.webp)
 
-$$
+$y_{\max}$는 여러 개의 segment로 구성되며, 각 segment는 두 점
+
+```math
 \mathbf p_0 = (x_0,\ y_0), \qquad \mathbf p_1 = (x_1,\ y_1)
-$$
+```
 
 사이에서 정의되는 line 또는 arc입니다. 따라서 각 segment의 유효 범위는 $x \in [x_0,\ x_1]$입니다.
 
 line segment는 두 점 사이의 선형 보간이고, arc segment는 원의 중심 $\mathbf c = (x_c,\ y_c)$와
 signed radius $R$로 정의됩니다.
 
-$$
+```math
 y_{\max}(x) =
 \begin{cases}
 y_0 + \dfrac{x - x_0}{x_1 - x_0}\,(y_1 - y_0) & \text{Line} \\[2ex]
-y_c + \operatorname{sgn}(R)\sqrt{R^2 - (x - x_c)^2} & \text{Arc}
+y_c + R\sqrt{1 - \left(\dfrac{x - x_c}{R}\right)^2} & \text{Arc}
 \end{cases}
-$$
+```
 
-$|R|$은 원의 반지름이고, $R$의 부호가 사용할 arc branch를 결정합니다. $R > 0$이면
-$y_{\max}(x) \ge y_c$, $R < 0$이면 $y_{\max}(x) \le y_c$입니다.
+$\mathbf c$는 두 점과 $R$로 정해지는 값이고, 아래 표에는 소수 넷째 자리까지 적었습니다.
 
-long finger의 $y_{\max}$는 다음 4개 segment로 구성됩니다.
-
-| Type | $\mathbf p_0$ | $\mathbf p_1$ | $\mathbf c$ | $R$ |
-| :--- | ---: | ---: | ---: | ---: |
-| Arc | (0, 0.4) | (10.6, 27.5) | (−117.5448848530, 62.0000287617) | −132.7078125000 |
-| Line | (10.6, 27.5) | (54.6, 27.5) | — | — |
-| Arc | (54.6, 27.5) | (92.68, 13.25) | (−71.1198326410, −366.4639071557) | 413.5372250000 |
-| Arc | (92.68, 13.25) | (95.46, 0) | (143.6789848190, 17.0335266262) | −51.1391388889 |
-
-thumb의 $y_{\max}$는 다음 4개 arc segment로 구성됩니다.
+thumb의 $y_{\max}$는 다음 4개 segment로 구성됩니다.
 
 | Type | $\mathbf p_0$ | $\mathbf p_1$ | $\mathbf c$ | $R$ |
 | :--- | ---: | ---: | ---: | ---: |
-| Arc | (0, 0.6) | (9, 29.6) | (−425.8806321979, 148.6664030959) | −450.8857644759 |
-| Arc | (9, 29.6) | (50, 45.1) | (−55.2563274548, 261.5441564934) | −240.6802180268 |
-| Arc | (50, 45.1) | (65, 37.3) | (30.1694515845, −11.3587469529) | 59.8401266539 |
-| Arc | (65, 37.3) | (76.23, 0) | (251.7767940919, 73.1928136100) | −190.1942819332 |
+| Arc | (0, 0) | (9.4, 29.5) | (−423.8055, 151.2907) | −450 |
+| Arc | (9.4, 29.5) | (48, 44.5) | (−61.5422, 269.2232) | −250 |
+| Arc | (48, 44.5) | (58.4, 39.43) | (27.0304, −11.7163) | 60 |
+| Line | (58.4, 39.43) | (59, 0) | — | — |
 
-## 3. Clamping behavior
+음수 $x$는 0°로 제한합니다. $(x, |y|)$가 workspace 안이면 명령을 그대로 둡니다. 밖이면 유클리드
+거리로 가장 가까운 경계 위의 점으로 옮기고(그림의 빨간 화살표), $y$의 부호를 되돌립니다. 이때 $x$와
+$y$가 함께 바뀔 수 있습니다.
 
-`joint0`과 `joint3`은 1절 표의 고정 범위로 각각 투영됩니다. flexion 연동은 반영하지 않습니다.
+### 2.3 joint3
 
-`(coupled)` 쌍은 (flexion, |abduction|) 조합이 workspace 안에 있는지에 따라 갈립니다.
+`joint3`(MCP flexion/extension)의 범위는 [0°, 75°]이고, 다른 joint와 무관합니다. 범위 밖의
+명령은 이 범위 안으로 제한합니다.
 
-- 안 → 그대로 통과
-- 밖 → 유클리드 거리 기준으로 가장 가까운 도달 가능 자세로 대체 (2절 그림의 주황 ✕ → ○)
+## 3. Long finger
 
-abduction은 대칭이므로 |abduction|으로 투영해 검사한 뒤 부호를 복원합니다.
+### 3.1 joint1 and joint2
+
+`joint2`(MCP flexion/extension) 각도를 $x$, `joint1`(MCP abduction/adduction) 각도를 $y$로
+표기합니다. 두 joint는 하나의 workspace를 공유합니다. $x$의 범위는 [0°, 96.2°]이고, $y$의 범위는
+$[-y_{\max}(x),\ y_{\max}(x)]$입니다. 경계는 $y$의 부호에 대해 대칭이므로, 그림에는 $y$가 0 이상인
+쪽만 그렸습니다.
+
+![long finger workspace와 clamp 투영](../assets/workspace_clamp_long.webp)
+
+$y_{\max}$는 여러 개의 segment로 구성되며, 각 segment는 두 점
+
+```math
+\mathbf p_0 = (x_0,\ y_0), \qquad \mathbf p_1 = (x_1,\ y_1)
+```
+
+사이에서 정의되는 line 또는 arc입니다. 따라서 각 segment의 유효 범위는 $x \in [x_0,\ x_1]$입니다.
+
+line segment는 두 점 사이의 선형 보간이고, arc segment는 원의 중심 $\mathbf c = (x_c,\ y_c)$와
+signed radius $R$로 정의됩니다.
+
+```math
+y_{\max}(x) =
+\begin{cases}
+y_0 + \dfrac{x - x_0}{x_1 - x_0}\,(y_1 - y_0) & \text{Line} \\[2ex]
+y_c + R\sqrt{1 - \left(\dfrac{x - x_c}{R}\right)^2} & \text{Arc}
+\end{cases}
+```
+
+$\mathbf c$는 두 점과 $R$로 정해지는 값이고, 아래 표에는 소수 넷째 자리까지 적었습니다.
+
+long finger의 $y_{\max}$는 다음 5개 segment로 구성됩니다.
+
+| Type | $\mathbf p_0$ | $\mathbf p_1$ | $\mathbf c$ | $R$ |
+| :--- | ---: | ---: | ---: | ---: |
+| Arc | (0, 0) | (11.56, 30) | (−142.7639, 72.2389) | −160 |
+| Line | (11.56, 30) | (50.5, 30) | — | — |
+| Arc | (50.5, 30) | (87.5, 18.5) | (104.1494, 137.3394) | −120 |
+| Arc | (87.5, 18.5) | (93.2, 12.4) | (76.0587, 2.0958) | 20 |
+| Arc | (93.2, 12.4) | (96.2, 0) | (121.1992, 12.6111) | −28 |
+
+음수 $x$는 0°로 제한합니다. $(x, |y|)$가 workspace 안이면 명령을 그대로 둡니다. 밖이면 유클리드
+거리로 가장 가까운 경계 위의 점으로 옮기고(그림의 빨간 화살표), $y$의 부호를 되돌립니다. 이때 $x$와
+$y$가 함께 바뀔 수 있습니다.
+
+### 3.2 joint3
+
+`joint3`(PIP flexion/extension) 각도를 $z$로 표기합니다. `joint3`의 범위는 $[z_{\min}(x, y),\ 80°]$입니다. 상한
+80°는 자세와 무관하고, 하한 $z_{\min}$은 3.1절의 $x$, $y$의 함수입니다. 범위 밖의 명령은
+이 범위 안으로 제한하며, $z_{\min}$은 $(x, y)$를 3.1절의 경계로 투영한 뒤의 값으로 정합니다.
+
+아래 식에서 각도는 모두 rad입니다.
+
+```math
+z_{\min}(x, y) = \max\bigl(0,\ \varphi(x, y)\bigr)
+```
+
+$\varphi(x, y)$는 다음과 같이 정의됩니다.
+
+```math
+\begin{aligned}
+\beta &= a_0 - x \\[1ex]
+\lambda &= a_1 + x + \mathrm{atan2}\bigl(\sin\beta + a_2\cos y,\ \cos\beta + a_3\bigr)
+  - \arccos\frac{a_4 + a_5\sin\beta\cos y + a_6\cos\beta}
+               {\sqrt{a_7 + a_8\cos^2 y + a_9\sin\beta\cos y + a_{10}\cos\beta}} \\[1ex]
+\varphi &= b_0 - \mathrm{atan2}\bigl(\sin\lambda + b_1,\ \cos\lambda + b_2\bigr)
+  + \arccos\frac{b_3 + b_4\cos\lambda + b_5\sin\lambda}
+               {\sqrt{b_6 + b_7\cos\lambda + b_8\sin\lambda}}
+\end{aligned}
+```
+
+상수는 다음과 같습니다.
+
+| $i$ | $a_i$ | $b_i$ |
+| ---: | ---: | ---: |
+| 0 | 0.819728 | −3.26693 |
+| 1 | 1.79827 | −2.91243 |
+| 2 | 0.287368 | −1.56229 |
+| 3 | 0.142105 | −2.13874 |
+| 4 | 0.371072 | 2.10835 |
+| 5 | 0.34125 | 3.93041 |
+| 6 | 0.16875 | 11.923 |
+| 7 | 1.02019 | −3.12458 |
+| 8 | 0.0825804 | −5.82487 |
+| 9 | 0.574736 | — |
+| 10 | 0.28421 | — |
+
+workspace 안에서 $z_{\min}$은 0~0.0995 rad(0°~5.7°)입니다. $y$가 0이면 $x$가 1.3044 rad(74.7°)
+이상에서 $\varphi \le 0$이 되어 하한이 0입니다.
+
+![long finger joint3 하한](../assets/joint3_lower_bound.webp)
