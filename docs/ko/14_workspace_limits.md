@@ -7,6 +7,11 @@ workspace 안으로 투영됩니다. 범위 제한과 가장 가까운 자세로
 명령을 보내기 전에 같은 제한을 직접 계산하려면(예: 상위 제어기에서 목표를 미리 맞출 때) 이 문서의 식과
 표로 구현하십시오.
 
+> [!IMPORTANT]
+> 이 문서의 범위와 식은 hand type A·B의 것입니다. type C로 빌드한 SDK는 0.7.0의 범위를 그대로 쓰고,
+> long finger `joint3`의 하한이 없습니다. 그 범위는
+> [0.7.0의 Workspace limits](https://github.com/aidinrobotics/aidin-hand2-sdk/blob/v0.7.0/docs/ko/14_workspace_limits.md)에 있습니다.
+
 ## Contents
 
 &nbsp;&nbsp;[**1. Joint limits**](#1-joint-limits)<br>
