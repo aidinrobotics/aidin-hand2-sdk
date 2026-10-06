@@ -123,8 +123,8 @@ enum class CommandSource {
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<std::uint16_t, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger) |
-| `palm` | `std::array<std::uint16_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
+| `fingers` | `std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger). Values are 0 to 65535 |
+| `palm` | `std::array<std::int32_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18. Values are 0 to 65535 |
 
 ## `CommandedState`
 

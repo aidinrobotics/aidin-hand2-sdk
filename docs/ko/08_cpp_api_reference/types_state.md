@@ -140,8 +140,8 @@ enum class CommandSource {
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<std::uint16_t, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger) |
-| `palm` | `std::array<std::uint16_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
+| `fingers` | `std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger). 값은 0~65535 |
+| `palm` | `std::array<std::int32_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18. 값은 0~65535 |
 
 ---
 
