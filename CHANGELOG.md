@@ -30,6 +30,8 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   that assigns a tactile array to a `std::array<std::uint16_t, N>` no longer compiles; change the
   element type to `std::int32_t`.
 
+- **The SDK no longer sets `restart-ms` on a CAN interface, because some adapters do not support it.**
+
 ## [0.7.1] - 2026-10-06
 
 The workspace clamp follows the hand after its mechanical design change, for hand types A and B,

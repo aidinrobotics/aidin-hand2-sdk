@@ -20,7 +20,7 @@
 //   RTM_NEWLINK + ifinfomsg + IFLA_TXQLEN
 //     + IFLA_LINKINFO { IFLA_INFO_KIND="can",
 //                       IFLA_INFO_DATA { IFLA_CAN_BITTIMING, IFLA_CAN_DATA_BITTIMING,
-//                                        IFLA_CAN_CTRLMODE(FD), IFLA_CAN_RESTART_MS } }
+//                                        IFLA_CAN_CTRLMODE(FD) } }
 // Configuring and bringing up are separate messages, because the kernel only configures a down link
 
 namespace aidin_hand2::canfd
@@ -41,9 +41,6 @@ constexpr std::uint32_t kNominalSyncJumpWidth       = 10;
 constexpr std::uint32_t kDataBitrate                = 5000000;
 constexpr std::uint32_t kDataSamplePointPerMille    = 875;
 constexpr std::uint32_t kDataSyncJumpWidth          = 2;
-
-// Restarts the controller automatically after bus-off
-constexpr std::uint32_t kBusOffRestartMilliseconds  = 100;
 
 constexpr std::uint32_t kTransmitQueueLength        = 1000;
 
@@ -106,8 +103,7 @@ Status ensure_interface_up(const std::string& interface_name)
     // Records what was applied, for diagnosing a hand in the field
     log_info("CAN interface '" + interface_name + "' was down; configured and brought up"
              " (bitrate " + std::to_string(kNominalBitrate) +
-             ", dbitrate " + std::to_string(kDataBitrate) +
-             ", fd on, restart-ms " + std::to_string(kBusOffRestartMilliseconds) + ")");
+             ", dbitrate " + std::to_string(kDataBitrate) + ", fd on)");
   }
   return status;
 }
@@ -189,7 +185,7 @@ Status manual_bringup_guidance(const std::string& interface_name)
           "CAN interface '" + interface_name + "' is down and cannot be configured " +
           "(needs CAP_NET_ADMIN). Bring it up manually:\n" +
           "  sudo ip link set " + interface_name + " type can bitrate 1000000 sample-point 0.875 sjw 10 " +
-          "dbitrate 5000000 dsample-point 0.875 dsjw 2 fd on restart-ms 100\n" +
+          "dbitrate 5000000 dsample-point 0.875 dsjw 2 fd on\n" +
           "  sudo ip link set " + interface_name + " up"};
 }
 
@@ -234,8 +230,6 @@ Status configure_protocol_constants(int netlink_socket, unsigned int interface_i
   control_mode.mask  = CAN_CTRLMODE_FD;
   control_mode.flags = CAN_CTRLMODE_FD;
   add_attribute(request, IFLA_CAN_CTRLMODE, &control_mode, sizeof(control_mode));
-
-  add_attribute(request, IFLA_CAN_RESTART_MS, &kBusOffRestartMilliseconds, sizeof(kBusOffRestartMilliseconds));
 
   end_nested_attribute(request, info_data);
   end_nested_attribute(request, link_info);
