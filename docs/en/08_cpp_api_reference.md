@@ -69,6 +69,9 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 | [`Hand::set_max_effort(double)`](08_cpp_api_reference/hand.md#handset_max_effort) | One effort ceiling for every actuator |
 | [`Hand::set_max_effort(array<double, 16>)`](08_cpp_api_reference/hand.md#handset_max_effort) | Per-actuator effort ceiling |
 | [`Hand::set_controller_config()`](08_cpp_api_reference/hand.md#handset_controller_config) | Position filter and impedance gains |
+| [`Hand::set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | Take the current tactile values as the bias |
+| [`Hand::reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | Return the tactile bias to `0` |
+| [`Hand::get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | The [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) being subtracted |
 | [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state) | The latest [`HandState`](08_cpp_api_reference/types_state.md#handstate) |
 | [`Hand::get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics) | The latest [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics) |
 | [`Hand::get_command_mode()`](08_cpp_api_reference/hand.md#handget_command_mode) | The [`CommandMode`](08_cpp_api_reference/types_command.md#enum-commandmode) that is active now |

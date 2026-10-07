@@ -1,5 +1,6 @@
 #include "hand_core/comms/canfd/protocol.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 
@@ -235,12 +236,13 @@ void Protocol::frames_to_hand_state(const StateFrames& frames, HandState& state)
   act.velocity_rpm   = frames.actual_velocity;
   act.current_mA     = frames.actual_current;
 
-  // Five fingers of 17 taxels, in order
-  state.tactile.fingers[0] = frames.tactile_thumb;
-  state.tactile.fingers[1] = frames.tactile_index;
-  state.tactile.fingers[2] = frames.tactile_middle;
-  state.tactile.fingers[3] = frames.tactile_ring;
-  state.tactile.fingers[4] = frames.tactile_baby;
+  // Five fingers of 17 taxels, in order, copied element by element from uint16 into int32
+  auto& fingers = state.tactile.fingers;
+  std::copy(frames.tactile_thumb.begin(),  frames.tactile_thumb.end(),  fingers[0].begin());
+  std::copy(frames.tactile_index.begin(),  frames.tactile_index.end(),  fingers[1].begin());
+  std::copy(frames.tactile_middle.begin(), frames.tactile_middle.end(), fingers[2].begin());
+  std::copy(frames.tactile_ring.begin(),   frames.tactile_ring.end(),   fingers[3].begin());
+  std::copy(frames.tactile_baby.begin(),   frames.tactile_baby.end(),   fingers[4].begin());
 
   // Three palm pads flattened into 58 cells: 20 upper, 20 lower, 18 palm2
   for (std::size_t i = 0; i < kPalm1UpperCount; ++i)

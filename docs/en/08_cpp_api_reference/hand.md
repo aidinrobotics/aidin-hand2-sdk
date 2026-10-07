@@ -26,6 +26,9 @@ Every method throws [`Exception`](types_error.md#exception--stdruntime_error) on
 | Command | [`set_command()`](#handset_command) | Latch a command and pick the controller |
 | Config | [`set_max_effort()`](#handset_max_effort) | Actuator current ceiling |
 | | [`set_controller_config()`](#handset_controller_config) | Filter and impedance gains |
+| Tactile | [`set_tactile_bias()`](#handset_tactile_bias) | Take the current tactile values as `0` |
+| | [`reset_tactile_bias()`](#handreset_tactile_bias) | Return tactile to the raw values |
+| | [`get_tactile_bias()`](#handget_tactile_bias) | The bias being subtracted |
 | Observation | [`get_state()`](#handget_state) | What the SDK read from the robot hand |
 | | [`get_diagnostics()`](#handget_diagnostics) | SDK and control and communication loop state |
 | | [`get_command_mode()`](#handget_command_mode) | The active mode |
@@ -191,6 +194,52 @@ non-finite or negative<br>
 **Notes**          ｜ On failure the SDK keeps the previous settings. There is no getter, so
 the application keeps
 the values it applied
+
+### `Hand::set_tactile_bias()`
+
+```cpp
+void set_tactile_bias();
+```
+
+Requests the current tactile values as the bias and returns at once. The raw values of the next
+cycle become the bias, and from that cycle the `tactile` field of [`get_state()`](#handget_state)
+holds the raw value minus the bias, which can be negative. The log records that cycle as a
+`tactile bias set` line.
+
+**Throws**         ｜ `CommunicationLost` (the SDK receives no state) · `ControlLoopFault` ·
+`WrongCallOrder` (`Disconnected`, destroyed `HandCore` or invalidated handle)<br>
+**Preconditions**  ｜ `Connected` · `Running` · `Stopped`<br>
+**Notes**          ｜ Call it while nothing is in contact. The bias stays until you call
+[`reset_tactile_bias()`](#handreset_tactile_bias), and it remains after
+[`reconnect()`](#handreconnect) and [`disconnect()`](#handdisconnect)
+
+### `Hand::reset_tactile_bias()`
+
+```cpp
+void reset_tactile_bias();
+```
+
+Requests the bias back to `0` and returns at once. From the next cycle, the `tactile` field of
+[`get_state()`](#handget_state) holds the raw values. The log records that cycle as a
+`tactile bias reset` line.
+
+**Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
+`WrongCallOrder` (`Disconnected`, destroyed `HandCore` or invalidated handle)<br>
+**Preconditions**  ｜ `Connected` · `Running` · `Stopped`
+
+### `Hand::get_tactile_bias()`
+
+```cpp
+[[nodiscard]] TactileState get_tactile_bias() const;
+```
+
+Returns the values that [`set_tactile_bias()`](#handset_tactile_bias) took and the SDK now
+subtracts.
+
+**Returns**        ｜ [`TactileState`](types_state.md#tactilestate). All `0` when no bias is set or
+after [`reset_tactile_bias()`](#handreset_tactile_bias)<br>
+**Throws**         ｜ `WrongCallOrder` (destroyed `HandCore` or invalidated handle)<br>
+**Notes**          ｜ Callable in any lifecycle state
 
 ### `Hand::get_state()`
 

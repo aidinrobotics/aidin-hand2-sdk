@@ -25,6 +25,10 @@ enum class RealtimeEventKind : std::int32_t {
   HomingPhaseEntered,
   HomingCompleted,
   HomingFailed,
+
+  // The cycle a tactile bias request took effect
+  TactileBiasSet,
+  TactileBiasReset,
 };
 
 // Fixed size POD with no strings, rendered into text by the event logging thread

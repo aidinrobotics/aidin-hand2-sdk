@@ -88,7 +88,7 @@ These are the reasons appended to `Cannot <action>: `. Read the current lifecycl
 | Reason | Situation | Remedy |
 |---|---|---|
 | `already connected — call disconnect() first to rebuild the link` | [`connect()`](08_cpp_api_reference/hand.md#handconnect) in `Running` or `Stopped` | Call [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect), then `connect()`, to rebuild communication |
-| `not connected — call connect() first` | [`run()`](08_cpp_api_reference/hand.md#handrun), [`stop()`](08_cpp_api_reference/hand.md#handstop), or [`home()`](08_cpp_api_reference/hand.md#handhome) in `Disconnected` | Call `connect()` first |
+| `not connected — call connect() first` | [`run()`](08_cpp_api_reference/hand.md#handrun), [`stop()`](08_cpp_api_reference/hand.md#handstop), [`home()`](08_cpp_api_reference/hand.md#handhome), [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias), or [`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) in `Disconnected` | Call `connect()` first |
 | `not connected yet — call connect()` | `reconnect()` in `Disconnected` | `reconnect()` is for recovery; the first connection is `connect()` |
 | `not connected yet — call connect(), then run()` | [`set_command()`](08_cpp_api_reference/hand.md#handset_command) in `Disconnected` | Connect and run, then send again |
 | `control not running — call run() first` | `stop()` in `Connected` | Leave it as is. Control is not running, so there is nothing to stop |
@@ -131,6 +131,7 @@ See [10. Faulted cause phrases](#10-faulted-cause-phrases).
 | `Cannot enable hand: interface <name> is gone — reconnect the CAN adapter, then recover with reconnect()` | The interface disappeared | Reconnect the adapter. The hand faults, and `reconnect()` recovers it from there |
 | `Cannot enable hand: interface <name> was re-created — recover with reconnect() once the hand faults` | Re-created under the same name, so the old socket is stale | Reception is gone, so the hand faults shortly. Call `reconnect()` then |
 | `Cannot enable hand: communication not restored (no RX on <name>) — restore CAN link and hand power, then recover with reconnect()` | Still nothing received | Restore communication and power. The hand faults, and `reconnect()` recovers it from there |
+| `Cannot set tactile bias: no RX on <name> — restore CAN link and hand power` | Nothing received when [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) was called | Restore communication and power, then call it again. The bias stays as it was |
 
 A call rejected in `Faulted` does not appear in this table; it arrives as `hand faulted (<cause>)` —
 see [10. Faulted cause phrases](#10-faulted-cause-phrases).

@@ -132,10 +132,11 @@ struct JointState {
   std::array<double, kJointCount> position_rad{};
 };
 
-// Raw 16-bit readings, no unit and no normalization
+// Raw sensor values, no unit and no normalization
+// After Hand::set_tactile_bias(), the difference from the bias
 struct TactileState {
-  std::array<std::array<std::uint16_t, kTactileTaxelsPerFinger>, kFingerCount> fingers{};
-  std::array<std::uint16_t, kPalmTactileCount> palm{};
+  std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount> fingers{};
+  std::array<std::int32_t, kPalmTactileCount> palm{};
 };
 
 // ------------------------------- Command echo -------------------------------

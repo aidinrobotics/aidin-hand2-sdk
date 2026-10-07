@@ -66,6 +66,17 @@ class Hand {
   // Set the position filter and the impedance gains
   void set_controller_config(const ControllerConfig& config);
 
+  // -------------------------------- Tactile ---------------------------------
+
+  // Make the current tactile values zero from the next cycle on (non-blocking)
+  void set_tactile_bias();
+
+  // Report the raw tactile values again from the next cycle on (non-blocking)
+  void reset_tactile_bias();
+
+  // The reading set_tactile_bias() took, all zero when none is set
+  [[nodiscard]] TactileState get_tactile_bias() const;
+
   // ------------------------------ Observation -------------------------------
 
   // Last observed actuator, joint, tactile and commanded state
