@@ -32,6 +32,8 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 - **The SDK no longer sets `restart-ms` on a CAN interface, because some adapters do not support it.**
 
+- **Homing preload is 80% of rated current instead of 60%.**
+
 ## [0.7.1] - 2026-10-06
 
 The workspace clamp follows the hand after its mechanical design change, for hand types A and B,
