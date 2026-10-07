@@ -23,6 +23,8 @@ enum class HandAction {
   Home,
   Reconnect,
   SetCommand,
+  SetTactileBias,
+  ResetTactileBias,
 };
 
 // Check the action is possible now

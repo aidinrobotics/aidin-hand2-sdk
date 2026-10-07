@@ -119,6 +119,23 @@ void Hand::set_controller_config(const ControllerConfig& config)
                  [&] { invoke(core_, [&](HandCore& c) { return c.set_controller_config(config); }); });
 }
 
+// --------------------------------- Tactile ----------------------------------
+
+void Hand::set_tactile_bias()
+{
+  guard_boundary("set_tactile_bias()", [&] { invoke(core_, [](HandCore& c) { return c.set_tactile_bias(); }); });
+}
+
+void Hand::reset_tactile_bias()
+{
+  guard_boundary("reset_tactile_bias()", [&] { invoke(core_, [](HandCore& c) { return c.reset_tactile_bias(); }); });
+}
+
+TactileState Hand::get_tactile_bias() const
+{
+  return guard_boundary("get_tactile_bias()", [&] { return lock_core(core_)->tactile_bias(); });
+}
+
 // ------------------------------- Observation --------------------------------
 
 HandState Hand::get_state() const

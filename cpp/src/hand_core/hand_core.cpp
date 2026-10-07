@@ -486,6 +486,18 @@ Status HandCore::set_controller_config(const ControllerConfig& config)
   return {};
 }
 
+// --------------------------------- Tactile ----------------------------------
+
+Status HandCore::set_tactile_bias()
+{
+  return request_tactile_bias(TactileBiasRequest::Set, HandAction::SetTactileBias);
+}
+
+Status HandCore::reset_tactile_bias()
+{
+  return request_tactile_bias(TactileBiasRequest::Reset, HandAction::ResetTactileBias);
+}
+
 // ------------------------------- Observation --------------------------------
 
 HandState HandCore::state() const
@@ -498,6 +510,16 @@ HandState HandCore::state() const
     last_state_ = latest;
   }
   return last_state_;
+}
+
+TactileState HandCore::tactile_bias() const
+{
+  if (request_destroy_.load()) {
+    throw_error(hand_side_, ErrorCode::WrongCallOrder, "Cannot read tactile bias: hand is destroyed — create a hand");
+  }
+  TactileState latest{};
+  if (tactile_bias_buffer_.read(latest)) last_tactile_bias_ = latest;
+  return last_tactile_bias_;
 }
 
 Diagnostics HandCore::diagnostics() const
@@ -652,6 +674,20 @@ void HandCore::stop_control_loop()
     rt_thread_.join();
   }
   lifecycle_.store(HandLifecycle::Disconnected);
+}
+
+// The RT loop logs the cycle it takes the request in, so nothing is logged here
+Status HandCore::request_tactile_bias(TactileBiasRequest request, HandAction action)
+{
+  if (Status allowed = check_allowed(action); !allowed.ok()) return allowed;
+
+  // Without RX the reading is the last frame before the link dropped
+  if (request == TactileBiasRequest::Set && !check_communication_.load()) {
+    return {ErrorCode::CommunicationLost,
+            "Cannot set tactile bias: no RX on " + interface_name_ + " — restore CAN link and hand power"};
+  }
+  request_tactile_bias_.store(request);
+  return {};
 }
 
 void HandCore::reset_fault_state()

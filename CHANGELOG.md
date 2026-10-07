@@ -8,10 +8,21 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+### Added
+
+- **`Hand::set_tactile_bias()` takes the current tactile values as zero.** Until now every
+  application averaged its own no-contact values and subtracted them, as `15_tactile.cpp` did. After
+  the call, `get_state()` reports each taxel as its difference from the bias, negative included,
+  and `Hand::reset_tactile_bias()` brings the raw values back. `Hand::get_tactile_bias()` returns
+  the values being subtracted. The bias comes from one cycle, stays until it is reset, and survives
+  `reconnect()` and `disconnect()`. Both calls need `Connected`, `Running` or `Stopped`, return at
+  once like `set_command()`, and take effect from the next cycle, which the log records as a
+  `tactile bias set` or `tactile bias reset` line. `15_tactile.cpp` now uses them.
+
 ### Changed
 
 - **Breaking: `TactileState` holds its readings as `std::int32_t` instead of `std::uint16_t`.**
-  The values are still the raw 16-bit readings, 0 to 65535. A reading is used as a difference from
+  The values are still the raw sensor readings. A reading is used as a difference from
   a baseline, and that difference has to go negative. C++ already promotes `uint16_t` to `int`
   before subtracting, but a numpy `uint16` array or a ROS 2 `uint16[]` field turns `100 - 200` into
   `65436` without an error, so the type changes at the source and every binding and message

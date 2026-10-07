@@ -19,7 +19,7 @@ namespace
 constexpr unsigned bit(HandLifecycle state) { return 1U << static_cast<unsigned>(state); }
 
 // kActionTable and kActionPhrase are fixed to this size
-constexpr std::size_t kActionCount = static_cast<std::size_t>(HandAction::SetCommand) + 1;
+constexpr std::size_t kActionCount = static_cast<std::size_t>(HandAction::ResetTactileBias) + 1;
 
 // One rule per action
 // The reason strings are appended to "Cannot <action>: " and reach the user as the message
@@ -69,6 +69,8 @@ constexpr ActionRule kActionTable[kActionCount] = {
     /*Home*/     {kConn | kRun | kStop,         kAfterFaultFirst,      kCallConnectFirst,   nullptr},
     /*Reconn*/   {kFault,                       nullptr,               kCallConnect,        kNotFaulted},
     /*SetCmd*/   {kRun,                         kAfterFault,           kCallConnectThenRun, kNotRunning},
+    /*SetBias*/  {kConn | kRun | kStop,         kAfterFault,           kCallConnectFirst,   nullptr},
+    /*RstBias*/  {kConn | kRun | kStop,         kAfterFault,           kCallConnectFirst,   nullptr},
 };
 
 // Same index as kActionTable
@@ -78,8 +80,10 @@ constexpr const char* kActionPhrase[kActionCount] = {
     "run hand", 
     "stop hand",
     "home hand",    
-    "reconnect hand",  
-    "set command"
+    "reconnect hand",
+    "set command",
+    "set tactile bias",
+    "reset tactile bias"
   };
 
 // Builds "Cannot <action>: <reason>"

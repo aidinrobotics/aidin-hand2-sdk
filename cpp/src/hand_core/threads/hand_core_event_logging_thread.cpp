@@ -148,6 +148,12 @@ void HandCore::log_pending_events()
                    " — home position NOT established; retry home()");
         }
         break;
+      case RealtimeEventKind::TactileBiasSet:
+        log_info(hand_side_, cycle_prefix + "tactile bias set — current tactile values are now zero");
+        break;
+      case RealtimeEventKind::TactileBiasReset:
+        log_info(hand_side_, cycle_prefix + "tactile bias reset — tactile values are raw again");
+        break;
     }
   }
   const std::uint64_t dropped = event_ring_.count_dropped();
