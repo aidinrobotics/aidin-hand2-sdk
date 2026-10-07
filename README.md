@@ -12,6 +12,35 @@ The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. I
 
 </div>
 
+## Latest release
+
+- [0.8.0](CHANGELOG.md#080---2026-10-07)
+  - `TactileState` changed from `std::uint16_t` to `std::int32_t`.
+  - Added the tactile bias (`Hand::set_tactile_bias()` and related functions).
+- [0.7.1](CHANGELOG.md#071---2026-10-06)
+  - The workspace clamp of hand types A and B changed.
+
+All changes are in the [CHANGELOG](CHANGELOG.md).
+
+## System Requirements
+
+The configuration below is verified for building and running the SDK.
+
+| Component | Requirement |
+|---|---|
+| Operating System | Ubuntu 22.04 / 24.04 |
+| Compiler | GCC ≥ 11 |
+| Build system | CMake ≥ 3.16 |
+| CAN device | CAN FD capable device supported by [SocketCAN](https://docs.kernel.org/networking/can.html) |
+| CAN bitrate | 1 Mbit/s arbitration / 5 Mbit/s data |
+| Dependencies | spdlog ≥ 1.9, can-utils |
+| Python bindings (planned) | Python ≥ 3.10, numpy |
+| ROS 2 wrapper (optional) | Humble |
+
+A PREEMPT_RT kernel is recommended for 500 Hz real-time control. Custom or RT-patched kernels (e.g. Jetson) may ship without the CAN driver — enable it yourself.
+
+See [Real-time kernel setup](docs/en/04_real_time_kernel_setup.md) and [CAN-FD setup](docs/en/05_can_fd_setup.md) for setup steps.
+
 ## Architecture
 
 ```mermaid
@@ -35,25 +64,6 @@ checked by moving them in the viewer below.
 <a href="https://aidinrobotics.github.io/aidin-hand2-ros2/"><img src="docs/assets/viewer_preview.webp" alt="AIDIN Hand Gen2 joint viewer"></a>
 
 </div>
-
-## System Requirements
-
-The configuration below is verified for building and running the SDK.
-
-| Component | Requirement |
-|---|---|
-| Operating System | Ubuntu 22.04 / 24.04 |
-| Compiler | GCC ≥ 11 |
-| Build system | CMake ≥ 3.16 |
-| CAN device | CAN FD capable device supported by [SocketCAN](https://docs.kernel.org/networking/can.html) |
-| CAN bitrate | 1 Mbit/s arbitration / 5 Mbit/s data |
-| Dependencies | spdlog ≥ 1.9, can-utils |
-| Python bindings (planned) | Python ≥ 3.10, numpy |
-| ROS 2 wrapper (optional) | Humble |
-
-A PREEMPT_RT kernel is recommended for 500 Hz real-time control. Custom or RT-patched kernels (e.g. Jetson) may ship without the CAN driver — enable it yourself.
-
-See [Real-time kernel setup](docs/en/04_real_time_kernel_setup.md) and [CAN-FD setup](docs/en/05_can_fd_setup.md) for setup steps.
 
 ## Testing
 
