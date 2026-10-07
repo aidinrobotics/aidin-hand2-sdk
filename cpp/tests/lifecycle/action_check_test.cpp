@@ -50,7 +50,8 @@ void test_destroyed_gate()
 {
   const HandAction actions[] = {HandAction::Connect,  HandAction::Disconnect, HandAction::Run,
                                 HandAction::Stop,      HandAction::Home,       HandAction::Reconnect,
-                                HandAction::SetCommand};
+                                HandAction::SetCommand, HandAction::SetTactileBias,
+                                HandAction::ResetTactileBias};
   for (HandAction a : actions) {
     // lifecycle/homed 와 무관하게 파기면 WrongCallOrder 거부.
     const Status s = check_action_allowed(a, HandLifecycle::Connected, HandLifecycle::Connected,
@@ -112,6 +113,15 @@ void test_transition_table()
   cell(HandAction::SetCommand, HandLifecycle::Running,      lf, H, true,  ErrorCode::None, "SetCommand@Running 허용");
   cell(HandAction::SetCommand, HandLifecycle::Stopped,      lf, H, false, ErrorCode::WrongCallOrder, "SetCommand@Stopped 거부(run 먼저)");
   cell(HandAction::SetCommand, HandLifecycle::Faulted,      lf, H, false, ErrorCode::ControlLoopFault, "SetCommand@Faulted 거부(파생)");
+
+  // ── SetTactileBias / ResetTactileBias: RT 루프가 도는 Connected/Running/Stopped 허용 ──
+  for (HandAction a : {HandAction::SetTactileBias, HandAction::ResetTactileBias}) {
+    cell(a, HandLifecycle::Disconnected, lf, H, false, ErrorCode::WrongCallOrder, "TactileBias@Disconnected 거부");
+    cell(a, HandLifecycle::Connected,    lf, H, true,  ErrorCode::None, "TactileBias@Connected 허용(토크 불필요)");
+    cell(a, HandLifecycle::Running,      lf, H, true,  ErrorCode::None, "TactileBias@Running 허용");
+    cell(a, HandLifecycle::Stopped,      lf, H, true,  ErrorCode::None, "TactileBias@Stopped 허용");
+    cell(a, HandLifecycle::Faulted,      lf, H, false, ErrorCode::ControlLoopFault, "TactileBias@Faulted 거부(파생)");
+  }
 }
 
 void test_faulted_error_code_derivation()

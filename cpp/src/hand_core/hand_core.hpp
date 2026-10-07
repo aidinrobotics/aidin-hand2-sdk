@@ -37,6 +37,8 @@ namespace test { struct HandCoreTestPeer; }
 //   set_controller_config -> controller_config_buffer_ ->
 //   home ------------------> request_homing_ ----------->
 //                         <- result_homing_ <------------
+//   tactile bias ---------> request_tactile_bias_ ------>
+//                         <- tactile_bias_buffer_ <------
 //   connect/run/stop ------> requested_lifecycle_ ------->
 //                         <- lifecycle_ <----------------
 //                         <- stop_confirmation_ <--------
@@ -106,15 +108,25 @@ class HandCore {
   [[nodiscard]] Status set_max_effort(const std::array<double, kActuatorCount>& limit);
   [[nodiscard]] Status set_controller_config(const ControllerConfig& config);
 
+  // -------------------------------- Tactile ---------------------------------
+
+  // Both take effect from the next cycle (non-blocking)
+  [[nodiscard]] Status set_tactile_bias();
+  [[nodiscard]] Status reset_tactile_bias();
+
   // ------------------------------ Observation -------------------------------
 
   [[nodiscard]] HandState state() const;
+  [[nodiscard]] TactileState tactile_bias() const;
   [[nodiscard]] Diagnostics diagnostics() const;
   [[nodiscard]] CommandMode command_mode() const;
   [[nodiscard]] HandLifecycle lifecycle() const noexcept { return lifecycle_.load(); }
   [[nodiscard]] HandSide hand_side() const noexcept { return hand_side_; }
 
  private:
+  // What set_tactile_bias() and reset_tactile_bias() ask the RT loop for
+  enum class TactileBiasRequest { None, Set, Reset };
+
   // =============================== Functions ================================
 
   // ---------------------------- State transition ----------------------------
@@ -136,6 +148,9 @@ class HandCore {
 
   [[nodiscard]] Status wait_first_frame(const char* operation);
   void stop_control_loop();
+
+  // Checks the call and hands the request to the RT loop
+  [[nodiscard]] Status request_tactile_bias(TactileBiasRequest request, HandAction action);
 
   // Clear the stop verdict, the cause and the homing channels
   void reset_fault_state();
@@ -193,6 +208,9 @@ class HandCore {
 
   // FK, updates last_valid_joint_rad_
   void fill_joint_state(HandState& hand_state);
+
+  // Takes or clears tactile_bias_ on request and logs that cycle, then subtracts it
+  void apply_tactile_bias(HandState& hand_state, std::uint64_t cycle);
 
   [[nodiscard]] canfd::CommandFrames command_to_frames(
       const HandCommand& command, const ControllerConfig& controller_config,
@@ -254,6 +272,9 @@ class HandCore {
   // [RT] holds the last solved angle for joints FK could not solve
   std::array<double, kJointCount> last_valid_joint_rad_{};
 
+  // [RT] subtracted from every tactile reading, kept across connects until reset
+  TactileState tactile_bias_{};
+
   // [user] staging_mutex_ is mutable because command_mode() is const
   HandCommand staging_command_{};
 
@@ -261,8 +282,9 @@ class HandCore {
   // default, so the last config is kept here to be republished
   ControllerConfig staging_controller_config_{};
   mutable std::mutex  staging_mutex_;
-  mutable HandState   last_state_{};
-  mutable Diagnostics last_diagnostics_{};
+  mutable HandState    last_state_{};
+  mutable Diagnostics  last_diagnostics_{};
+  mutable TactileState last_tactile_bias_{};
   std::thread rt_thread_;
   std::thread event_logging_thread_;
 
@@ -276,8 +298,9 @@ class HandCore {
   RealtimeBuffer<ControllerConfig> controller_config_buffer_;
 
   // [RT -> user]
-  mutable RealtimeBuffer<HandState>   state_buffer_;
-  mutable RealtimeBuffer<Diagnostics> diagnostics_buffer_;
+  mutable RealtimeBuffer<HandState>    state_buffer_;
+  mutable RealtimeBuffer<Diagnostics>  diagnostics_buffer_;
+  mutable RealtimeBuffer<TactileState> tactile_bias_buffer_;
 
   // [RT -> logging]
   RealtimeEventRing event_ring_;
@@ -312,6 +335,9 @@ class HandCore {
 
   // Pose hold, enable_control() requests it on stop -> run and the RT loop fills the pose
   std::atomic<bool> request_hold_{false};
+
+  // Tactile bias, set_tactile_bias() and reset_tactile_bias() request it and the RT loop takes it
+  std::atomic<TactileBiasRequest> request_tactile_bias_{TactileBiasRequest::None};
 
   // Link, check_first_frame_ is consumed by the connect() wait
   std::atomic<bool> check_communication_{false};

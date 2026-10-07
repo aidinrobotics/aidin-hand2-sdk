@@ -125,6 +125,7 @@ void HandCore::run_control_loop()
     ActuatorHealth actuator_health{};
     (void)comms_.read(hand_state, actuator_health);
     fill_joint_state(hand_state);
+    apply_tactile_bias(hand_state, cycle_count);
     hand_state.timestamp = system_nanoseconds();
 
     // 3) Watch the link and the drives
@@ -479,6 +480,31 @@ void HandCore::fill_joint_state(HandState& hand_state)
       last_valid_joint_rad_[i] = joint_rad[i];
     }
     hand_state.joints.position_rad[i] = last_valid_joint_rad_[i];
+  }
+}
+
+void HandCore::apply_tactile_bias(HandState& hand_state, std::uint64_t cycle)
+{
+  const TactileBiasRequest request = request_tactile_bias_.exchange(TactileBiasRequest::None);
+  if (request == TactileBiasRequest::Set) {
+    tactile_bias_ = hand_state.tactile;
+  } else if (request == TactileBiasRequest::Reset) {
+    tactile_bias_ = TactileState{};
+  }
+  if (request != TactileBiasRequest::None) {
+    tactile_bias_buffer_.write(tactile_bias_);
+    const RealtimeEventKind kind = request == TactileBiasRequest::Set ? RealtimeEventKind::TactileBiasSet
+                                                                      : RealtimeEventKind::TactileBiasReset;
+    (void)event_ring_.push({kind, cycle, -1, 0, 0, lifecycle_.load(std::memory_order_relaxed), false, 0});
+  }
+
+  for (std::size_t finger = 0; finger < kFingerCount; ++finger) {
+    for (std::size_t taxel = 0; taxel < kTactileTaxelsPerFinger; ++taxel) {
+      hand_state.tactile.fingers[finger][taxel] -= tactile_bias_.fingers[finger][taxel];
+    }
+  }
+  for (std::size_t taxel = 0; taxel < kPalmTactileCount; ++taxel) {
+    hand_state.tactile.palm[taxel] -= tactile_bias_.palm[taxel];
   }
 }
 

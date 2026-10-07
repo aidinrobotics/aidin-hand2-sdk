@@ -8,6 +8,43 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-07
+
+Tactile readings are `int32`, and the SDK takes a tactile bias, so the difference from the
+no-contact values comes straight out of `get_state()`. `HandState` changes size: request 0.8 and
+rebuild. Homing pushes with 80% of rated current, and the SDK no longer sets `restart-ms`.
+
+### Added
+
+- **`Hand::set_tactile_bias()` takes the current tactile values as zero.** Until now every
+  application averaged its own no-contact values and subtracted them, as `15_tactile.cpp` did. After
+  the call, `get_state()` reports each taxel as its difference from the bias, negative included,
+  and `Hand::reset_tactile_bias()` brings the raw values back. `Hand::get_tactile_bias()` returns
+  the values being subtracted. The bias comes from one cycle, stays until it is reset, and survives
+  `reconnect()` and `disconnect()`. Both calls need `Connected`, `Running` or `Stopped`, return at
+  once like `set_command()`, and take effect from the next cycle, which the log records as a
+  `tactile bias set` or `tactile bias reset` line. `15_tactile.cpp` now uses them.
+
+### Changed
+
+- **Breaking: request the new minor version and rebuild.** Use
+  `find_package(aidin_hand2 0.8 REQUIRED)`. A 0.7 consumer stops at configure time, and the soname
+  moves to `libaidin_hand2.so.0.8`, so a binary that was not rebuilt fails to load instead of
+  reading a `HandState` of the wrong size.
+
+- **Breaking: `TactileState` holds its readings as `std::int32_t` instead of `std::uint16_t`.**
+  The values are still the raw sensor readings. A reading is used as a difference from
+  a baseline, and that difference has to go negative. C++ already promotes `uint16_t` to `int`
+  before subtracting, but a numpy `uint16` array or a ROS 2 `uint16[]` field turns `100 - 200` into
+  `65436` without an error, so the type changes at the source and every binding and message
+  carries a signed value. `HandState` grows from 1032 to 1320 bytes: rebuild every consumer. Code
+  that assigns a tactile array to a `std::array<std::uint16_t, N>` no longer compiles; change the
+  element type to `std::int32_t`.
+
+- **The SDK no longer sets `restart-ms` on a CAN interface, because some adapters do not support it.**
+
+- **Homing preload is 80% of rated current instead of 60%.**
+
 ## [0.7.1] - 2026-10-06
 
 The workspace clamp follows the hand after its mechanical design change, for hand types A and B,
@@ -401,7 +438,8 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.1...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.8.0...develop
+[0.8.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...v0.6.0

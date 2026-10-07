@@ -13,7 +13,7 @@ namespace
 
 // Sequence parameters, confirmed on hardware
 // Percent of rated current, 1000 being 100%
-constexpr std::int16_t kPreloadEffort = -600;
+constexpr std::int16_t kPreloadEffort = -800;
 constexpr std::int16_t kMaxEffort     = 1000;
 // Preload ends on a fixed duration rather than a velocity test, which the small vibration
 // at the settling point would make unrepeatable

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(aidin_hand2 VERSION 0.7.1 LANGUAGES CXX)
+project(aidin_hand2 VERSION 0.8.0 LANGUAGES CXX)
 
 # A printf format that no longer matches its argument is otherwise silent.
 add_compile_options(-Wall -Wextra)
@@ -247,6 +247,12 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_link_libraries(reconnect_reset_test PRIVATE aidin_hand2)
   target_include_directories(reconnect_reset_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
   add_test(NAME reconnect_reset COMMAND reconnect_reset_test)
+
+  # hand_core: tactile bias 를 한 주기에 잡고, 이후 차이(음수 포함)를 내고, reset 으로 되돌리는지.
+  add_executable(tactile_bias_test tests/hand_core/tactile_bias_test.cpp)
+  target_link_libraries(tactile_bias_test PRIVATE aidin_hand2)
+  target_include_directories(tactile_bias_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  add_test(NAME tactile_bias COMMAND tactile_bias_test)
 
   # liveness: stop()/destroy() 및 전체 lifecycle 이 정지확인 미수신에도 유한 반환(watchdog).
   # link-time seam: mock_transport.cpp 가 실제 transport.cpp 자리에 링크된다 — 따라서 이 타깃은
