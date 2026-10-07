@@ -67,6 +67,9 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 | [`Hand::set_max_effort(double)`](08_cpp_api_reference/hand.md#handset_max_effort) | 공통 effort 상한 |
 | [`Hand::set_max_effort(array<double, 16>)`](08_cpp_api_reference/hand.md#handset_max_effort) | actuator별 effort 상한 |
 | [`Hand::set_controller_config()`](08_cpp_api_reference/hand.md#handset_controller_config) | 위치 filter와 impedance gain |
+| [`Hand::set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | 지금 tactile 값을 bias로 잡음 |
+| [`Hand::reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | tactile bias를 `0`으로 되돌림 |
+| [`Hand::get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) |
 | [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state) | 최신 [`HandState`](08_cpp_api_reference/types_state.md#handstate) |
 | [`Hand::get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics) | 최신 [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics) |
 | [`Hand::get_command_mode()`](08_cpp_api_reference/hand.md#handget_command_mode) | 지금 활성인 [`CommandMode`](08_cpp_api_reference/types_command.md#enum-commandmode) |

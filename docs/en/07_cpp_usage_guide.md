@@ -792,16 +792,45 @@ is. Check whether the `selected_source` value is `Controller` as well.
 ### 7.3 Tactile
 
 The `state.tactile` field holds the taxel values of the fingers and the palm. It holds the raw
-16-bit values (0 to 65535) that the sensor sends in `std::int32_t`, so it carries no unit and no
-normalization.
+values that the sensor sends in `std::int32_t`, so it carries no unit and no normalization. When a tactile bias is set, the field holds the difference from the bias instead of
+the raw value.
 
 | Field | Size | Description |
 |---|---|---|
 | `tactile.fingers` | `kFingerCount` × `kTactileTaxelsPerFinger` (5 × 17) | The finger index follows the order of the [`Finger`](08_cpp_api_reference/types_description.md#enum-finger) enum |
 | `tactile.palm` | `kPalmTactileCount` (58) | palm1 upper 20 + lower 20 + palm2 18 |
 
-The SDK does not offer a threshold for deciding contact. Take the state without contact as a
-baseline and watch the difference from that baseline.
+The SDK does not offer a threshold for deciding contact. Set the values without contact as the
+tactile bias and watch the difference from the bias.
+
+```cpp
+// Call this while nothing touches the robot hand
+hand.set_tactile_bias();
+
+// The bias applies from the next cycle, so read after one cycle
+std::this_thread::sleep_for(std::chrono::milliseconds(10));
+const HandState state = hand.get_state();            // the tactile field holds the difference from the bias
+const TactileState bias = hand.get_tactile_bias();   // the values being subtracted
+```
+
+| Call | Result |
+|---|---|
+| [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | Requests the bias and returns at once. The raw values of the next cycle become the bias |
+| [`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | Requests the reset and returns at once. The bias is `0` from the next cycle |
+| [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | Returns the values being subtracted. All `0` when no bias is set |
+
+From the cycle the bias applies, `get_state()` reports each taxel as its raw value minus the bias,
+and the result can be negative. The log records that cycle as a `[cycle N] tactile bias set` line.
+The bias stays until you call `reset_tactile_bias()`, and it remains after `reconnect()` and
+`disconnect()`.
+
+You can call both functions in `Connected`, `Running` and `Stopped`, and neither needs torque.
+`set_tactile_bias()` throws `CommunicationLost` while the SDK receives no state.
+
+> [!NOTE]
+> The bias comes from one cycle, so it includes the noise of that moment. Temperature and a long
+> grasp also move the values, so an application that runs for a long time should call
+> `set_tactile_bias()` again whenever nothing is in contact.
 
 > [!TIP]
 > The following examples run what this chapter describes.
@@ -809,8 +838,9 @@ baseline and watch the difference from that baseline.
 > - [`14_read_state.cpp`](../../cpp/examples/14_read_state.cpp) — prints the fields in turn to show
 >   the two placeholders reading `0`, the `controller_output` value holding `std::monostate` outside
 >   a control session, and the two calls reading their buffers separately.
-> - [`15_tactile.cpp`](../../cpp/examples/15_tactile.cpp) — averages a second of no contact into a
->   baseline, then prints the deviation from it per finger and palm region. It applies no torque.
+> - [`15_tactile.cpp`](../../cpp/examples/15_tactile.cpp) — takes the bias with `set_tactile_bias()`
+>   while nothing is in contact, then prints the difference from it per finger and palm region. It
+>   applies no torque.
 
 ## 8. Diagnostics
 

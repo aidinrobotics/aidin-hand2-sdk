@@ -81,7 +81,7 @@ Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_s
 | Reason | Situation | Remedy |
 |---|---|---|
 | `already connected — call disconnect() first to rebuild the link` | `Running`·`Stopped`에서 [`connect()`](08_cpp_api_reference/hand.md#handconnect) | 통신을 다시 세우려면 [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect)를 호출한 뒤 `connect()`를 호출합니다 |
-| `not connected — call connect() first` | `Disconnected`에서 [`run()`](08_cpp_api_reference/hand.md#handrun)·[`stop()`](08_cpp_api_reference/hand.md#handstop)·[`home()`](08_cpp_api_reference/hand.md#handhome) | `connect()`를 먼저 호출합니다 |
+| `not connected — call connect() first` | `Disconnected`에서 [`run()`](08_cpp_api_reference/hand.md#handrun)·[`stop()`](08_cpp_api_reference/hand.md#handstop)·[`home()`](08_cpp_api_reference/hand.md#handhome)·[`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias)·[`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | `connect()`를 먼저 호출합니다 |
 | `not connected yet — call connect()` | `Disconnected`에서 `reconnect()` | 최초 연결은 `connect()`를 호출합니다. `reconnect()`는 복구용입니다 |
 | `not connected yet — call connect(), then run()` | `Disconnected`에서 [`set_command()`](08_cpp_api_reference/hand.md#handset_command) | 연결·실행 뒤 다시 보냅니다 |
 | `control not running — call run() first` | `Connected`에서 `stop()` | 그대로 두십시오. 제어 중이 아니라 세울 것이 없습니다 |
@@ -124,6 +124,7 @@ Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_s
 | `Cannot enable hand: interface <이름> is gone — reconnect the CAN adapter, then recover with reconnect()` | interface가 사라짐 | adapter를 다시 연결하면 `lifecycle` 값이 `Faulted`로 전이하므로, 전이한 뒤에 `reconnect()`를 호출합니다 |
 | `Cannot enable hand: interface <이름> was re-created — recover with reconnect() once the hand faults` | 같은 이름으로 재생성되어 기존 socket이 무효 | 수신이 끊겼으므로 `lifecycle` 값이 곧 `Faulted`로 전이합니다. 전이한 뒤에 `reconnect()`를 호출합니다 |
 | `Cannot enable hand: communication not restored (no RX on <이름>) — restore CAN link and hand power, then recover with reconnect()` | 아직 수신이 없음 | 통신과 전원을 복구하면 `lifecycle` 값이 `Faulted`로 전이하므로, 전이한 뒤에 `reconnect()`를 호출합니다 |
+| `Cannot set tactile bias: no RX on <이름> — restore CAN link and hand power` | [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias)를 호출한 시점에 수신이 없음 | 통신과 전원을 복구한 뒤 다시 호출합니다. bias는 바뀌지 않습니다 |
 
 `Faulted` 상태에서 호출이 거부되면 message가 이 표의 문구가 아니라 `hand faulted (<원인>)` 형태입니다 —
 [10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.

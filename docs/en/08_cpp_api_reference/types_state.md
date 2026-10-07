@@ -123,8 +123,13 @@ enum class CommandSource {
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger). Values are 0 to 65535 |
-| `palm` | `std::array<std::int32_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18. Values are 0 to 65535 |
+| `fingers` | `std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount>` | Outer index is [`Finger`](types_description.md#enum-finger) |
+| `palm` | `std::array<std::int32_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
+
+The values are the raw values of the sensors. After a bias is set with
+[`Hand::set_tactile_bias()`](hand.md#handset_tactile_bias), the values from
+[`get_state()`](hand.md#handget_state) are the difference from the bias and can be negative.
+[`Hand::get_tactile_bias()`](hand.md#handget_tactile_bias) returns the bias in this type too.
 
 ## `CommandedState`
 

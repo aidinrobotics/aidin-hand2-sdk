@@ -748,16 +748,44 @@ effort 계열은 짝이 없습니다. `target_effort_pct` 필드는 정격 전�
 
 ### 7.3 Tactile
 
-`state.tactile` 필드는 finger와 palm의 taxel 값입니다. 센서가 전송한 16-bit raw value(0~65535)를
-`std::int32_t`에 그대로 담은 값이라 단위도 정규화도 없습니다.
+`state.tactile` 필드는 finger와 palm의 taxel 값입니다. 센서가 전송한 raw value를
+`std::int32_t`에 그대로 담은 값이라 단위도 정규화도 없습니다. tactile bias를 설정하면 raw value 대신
+bias와의 차이를 담습니다.
 
 | Field | Size | Description |
 |---|---|---|
 | `tactile.fingers` | `kFingerCount` × `kTactileTaxelsPerFinger` (5 × 17) | finger index는 [`Finger`](08_cpp_api_reference/types_description.md#enum-finger) enum 순서 |
 | `tactile.palm` | `kPalmTactileCount` (58) | palm1 upper 20 + lower 20 + palm2 18 |
 
-접촉 판정 임계값은 SDK가 기준을 제시하지 않습니다. 접촉이 없는 상태를 baseline으로 설정하고
-baseline과의 차이를 확인하십시오.
+접촉 판정 임계값은 SDK가 기준을 제시하지 않습니다. 접촉이 없는 상태의 값을 tactile bias로 설정하고
+bias와의 차이를 확인하십시오.
+
+```cpp
+// 아무것도 로봇 핸드에 닿지 않은 상태에서 호출합니다
+hand.set_tactile_bias();
+
+// 다음 cycle부터 적용되므로 한 cycle 뒤에 읽습니다
+std::this_thread::sleep_for(std::chrono::milliseconds(10));
+const HandState state = hand.get_state();            // tactile 필드는 bias와의 차이
+const TactileState bias = hand.get_tactile_bias();   // 빼고 있는 값
+```
+
+| Call | Result |
+|---|---|
+| [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | 요청만 하고 바로 반환합니다. 다음 cycle의 raw value가 bias가 됩니다 |
+| [`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | 요청만 하고 바로 반환합니다. 다음 cycle부터 bias가 `0`입니다 |
+| [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 값을 돌려줍니다. 설정하지 않았으면 모두 `0`입니다 |
+
+bias가 적용된 cycle부터 `get_state()`는 taxel마다 raw value에서 bias를 뺀 값을 돌려주며, 이 값은
+음수일 수 있습니다. 적용된 cycle은 log에 `[cycle N] tactile bias set` 줄로 남습니다. bias는
+`reset_tactile_bias()`를 호출할 때까지 유지되고 `reconnect()`와 `disconnect()` 뒤에도 남습니다.
+
+두 함수는 `Connected`·`Running`·`Stopped`에서 호출할 수 있고 토크가 필요하지 않습니다.
+`set_tactile_bias()`는 state를 수신하지 못하는 동안 `CommunicationLost` 예외를 던집니다.
+
+> [!NOTE]
+> bias는 한 cycle의 값이라 그 순간의 noise가 함께 들어갑니다. 온도와 오래 쥐고 있던 상태도 값을
+> 바꾸므로, 오래 실행하는 application은 접촉이 없을 때 `set_tactile_bias()`를 다시 호출하십시오.
 
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다.
@@ -765,8 +793,8 @@ baseline과의 차이를 확인하십시오.
 > - [`14_read_state.cpp`](../../cpp/examples/14_read_state.cpp) — 필드를 차례로 출력하며 placeholder
 >   두 개가 `0`으로 읽히는 것, control session 밖에서 `controller_output` 필드가 `std::monostate`인
 >   것, 두 호출이 각각 buffer를 개별적으로 읽는 것을 확인합니다.
-> - [`15_tactile.cpp`](../../cpp/examples/15_tactile.cpp) — 접촉이 없는 상태를 1초간 평균해 baseline을
->   만들고, 이후 baseline과의 차이를 finger와 palm 영역별로 갱신해 출력합니다. 토크를 걸지 않습니다.
+> - [`15_tactile.cpp`](../../cpp/examples/15_tactile.cpp) — 접촉이 없는 상태에서 `set_tactile_bias()`로
+>   bias를 잡고, 이후 bias와의 차이를 finger와 palm 영역별로 갱신해 출력합니다. 토크를 걸지 않습니다.
 
 ## 8. Diagnostics
 

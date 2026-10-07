@@ -140,8 +140,12 @@ enum class CommandSource {
 
 | Field | Type | Description |
 |---|---|---|
-| `fingers` | `std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger). 값은 0~65535 |
-| `palm` | `std::array<std::int32_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18. 값은 0~65535 |
+| `fingers` | `std::array<std::array<std::int32_t, kTactileTaxelsPerFinger>, kFingerCount>` | 바깥 index가 [`Finger`](types_description.md#enum-finger) |
+| `palm` | `std::array<std::int32_t, kPalmTactileCount>` | palm1 upper 20 + lower 20 + palm2 18 |
+
+값은 센서의 raw value입니다. [`Hand::set_tactile_bias()`](hand.md#handset_tactile_bias)로 bias를
+설정하면 [`get_state()`](hand.md#handget_state)의 값은 bias와의 차이이며 음수일 수 있습니다.
+[`Hand::get_tactile_bias()`](hand.md#handget_tactile_bias)도 이 type으로 bias를 돌려줍니다.
 
 ---
 

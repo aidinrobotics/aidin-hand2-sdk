@@ -27,6 +27,9 @@
 | Command | [`set_command()`](#handset_command) | command를 latch하고 controller 선택 |
 | Config | [`set_max_effort()`](#handset_max_effort) | actuator 전류 상한 |
 | | [`set_controller_config()`](#handset_controller_config) | filter와 impedance gain |
+| Tactile | [`set_tactile_bias()`](#handset_tactile_bias) | 지금 tactile 값을 `0`으로 |
+| | [`reset_tactile_bias()`](#handreset_tactile_bias) | tactile을 raw value로 되돌림 |
+| | [`get_tactile_bias()`](#handget_tactile_bias) | 지금 빼고 있는 bias |
 | Observation | [`get_state()`](#handget_state) | 로봇 핸드에서 읽은 값 |
 | | [`get_diagnostics()`](#handget_diagnostics) | SDK·제어·통신 루프 상태 |
 | | [`get_command_mode()`](#handget_command_mode) | 지금 활성인 mode |
@@ -200,6 +203,54 @@ filter와 impedance gain을 결정합니다. 언제든 호출할 수 있고 다�
 음수인 값이 있을 때<br>
 **Notes**          ｜ 실패하면 기존 설정을 유지합니다. getter가 없으므로 적용값이 필요하면 application에서 직접
 보관하십시오
+
+---
+
+### `Hand::set_tactile_bias()`
+
+```cpp
+void set_tactile_bias();
+```
+
+지금 tactile 값을 bias로 잡도록 요청하고 바로 반환합니다. 다음 cycle의 raw value가 bias가 되고, 그 cycle부터
+[`get_state()`](#handget_state)의 `tactile` 필드는 raw value에서 bias를 뺀 값이며 음수일 수 있습니다.
+적용된 cycle은 log에 `tactile bias set` 줄로 남습니다.
+
+**Throws**         ｜ `CommunicationLost`(state를 수신하지 못함) · `ControlLoopFault` ·
+`WrongCallOrder`(`Disconnected`, 파기된 `HandCore` 또는 무효가 된 handle)<br>
+**Preconditions**  ｜ `Connected` · `Running` · `Stopped`<br>
+**Notes**          ｜ 접촉이 없을 때 호출하십시오. bias는 [`reset_tactile_bias()`](#handreset_tactile_bias)를
+호출할 때까지 유지되고 [`reconnect()`](#handreconnect)와 [`disconnect()`](#handdisconnect) 뒤에도 남습니다
+
+---
+
+### `Hand::reset_tactile_bias()`
+
+```cpp
+void reset_tactile_bias();
+```
+
+bias를 `0`으로 되돌리도록 요청하고 바로 반환합니다. 다음 cycle부터 [`get_state()`](#handget_state)의
+`tactile` 필드는 raw value입니다. 적용된 cycle은 log에 `tactile bias reset` 줄로 남습니다.
+
+**Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
+`WrongCallOrder`(`Disconnected`, 파기된 `HandCore` 또는 무효가 된 handle)<br>
+**Preconditions**  ｜ `Connected` · `Running` · `Stopped`
+
+---
+
+### `Hand::get_tactile_bias()`
+
+```cpp
+[[nodiscard]] TactileState get_tactile_bias() const;
+```
+
+[`set_tactile_bias()`](#handset_tactile_bias)가 잡아 지금 빼고 있는 값을 돌려줍니다.
+
+**Returns**        ｜ [`TactileState`](types_state.md#tactilestate). bias를 설정하지 않았거나
+[`reset_tactile_bias()`](#handreset_tactile_bias) 뒤에는 모두 `0`<br>
+**Throws**         ｜ `WrongCallOrder`(파기된 `HandCore` 또는 무효가 된 handle)<br>
+**Notes**          ｜ lifecycle과 무관하게 호출할 수 있습니다
 
 ---
 
