@@ -213,7 +213,7 @@ void set_tactile_bias();
 ```
 
 지금 tactile 값을 bias로 잡도록 요청하고 바로 반환합니다. 다음 cycle의 raw value가 bias가 되고, 그 cycle부터
-[`get_state()`](#handget_state)의 `tactile` 필드는 raw value에서 bias를 뺀 값이며 음수일 수 있습니다.
+[`HandState`](types_state.md#handstate)의 `tactile` 필드는 raw value에서 bias를 뺀 값이며 음수일 수 있습니다.
 적용된 cycle은 log에 `tactile bias set` 줄로 남습니다.
 
 **Throws**         ｜ `CommunicationLost`(state를 수신하지 못함) · `ControlLoopFault` ·
@@ -230,7 +230,7 @@ void set_tactile_bias();
 void reset_tactile_bias();
 ```
 
-bias를 `0`으로 되돌리도록 요청하고 바로 반환합니다. 다음 cycle부터 [`get_state()`](#handget_state)의
+bias를 `0`으로 되돌리도록 요청하고 바로 반환합니다. 다음 cycle부터 [`HandState`](types_state.md#handstate)의
 `tactile` 필드는 raw value입니다. 적용된 cycle은 log에 `tactile bias reset` 줄로 남습니다.
 
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·

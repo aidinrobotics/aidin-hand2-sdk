@@ -18,8 +18,8 @@ rebuild. Homing pushes with 80% of rated current, and the SDK no longer sets `re
 
 - **`Hand::set_tactile_bias()` takes the current tactile values as zero.** Until now every
   application averaged its own no-contact values and subtracted them, as `15_tactile.cpp` did. After
-  the call, `get_state()` reports each taxel as its difference from the bias, negative included,
-  and `Hand::reset_tactile_bias()` brings the raw values back. `Hand::get_tactile_bias()` returns
+  the call, the `tactile` field of `HandState` holds each taxel's difference from the bias, negative
+  included, and `Hand::reset_tactile_bias()` brings the raw values back. `Hand::get_tactile_bias()` returns
   the values being subtracted. The bias comes from one cycle, stays until it is reset, and survives
   `reconnect()` and `disconnect()`. Both calls need `Connected`, `Running` or `Stopped`, return at
   once like `set_command()`, and take effect from the next cycle, which the log records as a

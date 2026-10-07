@@ -776,7 +776,7 @@ const TactileState bias = hand.get_tactile_bias();   // 빼고 있는 값
 | [`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | 요청만 하고 바로 반환합니다. 다음 cycle부터 bias가 `0`입니다 |
 | [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 값을 돌려줍니다. 설정하지 않았으면 모두 `0`입니다 |
 
-bias가 적용된 cycle부터 `get_state()`는 taxel마다 raw value에서 bias를 뺀 값을 돌려주며, 이 값은
+bias가 적용된 cycle부터 `state.tactile` 필드는 taxel마다 raw value에서 bias를 뺀 값이며, 이 값은
 음수일 수 있습니다. 적용된 cycle은 log에 `[cycle N] tactile bias set` 줄로 남습니다. bias는
 `reset_tactile_bias()`를 호출할 때까지 유지되고 `reconnect()`와 `disconnect()` 뒤에도 남습니다.
 

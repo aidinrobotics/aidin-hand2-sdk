@@ -12,6 +12,35 @@
 
 </div>
 
+## Latest release
+
+- [0.8.0](CHANGELOG.md#080---2026-10-07)
+  - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 바뀌었습니다.
+  - tactile bias 기능(`Hand::set_tactile_bias()` 등)이 추가되었습니다.
+- [0.7.1](CHANGELOG.md#071---2026-10-06)
+  - hand type A·B의 workspace clamp 범위가 바뀌었습니다.
+
+전체 변경은 [CHANGELOG](CHANGELOG.md)에 있습니다.
+
+## System Requirements
+
+아래는 SDK 빌드·실행이 검증된 구성입니다.
+
+| Component | Requirement |
+|---|---|
+| Operating System | Ubuntu 22.04 / 24.04 |
+| Compiler | GCC ≥ 11 |
+| Build system | CMake ≥ 3.16 |
+| CAN device | [SocketCAN](https://docs.kernel.org/networking/can.html)이 지원되는 CAN FD capable device |
+| CAN bitrate | arbitration 1 Mbit/s / data 5 Mbit/s |
+| Dependencies | spdlog ≥ 1.9, can-utils |
+| Python bindings (예정) | Python ≥ 3.10, numpy |
+| ROS 2 wrapper (선택) | Humble |
+
+500 Hz 실시간 제어에는 PREEMPT_RT kernel을 권장합니다. 커스텀·RT 패치 kernel(예: Jetson)은 CAN driver가 빠져 있을 수 있어 직접 켜야 합니다.
+
+셋업 절차는 [Real-time kernel setup](docs/ko/04_real_time_kernel_setup.md)과 [CAN-FD setup](docs/ko/05_can_fd_setup.md)을 참고하십시오.
+
 ## Architecture
 
 ```mermaid
@@ -34,25 +63,6 @@ lifecycle과 명령·상태 API는 [C++ guide](docs/ko/07_cpp_usage_guide.md)를
 <a href="https://aidinrobotics.github.io/aidin-hand2-ros2/"><img src="docs/assets/viewer_preview.webp" alt="AIDIN Hand Gen2 joint viewer"></a>
 
 </div>
-
-## System Requirements
-
-아래는 SDK 빌드·실행이 검증된 구성입니다.
-
-| Component | Requirement |
-|---|---|
-| Operating System | Ubuntu 22.04 / 24.04 |
-| Compiler | GCC ≥ 11 |
-| Build system | CMake ≥ 3.16 |
-| CAN device | [SocketCAN](https://docs.kernel.org/networking/can.html)이 지원되는 CAN FD capable device |
-| CAN bitrate | arbitration 1 Mbit/s / data 5 Mbit/s |
-| Dependencies | spdlog ≥ 1.9, can-utils |
-| Python bindings (예정) | Python ≥ 3.10, numpy |
-| ROS 2 wrapper (선택) | Humble |
-
-500 Hz 실시간 제어에는 PREEMPT_RT kernel을 권장합니다. 커스텀·RT 패치 kernel(예: Jetson)은 CAN driver가 빠져 있을 수 있어 직접 켜야 합니다.
-
-셋업 절차는 [Real-time kernel setup](docs/ko/04_real_time_kernel_setup.md)과 [CAN-FD setup](docs/ko/05_can_fd_setup.md)을 참고하십시오.
 
 ## Testing
 

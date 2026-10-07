@@ -202,7 +202,7 @@ void set_tactile_bias();
 ```
 
 Requests the current tactile values as the bias and returns at once. The raw values of the next
-cycle become the bias, and from that cycle the `tactile` field of [`get_state()`](#handget_state)
+cycle become the bias, and from that cycle the `tactile` field of [`HandState`](types_state.md#handstate)
 holds the raw value minus the bias, which can be negative. The log records that cycle as a
 `tactile bias set` line.
 
@@ -220,7 +220,7 @@ void reset_tactile_bias();
 ```
 
 Requests the bias back to `0` and returns at once. From the next cycle, the `tactile` field of
-[`get_state()`](#handget_state) holds the raw values. The log records that cycle as a
+[`HandState`](types_state.md#handstate) holds the raw values. The log records that cycle as a
 `tactile bias reset` line.
 
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·

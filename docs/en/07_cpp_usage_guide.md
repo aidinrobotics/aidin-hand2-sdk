@@ -819,8 +819,8 @@ const TactileState bias = hand.get_tactile_bias();   // the values being subtrac
 | [`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | Requests the reset and returns at once. The bias is `0` from the next cycle |
 | [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | Returns the values being subtracted. All `0` when no bias is set |
 
-From the cycle the bias applies, `get_state()` reports each taxel as its raw value minus the bias,
-and the result can be negative. The log records that cycle as a `[cycle N] tactile bias set` line.
+From the cycle the bias applies, the `state.tactile` field holds each taxel as its raw value minus
+the bias, and the result can be negative. The log records that cycle as a `[cycle N] tactile bias set` line.
 The bias stays until you call `reset_tactile_bias()`, and it remains after `reconnect()` and
 `disconnect()`.
 
