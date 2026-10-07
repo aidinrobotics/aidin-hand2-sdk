@@ -8,6 +8,12 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-07
+
+Tactile readings are `int32`, and the SDK takes a tactile bias, so the difference from the
+no-contact values comes straight out of `get_state()`. `HandState` changes size: request 0.8 and
+rebuild. Homing pushes with 80% of rated current, and the SDK no longer sets `restart-ms`.
+
 ### Added
 
 - **`Hand::set_tactile_bias()` takes the current tactile values as zero.** Until now every
@@ -20,6 +26,11 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   `tactile bias set` or `tactile bias reset` line. `15_tactile.cpp` now uses them.
 
 ### Changed
+
+- **Breaking: request the new minor version and rebuild.** Use
+  `find_package(aidin_hand2 0.8 REQUIRED)`. A 0.7 consumer stops at configure time, and the soname
+  moves to `libaidin_hand2.so.0.8`, so a binary that was not rebuilt fails to load instead of
+  reading a `HandState` of the wrong size.
 
 - **Breaking: `TactileState` holds its readings as `std::int32_t` instead of `std::uint16_t`.**
   The values are still the raw sensor readings. A reading is used as a difference from
@@ -427,7 +438,8 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.1...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.8.0...develop
+[0.8.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.5.2...v0.6.0
