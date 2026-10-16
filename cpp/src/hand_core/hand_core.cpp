@@ -480,6 +480,58 @@ Status HandCore::set_controller_config(const ControllerConfig& config)
               "Cannot set controller config: joint impedance stiffness and damping must be finite and >= 0"};
     }
   }
+  if (!std::isfinite(impedance.p_saturation_effort) || impedance.p_saturation_effort < 0.0 ||
+      !std::isfinite(impedance.velocity_cutoff_hz) || impedance.velocity_cutoff_hz < 0.0) {
+    return {ErrorCode::InvalidArgument,
+            "Cannot set controller config: joint impedance p_saturation_effort and velocity_cutoff_hz must be "
+            "finite and >= 0"};
+  }
+  for (std::size_t i = 0; i < impedance.cross_stiffness.size(); ++i) {
+    if (!std::isfinite(impedance.cross_stiffness[i]) || !std::isfinite(impedance.cross_damping[i])) {
+      return {ErrorCode::InvalidArgument,
+              "Cannot set controller config: joint impedance cross_stiffness and cross_damping must be finite"};
+    }
+  }
+  const auto finite_non_negative = [](double v) { return std::isfinite(v) && v >= 0.0; };
+  for (std::size_t i = 0; i < kActuatorCount; ++i) {
+    if (!finite_non_negative(impedance.friction_coulomb_positive[i]) ||
+        !finite_non_negative(impedance.friction_coulomb_negative[i]) ||
+        !finite_non_negative(impedance.friction_viscous[i])) {
+      return {ErrorCode::InvalidArgument,
+              "Cannot set controller config: joint impedance friction_coulomb_* and friction_viscous must be "
+              "finite and >= 0"};
+    }
+  }
+  if (!finite_non_negative(impedance.friction_stick_velocity) || !finite_non_negative(impedance.friction_scale) ||
+      !std::isfinite(impedance.friction_stick_ramp) || impedance.friction_stick_ramp <= 0.0) {
+    return {ErrorCode::InvalidArgument,
+            "Cannot set controller config: joint impedance friction_stick_velocity and friction_scale must be "
+            "finite and >= 0, friction_stick_ramp finite and > 0"};
+  }
+  using FrictionModel = ControllerConfig::JointImpedanceController::FrictionModel;
+  if (impedance.friction_model != FrictionModel::Coulomb &&
+      impedance.friction_model != FrictionModel::PositionTable) {
+    return {ErrorCode::InvalidArgument, "Cannot set controller config: unknown joint impedance friction_model"};
+  }
+  for (std::size_t i = 0; i < kActuatorCount; ++i) {
+    if (!std::isfinite(impedance.friction_table_start[i]) || !std::isfinite(impedance.friction_table_end[i])) {
+      return {ErrorCode::InvalidArgument,
+              "Cannot set controller config: joint impedance friction_table_start and friction_table_end must "
+              "be finite"};
+    }
+    for (std::size_t k = 0; k < ControllerConfig::JointImpedanceController::kFrictionTableBins; ++k) {
+      if (!finite_non_negative(impedance.friction_table_positive[i][k]) ||
+          !finite_non_negative(impedance.friction_table_negative[i][k])) {
+        return {ErrorCode::InvalidArgument,
+                "Cannot set controller config: joint impedance friction_table_* values must be finite and >= 0"};
+      }
+    }
+  }
+  if (!finite_non_negative(impedance.velocity_soft_limit) || !finite_non_negative(impedance.velocity_brake_gain)) {
+    return {ErrorCode::InvalidArgument,
+            "Cannot set controller config: joint impedance velocity_soft_limit and velocity_brake_gain must be "
+            "finite and >= 0"};
+  }
   std::lock_guard<std::mutex> lock(staging_mutex_);
   staging_controller_config_ = config;
   controller_config_buffer_.write(config);

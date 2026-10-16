@@ -254,6 +254,224 @@ void test_impedance_law()
     controller.compute(impedance, gains, state, max_effort, frames);
     check(frames.target_effort[0] == 0, "zero gains give zero torque");
   }
+  // P 포화: stiffness 1, 오차 5000 → p_saturation 1000 이면 1000 에서 멈추고(max_effort 2000 보다 먼저),
+  // 0 이면 기존대로 max_effort 2000 에서 잘린다. 포화 뒤에도 D 항은 더해진다(rpm 속도 + 로 −effort).
+  {
+    std::array<double, kActuatorCount> max2000{};
+    max2000.fill(2000.0);
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(1.0);
+    gains.damping.fill(0.0);
+    HandState far = healthy_state();  far.actuators.position_count[0] = -5000.0;  // error = +5000
+
+    controllers::JointImpedanceController plain(kPeriodNs);
+    canfd::CommandFrames fp{};
+    plain.compute(impedance, gains, far, max2000, fp);
+    check(fp.target_effort[0] == 2000, "default law keeps the max_effort clamp only");
+
+    gains.p_saturation_effort = 1000.0;
+    controllers::JointImpedanceController saturating(kPeriodNs);
+    canfd::CommandFrames fs{};
+    saturating.compute(impedance, gains, far, max2000, fs);
+    check(fs.target_effort[0] == 1000, "p_saturation caps the stiffness term at 1000");
+
+    gains.damping.fill(0.1);
+    gains.velocity_from_rpm = true;
+    far.actuators.velocity_rpm[0] = 60;  // 1024 count/s → D term −102.4
+    controllers::JointImpedanceController damped(kPeriodNs);
+    canfd::CommandFrames fd{};
+    damped.compute(impedance, gains, far, max2000, fd);
+    check(std::abs(fd.target_effort[0] - (1000 - 102)) <= 1, "damping still acts after the stiffness term saturates");
+  }
+  // rpm 속도원: 첫 cycle 부터 drive 의 rpm 을 쓴다(차분과 달리 seed 가 필요 없다). 60 rpm = 1024 count/s.
+  {
+    controllers::JointImpedanceController controller(kPeriodNs);
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(0.0);
+    gains.damping.fill(0.1);
+    gains.velocity_from_rpm = true;
+    HandState s = healthy_state();  s.actuators.velocity_rpm[0] = 60;
+    canfd::CommandFrames f{};
+    controller.compute(impedance, gains, s, max_effort, f);
+    check(f.target_effort[0] == -102, "velocity_from_rpm uses 1024 count per revolution on the first cycle");
+  }
+  // 속도 필터: cutoff 가 있으면 첫 cycle 은 alpha = 1 − exp(−2π f dt) 만큼만 반영된다(500 Hz, 50 Hz → 0.466).
+  {
+    controllers::JointImpedanceController controller(kPeriodNs);
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(0.0);
+    gains.damping.fill(1.0);
+    gains.velocity_from_rpm = true;
+    gains.velocity_cutoff_hz = 50.0;
+    HandState s = healthy_state();  s.actuators.velocity_rpm[0] = 60;  // 1024 count/s
+    canfd::CommandFrames f1{}, f2{};
+    controller.compute(impedance, gains, s, max_effort, f1);
+    check(std::abs(f1.target_effort[0] - (-477)) <= 1, "velocity filter first cycle = alpha * v");
+    controller.compute(impedance, gains, s, max_effort, f2);
+    check(std::abs(f2.target_effort[0] - (-732)) <= 1, "velocity filter converges toward v");
+    controller.reset();
+    canfd::CommandFrames f3{};
+    controller.compute(impedance, gains, s, max_effort, f3);
+    check(std::abs(f3.target_effort[0] - (-477)) <= 1, "reset clears the velocity filter");
+  }
+  // 교차 gain: index 쌍(4, 5)에 k 1, kx 0.5. 같은 방향 오차 +100/+100 → 150 씩(공통 모드 k + kx),
+  // 반대 방향 +100/−100 → +50/−50(차동 모드 k − kx). 쌍 밖의 actuator 3 은 그대로이고, 교차 damping 은
+  // 짝의 rpm 속도에 걸린다(짝만 60 rpm = 1024 count/s, dx 0.1 → −102).
+  {
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(1.0);
+    gains.damping.fill(0.0);
+    gains.cross_stiffness[1] = 0.5;
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    std::array<int, kActuatorCount> home{};
+    kinematics::ik_joint_to_actuator(impedance.target, home);
+
+    HandState same = healthy_state();
+    for (std::size_t i = 0; i < kActuatorCount; ++i) same.actuators.position_count[i] = home[i];
+    same.actuators.position_count[4] = home[4] - 100;  same.actuators.position_count[5] = home[5] - 100;
+    same.actuators.position_count[3] = home[3] - 100;
+    controllers::JointImpedanceController common(kPeriodNs);
+    canfd::CommandFrames fc{};
+    common.compute(impedance, gains, same, max_effort, fc);
+    check(fc.target_effort[4] == 150 && fc.target_effort[5] == 150, "common-mode error sees k + kx on both actuators");
+    check(fc.target_effort[3] == 100, "an actuator outside a pair keeps its own gain only");
+
+    HandState opposite = healthy_state();
+    for (std::size_t i = 0; i < kActuatorCount; ++i) opposite.actuators.position_count[i] = home[i];
+    opposite.actuators.position_count[4] = home[4] - 100;  opposite.actuators.position_count[5] = home[5] + 100;
+    controllers::JointImpedanceController differential(kPeriodNs);
+    canfd::CommandFrames fo{};
+    differential.compute(impedance, gains, opposite, max_effort, fo);
+    check(fo.target_effort[4] == 50 && fo.target_effort[5] == -50, "differential-mode error sees k - kx");
+
+    gains.stiffness.fill(0.0);
+    gains.cross_stiffness[1] = 0.0;
+    gains.cross_damping[1] = 0.1;
+    gains.velocity_from_rpm = true;
+    HandState moving = healthy_state();
+    for (std::size_t i = 0; i < kActuatorCount; ++i) moving.actuators.position_count[i] = home[i];
+    moving.actuators.velocity_rpm[5] = 60;
+    controllers::JointImpedanceController damped(kPeriodNs);
+    canfd::CommandFrames fm{};
+    damped.compute(impedance, gains, moving, max_effort, fm);
+    check(fm.target_effort[4] == -102 && fm.target_effort[5] == 0, "cross damping acts on the partner's velocity");
+  }
+  // 마찰 보상: 움직일 때(60 rpm = 1024 count/s) coulomb+ 50 과 점성 0.01 → +60. 정지 대역에서는 impedance effort 의
+  // 방향을 ramp(100)로 따라가므로 오차 +50(effort 50) → 방향 0.5 → +25, 오차 −50 → coulomb− 80 의 절반 −40.
+  // scale 0 이면 아무것도 더하지 않는다.
+  {
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(0.0);
+    gains.damping.fill(0.0);
+    gains.velocity_from_rpm = true;
+    gains.friction_scale = 1.0;
+    gains.friction_stick_velocity = 100.0;
+    gains.friction_stick_ramp = 100.0;
+    gains.friction_coulomb_positive.fill(50.0);
+    gains.friction_coulomb_negative.fill(80.0);
+    gains.friction_viscous.fill(0.01);
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    std::array<int, kActuatorCount> home{};
+    kinematics::ik_joint_to_actuator(impedance.target, home);
+
+    HandState moving = healthy_state();
+    for (std::size_t i = 0; i < kActuatorCount; ++i) moving.actuators.position_count[i] = home[i];
+    moving.actuators.velocity_rpm[0] = 60;
+    controllers::JointImpedanceController sliding(kPeriodNs);
+    canfd::CommandFrames fs{};
+    sliding.compute(impedance, gains, moving, max_effort, fs);
+    check(fs.target_effort[0] == 60, "moving: coulomb+ plus viscous in the direction of motion");
+    check(fs.target_effort[1] == 0, "at rest with zero effort nothing is added");
+
+    gains.stiffness.fill(1.0);
+    HandState resting = healthy_state();
+    for (std::size_t i = 0; i < kActuatorCount; ++i) resting.actuators.position_count[i] = home[i];
+    resting.actuators.position_count[0] = home[0] - 50;  // error +50
+    resting.actuators.position_count[1] = home[1] + 50;  // error −50
+    controllers::JointImpedanceController sticking(kPeriodNs);
+    canfd::CommandFrames fr{};
+    sticking.compute(impedance, gains, resting, max_effort, fr);
+    check(fr.target_effort[0] == 75, "stick band: half the ramp toward + adds half of coulomb+");
+    check(fr.target_effort[1] == -90, "stick band: half the ramp toward - adds half of coulomb-");
+
+    gains.friction_scale = 0.0;
+    controllers::JointImpedanceController off(kPeriodNs);
+    canfd::CommandFrames fo{};
+    off.compute(impedance, gains, resting, max_effort, fo);
+    check(fo.target_effort[0] == 50 && fo.target_effort[1] == -50, "friction_scale 0 leaves the law alone");
+  }
+  // 위치 표 모델: actuator 0 의 표는 count 0~8000 에 8 칸(칸 1000), + 방향 10, 20, …, 80, − 방향 전부 40.
+  // count 2500 은 칸 2 의 중심이라 + 30, count 3000 은 칸 2·3 중심 사이라 + 35. 이동 중(+) 이면 c+ 그대로,
+  // 범위 밖(count −500)은 첫 칸 값 10. bias = (c+ − c−)/2 는 정지 대역에서 bias_at_rest 면 그대로, 아니면 |d| 배.
+  {
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(0.0);
+    gains.damping.fill(0.0);
+    gains.velocity_from_rpm = true;
+    gains.friction_scale = 1.0;
+    gains.friction_model = ControllerConfig::JointImpedanceController::FrictionModel::PositionTable;
+    for (std::size_t k = 0; k < ControllerConfig::JointImpedanceController::kFrictionTableBins; ++k) {
+      gains.friction_table_positive[0][k] = 10.0 * static_cast<double>(k + 1);
+      gains.friction_table_negative[0][k] = 40.0;
+    }
+    gains.friction_table_start[0] = 0.0;
+    gains.friction_table_end[0] = 8000.0;
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    std::array<int, kActuatorCount> home{};
+    kinematics::ik_joint_to_actuator(impedance.target, home);
+    auto effort_at = [&](double count, std::int32_t rpm, double stiffness, bool bias_at_rest) {
+      ControllerConfig::JointImpedanceController g = gains;
+      g.stiffness.fill(stiffness);
+      g.friction_bias_at_rest = bias_at_rest;
+      HandState s = healthy_state();
+      for (std::size_t i = 0; i < kActuatorCount; ++i) s.actuators.position_count[i] = home[i];
+      s.actuators.position_count[0] = static_cast<std::int32_t>(count);
+      s.actuators.velocity_rpm[0] = rpm;
+      controllers::JointImpedanceController c(kPeriodNs);
+      canfd::CommandFrames f{};
+      c.compute(impedance, g, s, max_effort, f);
+      return static_cast<int>(f.target_effort[0]);
+    };
+    check(effort_at(2500.0, 60, 0.0, false) == 30, "table: bin centre while moving +");
+    check(effort_at(3000.0, 60, 0.0, false) == 35, "table: halfway between two bin centres");
+    check(effort_at(-500.0, 60, 0.0, false) == 10, "table: the edge value held outside the range");
+    check(effort_at(2500.0, -60, 0.0, false) == -40, "table: moving - gives c- at that count");
+    // 정지 대역, 오차 0 (count 2500 = 목표가 home 이므로 오차 −2500 이지만 stiffness 0 이라 effort 0):
+    // bias = (30 − 40)/2 = −5. bias_at_rest 면 −5, 아니면 0.
+    check(effort_at(2500.0, 0, 0.0, true) == -5, "table: the bias is held at rest with friction_bias_at_rest");
+    check(effort_at(2500.0, 0, 0.0, false) == 0, "table: no bias at rest without it");
+  }
+  // 속도 soft limit: 1200 rpm(20480 count/s)부터 count/s 당 0.01 의 제동. 1500 rpm(25600 count/s)에서는 넘친 5120 ×
+  // 0.01 = 51 을 운동 방향 반대로 더하고, 900 rpm 에서는 아무것도 더하지 않는다. 음의 속도면 부호가 반대다.
+  {
+    ControllerConfig::JointImpedanceController gains{};
+    gains.stiffness.fill(0.0);
+    gains.damping.fill(0.0);
+    gains.velocity_from_rpm = true;
+    gains.velocity_soft_limit = 20480.0;
+    gains.velocity_brake_gain = 0.01;
+    JointImpedanceCommand impedance{};
+    impedance.target.fill(0.0);
+    HandState s = healthy_state();
+    s.actuators.velocity_rpm[0] = 1500;
+    s.actuators.velocity_rpm[1] = 900;
+    s.actuators.velocity_rpm[2] = -1500;
+    controllers::JointImpedanceController controller(kPeriodNs);
+    canfd::CommandFrames f{};
+    controller.compute(impedance, gains, s, max_effort, f);
+    check(f.target_effort[0] == -51, "above the soft limit the brake opposes the motion");
+    check(f.target_effort[1] == 0, "below the soft limit nothing is added");
+    check(f.target_effort[2] == 51, "the brake follows the sign of the velocity");
+  }
 }
 
 }  // namespace

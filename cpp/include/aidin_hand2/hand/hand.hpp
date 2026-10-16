@@ -63,7 +63,7 @@ class Hand {
   void set_max_effort(double limit);
   void set_max_effort(const std::array<double, kActuatorCount>& limit);
 
-  // Set the position filter and the impedance gains
+  // Set the position filter and the impedance gains, with how those gains become effort
   void set_controller_config(const ControllerConfig& config);
 
   // -------------------------------- Tactile ---------------------------------

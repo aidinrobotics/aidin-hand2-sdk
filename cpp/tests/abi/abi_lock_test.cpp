@@ -45,7 +45,7 @@ struct SizeLock {
 AIDIN_ABI_SIZE_LOCK(HandState,               1320);
 AIDIN_ABI_SIZE_LOCK(Diagnostics,               96);
 AIDIN_ABI_SIZE_LOCK(HandConfig,                88);
-AIDIN_ABI_SIZE_LOCK(ControllerConfig,         280);
+AIDIN_ABI_SIZE_LOCK(ControllerConfig,        3128);
 AIDIN_ABI_SIZE_LOCK(Idle,                       1);
 AIDIN_ABI_SIZE_LOCK(JointPositionCommand,     128);
 AIDIN_ABI_SIZE_LOCK(JointImpedanceCommand,    128);

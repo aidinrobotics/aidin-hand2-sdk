@@ -13,6 +13,7 @@ namespace aidin_hand2::controllers
 
 // PD impedance in encoder space: effort = stiffness * error - damping * velocity
 // IK gives the target position, and the resulting effort is clamped to max_effort and sent as CST
+// Saturation, cross gains, friction and the brake come from the config
 class JointImpedanceController
 {
  public:
@@ -32,6 +33,9 @@ class JointImpedanceController
   // The velocity term differentiates the encoder against the previous cycle
   std::array<std::int32_t, kActuatorCount> previous_position_count_{};
   bool have_previous_ = false;
+
+  // count/s
+  std::array<double, kActuatorCount> filtered_velocity_{};
 };
 
 }  // namespace aidin_hand2::controllers
