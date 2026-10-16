@@ -53,6 +53,12 @@ void aidin_hand2_kin_ik_joint_to_actuator(const double* active_joint, int* encod
 void aidin_hand2_kin_ik_task_to_joint(const double* task, double* active_joint);
 void aidin_hand2_kin_ik_oriented_task_to_joint(const double* task, double* active_joint);
 
+// Hand types a and b only
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
+void aidin_hand2_kin_jacobian_actuator_to_joint(const double* active_joint, double* jacobian);
+void aidin_hand2_kin_jacobian_joint_to_actuator(const double* active_joint, double* jacobian);
+#endif
+
 }  // extern "C"
 
 // ---- Internal interface, used by HandCore and never shipped in include/ ----
@@ -92,5 +98,24 @@ inline void ik_oriented_task_to_joint(
 {
   aidin_hand2_kin_ik_oriented_task_to_joint(task.data(), active_joint.data());
 }
+
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
+// Row-major 16 x 16, block diagonal by digit
+// d(active joint)/d(encoder) in rad per count
+inline void jacobian_actuator_to_joint(
+  const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
+  std::array<double, ACTIVE_JOINT_NUM * ACTUATOR_NUM>& jacobian)
+{
+  aidin_hand2_kin_jacobian_actuator_to_joint(active_joint.data(), jacobian.data());
+}
+
+// d(encoder)/d(active joint) in count per rad
+inline void jacobian_joint_to_actuator(
+  const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
+  std::array<double, ACTUATOR_NUM * ACTIVE_JOINT_NUM>& jacobian)
+{
+  aidin_hand2_kin_jacobian_joint_to_actuator(active_joint.data(), jacobian.data());
+}
+#endif
 
 }  // namespace aidin_hand2::kinematics

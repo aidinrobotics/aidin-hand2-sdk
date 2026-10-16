@@ -6,6 +6,7 @@
 #include <array>
 
 #include <aidin_hand2/types/description.hpp>
+#include <aidin_hand2/types/state.hpp>
 
 namespace aidin_hand2
 {
@@ -34,5 +35,10 @@ std::array<double, kActiveJointCount> ik_task_to_joint(
 // Thumb pose and fingertip positions to joint angles (not using)
 std::array<double, kActiveJointCount> ik_oriented_task_to_joint(
     const std::array<double, kOrientedTaskCount>& oriented_task);
+
+// ------------------------- Joint velocity and effort ------------------------
+
+// Velocity and effort of the active joints at the pose in state
+HandStateJointVelEff compute_joint_vel_eff(const HandState& state);
 
 }  // namespace aidin_hand2

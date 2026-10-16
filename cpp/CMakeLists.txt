@@ -91,6 +91,7 @@ add_library(aidin_hand2 SHARED
   src/hand_core/comms/canfd/transport.cpp
   src/hand_core/comms/state_machine/homing_sequence.cpp
   src/hand_core/kinematics/hand_kinematics_public.cpp
+  src/hand_core/kinematics/hand_state_joint_vel_eff.cpp
   src/hand_core/kinematics/joint_clamp.cpp
   src/logging/logging.cpp
 )
@@ -151,6 +152,12 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_include_directories(joint_clamp_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
   target_compile_definitions(joint_clamp_test PRIVATE ${_clamp_type_definition})
   add_test(NAME joint_clamp COMMAND joint_clamp_test)
+
+  # kinematics: joint velocity and effort through the Jacobians, public API only
+  add_executable(joint_vel_eff_test tests/kinematics/joint_vel_eff_test.cpp)
+  target_link_libraries(joint_vel_eff_test PRIVATE aidin_hand2)
+  target_compile_definitions(joint_vel_eff_test PRIVATE ${_clamp_type_definition})
+  add_test(NAME joint_vel_eff COMMAND joint_vel_eff_test)
 
   # types: RealtimeBuffer SPSC 의미론 + tearing 부재(2-스레드).
   add_executable(realtime_buffer_test tests/types/realtime_buffer_test.cpp)

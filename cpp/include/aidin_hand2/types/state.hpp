@@ -180,4 +180,23 @@ struct HandState {
   CommandedState commanded{};
 };
 
+// ------------------------- Joint velocity and effort ------------------------
+
+// Active joints, from one HandState by compute_joint_vel_eff()
+// Effort is the motor torque constant times the current, gear losses not included
+// All NaN on hand type c
+struct HandStateJointVelEff {
+  // From velocity_rpm
+  std::array<double, kActiveJointCount> velocity_rad_s{};
+
+  // From current_mA
+  std::array<double, kActiveJointCount> effort_Nm{};
+
+  // From the controller effort output, NaN without one
+  std::array<double, kActiveJointCount> commanded_effort_Nm{};
+
+  // Effort that brings the most loaded actuator to rated
+  std::array<double, kActiveJointCount> rated_effort_Nm{};
+};
+
 }  // namespace aidin_hand2
