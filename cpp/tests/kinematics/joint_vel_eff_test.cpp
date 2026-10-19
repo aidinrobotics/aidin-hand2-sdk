@@ -122,7 +122,7 @@ void test_virtual_work()
 void test_rated_and_commanded()
 {
   HandState state = state_at_pose({});
-  state.actuators.current_mA[0] = 390;
+  state.actuators.current_mA[0] = 400;
   const HandStateJointVelEff idle = compute_joint_vel_eff(state);
   check(std::abs(std::abs(idle.effort_Nm[0]) - idle.rated_effort_Nm[0]) < 1e-9 * idle.rated_effort_Nm[0],
         "rated current on thumb_actuator0 gives rated_effort_Nm on thumb_joint0");

@@ -17,7 +17,8 @@ namespace
 
 // maxon ECX SPEED 8 M datasheet
 constexpr double kTorqueConstantNmPerA = 3.62e-3;
-constexpr double kRatedCurrentA        = 0.39;
+// Current at effort 1000, the drive setting
+constexpr double kRatedCurrentA        = 0.4;
 constexpr double kRatedMotorTorqueNm   = kTorqueConstantNmPerA * kRatedCurrentA;
 
 // 256 CPT x 4 on the motor shaft
