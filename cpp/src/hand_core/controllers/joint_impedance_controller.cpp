@@ -11,22 +11,93 @@ namespace aidin_hand2::controllers
 namespace
 {
 
-constexpr std::size_t kFrictionTableBins = ControllerConfig::JointImpedanceController::kFrictionTableBins;
+using Config = ControllerConfig::JointImpedanceController;
+constexpr std::size_t kTableBins = Config::PositionTableFriction::kBins;
+
+constexpr double kCountPerRevolution = 256.0 * 4.0;
+
+// count/s, below it the impedance effort sets the friction direction
+constexpr double kStickVelocity = 300.0;
+
+// Effort, the least the direction ramps over at rest
+constexpr double kMinStickRamp = 300.0;
 
 // Linear between bin centres, the edge value held outside them, the first bin when start == end
-double friction_table_at(const std::array<double, kFrictionTableBins>& table, double start, double end,
-                         double count)
+double table_at(const std::array<double, kTableBins>& table, double start, double end, double count)
 {
-  constexpr double kBins = static_cast<double>(kFrictionTableBins);
+  constexpr double kBins = static_cast<double>(kTableBins);
   if (end == start) return table[0];
 
   // 0 at the first bin centre
   const double position = (count - start) / (end - start) * kBins - 0.5;
   if (position <= 0.0) return table[0];
-  if (position >= kBins - 1.0) return table[kFrictionTableBins - 1];
+  if (position >= kBins - 1.0) return table[kTableBins - 1];
   const auto lower = static_cast<std::size_t>(position);
   const double fraction = position - static_cast<double>(lower);
   return table[lower] + fraction * (table[lower + 1] - table[lower]);
+}
+
+// c at speed, s at rest
+double stribeck_at(double c, double s, double stribeck_velocity, double shape, double speed)
+{
+  if (!(stribeck_velocity > 0.0)) return c;
+  return c + (s - c) * std::exp(-std::pow(speed / stribeck_velocity, shape));
+}
+
+// Resisting effort toward +count and -count, and the viscous gain, of a static model
+struct StaticFriction {
+  double positive;
+  double negative;
+  double viscous;
+};
+
+StaticFriction static_friction_of(const Config& config, std::size_t i, double count, double speed)
+{
+  switch (config.friction_model) {
+    case Config::FrictionModel::PositionTable: {
+      const Config::PositionTableFriction& f = config.position_table_friction;
+      return {table_at(f.positive[i], f.start[i], f.end[i], count),
+              table_at(f.negative[i], f.start[i], f.end[i], count), f.viscous[i]};
+    }
+    case Config::FrictionModel::Stribeck: {
+      const Config::StribeckFriction& f = config.stribeck_friction;
+      return {stribeck_at(f.positive[i], f.static_positive[i], f.stribeck_velocity[i], f.shape, speed),
+              stribeck_at(f.negative[i], f.static_negative[i], f.stribeck_velocity[i], f.shape, speed),
+              f.viscous[i]};
+    }
+    default: {
+      const Config::CoulombFriction& f = config.coulomb_friction;
+      return {f.positive[i], f.negative[i], f.viscous[i]};
+    }
+  }
+}
+
+// Twice the largest resisting effort of the static model, so the ramp adds little stiffness
+double stick_ramp_of(const Config& config)
+{
+  double largest = 0.0;
+  const auto take = [&largest](const auto& values) {
+    for (const double v : values) largest = std::max(largest, v);
+  };
+  switch (config.friction_model) {
+    case Config::FrictionModel::PositionTable:
+      for (std::size_t i = 0; i < kActuatorCount; ++i) {
+        take(config.position_table_friction.positive[i]);
+        take(config.position_table_friction.negative[i]);
+      }
+      break;
+    case Config::FrictionModel::Stribeck:
+      take(config.stribeck_friction.static_positive);
+      take(config.stribeck_friction.static_negative);
+      take(config.stribeck_friction.positive);
+      take(config.stribeck_friction.negative);
+      break;
+    default:
+      take(config.coulomb_friction.positive);
+      take(config.coulomb_friction.negative);
+      break;
+  }
+  return std::max(kMinStickRamp, 2.0 * largest);
 }
 
 }  // namespace
@@ -38,8 +109,7 @@ JointImpedanceController::JointImpedanceController(long period_nanoseconds)
 
 void JointImpedanceController::reset()
 {
-  have_previous_ = false;
-  filtered_velocity_.fill(0.0);
+  bristle_.fill(0.0);
 }
 
 void JointImpedanceController::compute(const JointImpedanceCommand& command,
@@ -54,24 +124,11 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
 
   // 2) Error (count) and velocity (count/s) of all actuators first
   //    A pair's cross gains read the partner's
-  constexpr double kCountPerRevolution = 256.0 * 4.0;
-  const double alpha = config.velocity_cutoff_hz > 0.0
-                           ? 1.0 - std::exp(-2.0 * M_PI * config.velocity_cutoff_hz * dt_seconds_)
-                           : 1.0;
   std::array<double, kActuatorCount> error{};
-  std::array<double, kActuatorCount> raw_velocity{};
+  std::array<double, kActuatorCount> velocity{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    error[i] = static_cast<double>(desired_cnt[i]) - state.actuators.position_count[i];
-    double velocity;
-    if (config.velocity_from_rpm) {
-      velocity = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
-    } else {
-      velocity = have_previous_
-                     ? (state.actuators.position_count[i] - previous_position_count_[i]) / dt_seconds_
-                     : 0.0;
-    }
-    raw_velocity[i] = velocity;
-    filtered_velocity_[i] += alpha * (velocity - filtered_velocity_[i]);
+    error[i]    = static_cast<double>(desired_cnt[i]) - state.actuators.position_count[i];
+    velocity[i] = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
   }
 
   // 3) Cross gains within each two-rod pair
@@ -87,55 +144,56 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
     cross_d[a] = cross_d[b] = config.cross_damping[p];
   }
 
+  const bool compensate = config.friction_scale > 0.0;
+  const bool lugre = config.friction_model == Config::FrictionModel::LuGre;
+  const double stick_ramp = compensate && !lugre ? stick_ramp_of(config) : kMinStickRamp;
+  if (!compensate || !lugre) bristle_.fill(0.0);
+
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    // 4) Stiffness term capped at p_saturation_effort, then damping
+    // 4) Stiffness and damping, each with the partner's cross term
     const std::size_t j = partner[i];
-    double p = config.stiffness[i] * error[i] + cross_k[i] * error[j];
-    if (config.p_saturation_effort > 0.0) {
-      p = std::clamp(p, -config.p_saturation_effort, config.p_saturation_effort);
-    }
-    const double impedance_effort =
-        p - config.damping[i] * filtered_velocity_[i] - cross_d[i] * filtered_velocity_[j];
+    const double v = velocity[i];
+    const double impedance_effort = config.stiffness[i] * error[i] + cross_k[i] * error[j] -
+                                    config.damping[i] * v - cross_d[i] * velocity[j];
 
-    // 5) Friction compensation, the impedance effort sets the direction at rest
+    // 5) Friction compensation
     double compensation = 0.0;
-    if (config.friction_scale > 0.0) {
-      const double v = filtered_velocity_[i];
-      const bool moving = std::abs(v) > config.friction_stick_velocity;
-      const double direction = moving ? (v > 0.0 ? 1.0 : -1.0)
-                                      : std::clamp(impedance_effort / config.friction_stick_ramp, -1.0, 1.0);
-      double positive = config.friction_coulomb_positive[i];
-      double negative = config.friction_coulomb_negative[i];
-      if (config.friction_model == ControllerConfig::JointImpedanceController::FrictionModel::PositionTable) {
-        positive = friction_table_at(config.friction_table_positive[i], config.friction_table_start[i],
-                                     config.friction_table_end[i], state.actuators.position_count[i]);
-        negative = friction_table_at(config.friction_table_negative[i], config.friction_table_start[i],
-                                     config.friction_table_end[i], state.actuators.position_count[i]);
-      }
-      const double bias = 0.5 * (positive - negative);
-      const double friction = 0.5 * (positive + negative);
-      const double bias_weight = (moving || config.friction_bias_at_rest) ? 1.0 : std::abs(direction);
-      compensation =
-          config.friction_scale * (bias * bias_weight + friction * direction + config.friction_viscous[i] * v);
+    if (compensate && lugre) {
+      // Implicit step of the bristle, stable for any bristle stiffness
+      const Config::LuGreFriction& f = config.lugre_friction;
+      const Config::StribeckFriction& curve = f.curve;
+      const double speed = std::abs(v);
+      const double g = v >= 0.0
+                           ? stribeck_at(curve.positive[i], curve.static_positive[i], curve.stribeck_velocity[i],
+                                         curve.shape, speed)
+                           : stribeck_at(curve.negative[i], curve.static_negative[i], curve.stribeck_velocity[i],
+                                         curve.shape, speed);
+      const double sigma0 = f.bristle_stiffness[i];
+      const double previous = bristle_[i];
+      const double next = (g > 0.0 && sigma0 > 0.0)
+                              ? (previous + v * dt_seconds_) / (1.0 + sigma0 * speed * dt_seconds_ / g)
+                              : 0.0;
+      bristle_[i] = next;
+      const double rate = (next - previous) / dt_seconds_;
+      compensation = config.friction_scale * (sigma0 * next + f.bristle_damping[i] * rate + curve.viscous[i] * v);
+    } else if (compensate) {
+      // The impedance effort sets the direction at rest, ramping over ±stick_ramp
+      const StaticFriction f =
+          static_friction_of(config, i, state.actuators.position_count[i], std::abs(v));
+      const bool moving = std::abs(v) > kStickVelocity;
+      const double direction =
+          moving ? (v > 0.0 ? 1.0 : -1.0) : std::clamp(impedance_effort / stick_ramp, -1.0, 1.0);
+      const double bias = 0.5 * (f.positive - f.negative);
+      const double friction = 0.5 * (f.positive + f.negative);
+      const double bias_weight = moving ? 1.0 : std::abs(direction);
+      compensation = config.friction_scale * (bias * bias_weight + friction * direction + f.viscous * v);
     }
+    const double effort = impedance_effort + compensation;
 
-    // 6) Brake above velocity_soft_limit, on the unfiltered velocity
-    double brake = 0.0;
-    if (config.velocity_soft_limit > 0.0) {
-      const double v = raw_velocity[i];
-      const double over = std::abs(v) - config.velocity_soft_limit;
-      if (over > 0.0) brake = config.velocity_brake_gain * over * (v > 0.0 ? 1.0 : -1.0);
-    }
-    const double effort = impedance_effort + compensation - brake;
-
-    // 7) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
+    // 6) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
     frames.mode_of_operation[i] = canfd::mode_of_operation::kCST;
     frames.target_effort[i]     = static_cast<std::int16_t>(std::clamp(effort, -max_effort[i], max_effort[i]));
   }
-
-  // 8) Keep this position for the next cycle's velocity term.
-  previous_position_count_ = state.actuators.position_count;
-  have_previous_ = true;
 }
 
 }  // namespace aidin_hand2::controllers

@@ -61,7 +61,7 @@ struct ControllerConfig {
     double deadband{0.000873};
   };
   // Effort is 0.1 % of rated, 1000 = 100%
-  // Fields after damping default to plain PD
+  // Velocity is the drive's velocity_rpm in count/s
   struct JointImpedanceController {
     // Effort per count
     std::array<double, kActuatorCount> stiffness{
@@ -73,60 +73,76 @@ struct ControllerConfig {
         1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5,
         1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5};
 
-    // Effort cap on the stiffness term, 0 = no cap
-    double p_saturation_effort{0.0};
-
-    // Velocity from velocity_rpm, not the encoder difference
-    bool velocity_from_rpm{false};
-
-    // Hz, velocity low-pass, 0 = no filter
-    double velocity_cutoff_hz{0.0};
-
     // Pairs in order: thumb, index, middle, ring, baby actuator1..2
     // Each actuator adds kx times the partner's error, |kx| < stiffness
     // cross_damping does the same with the partner's velocity
     std::array<double, 5> cross_stiffness{};
     std::array<double, 5> cross_damping{};
 
-    // Friction compensation, friction_scale 0 = off
-    // c+ resists motion toward +count, c- toward -count
-    enum class FrictionModel : int { Coulomb = 0, PositionTable = 1 };
-    static constexpr std::size_t kFrictionTableBins = 8;
+    // Friction models, per actuator
+    // positive resists motion toward +count and negative toward -count, in effort
+    // viscous is effort per count/s
+
+    // c±
+    struct CoulombFriction {
+      std::array<double, kActuatorCount> positive{};
+      std::array<double, kActuatorCount> negative{};
+      std::array<double, kActuatorCount> viscous{};
+    };
+
+    // c± per bin, bin centres evenly over start..end in count, edge values held outside
+    struct PositionTableFriction {
+      static constexpr std::size_t kBins = 8;
+      std::array<std::array<double, kBins>, kActuatorCount> positive{};
+      std::array<std::array<double, kBins>, kActuatorCount> negative{};
+      std::array<double, kActuatorCount> start{};
+      std::array<double, kActuatorCount> end{};
+      std::array<double, kActuatorCount> viscous{};
+    };
+
+    // c + (s - c) * exp(-(|v| / stribeck_velocity)^shape), s± the breakaway at rest
+    struct StribeckFriction {
+      std::array<double, kActuatorCount> positive{};
+      std::array<double, kActuatorCount> negative{};
+      std::array<double, kActuatorCount> static_positive{};
+      std::array<double, kActuatorCount> static_negative{};
+      // count/s
+      std::array<double, kActuatorCount> stribeck_velocity{};
+      double shape{2.0};
+      std::array<double, kActuatorCount> viscous{};
+    };
+
+    // Bristle state z with the Stribeck curve g of StribeckFriction's fields
+    // dz/dt = v - bristle_stiffness * |v| * z / g(v)
+    // effort = bristle_stiffness * z + bristle_damping * dz/dt + viscous * v
+    // bristle_damping 0 is the Dahl model
+    struct LuGreFriction {
+      StribeckFriction curve{};
+      // Effort per count
+      std::array<double, kActuatorCount> bristle_stiffness{};
+      // Effort per count/s
+      std::array<double, kActuatorCount> bristle_damping{};
+    };
+
+    // Friction compensation with the chosen model, friction_scale 0 = off
+    enum class FrictionModel : int { Coulomb = 0, PositionTable = 1, Stribeck = 2, LuGre = 3 };
     FrictionModel friction_model{FrictionModel::Coulomb};
-
-    // Effort, c+ and c- of Coulomb
-    std::array<double, kActuatorCount> friction_coulomb_positive{};
-    std::array<double, kActuatorCount> friction_coulomb_negative{};
-
-    // Effort per bin, c+ and c- of PositionTable
-    // Bins span friction_table_start..end in count
-    std::array<std::array<double, kFrictionTableBins>, kActuatorCount> friction_table_positive{};
-    std::array<std::array<double, kFrictionTableBins>, kActuatorCount> friction_table_negative{};
-    std::array<double, kActuatorCount> friction_table_start{};
-    std::array<double, kActuatorCount> friction_table_end{};
-
-    // Effort per count/s
-    std::array<double, kActuatorCount> friction_viscous{};
-
-    // count/s, below it the impedance effort sets the direction
-    double friction_stick_velocity{300.0};
-
-    // Effort for full compensation at rest, at least 2 * max(c+, c-)
-    double friction_stick_ramp{300.0};
     double friction_scale{0.0};
-
-    // Apply the bias (c+ - c-) / 2 at rest too
-    bool friction_bias_at_rest{false};
-
-    // count/s, braking starts above it, 0 = no brake
-    double velocity_soft_limit{0.0};
-
-    // Effort per count/s over velocity_soft_limit
-    double velocity_brake_gain{0.0};
+    CoulombFriction coulomb_friction{};
+    PositionTableFriction position_table_friction{};
+    StribeckFriction stribeck_friction{};
+    LuGreFriction lugre_friction{};
   };
 
   JointPositionController  joint_position_controller{};
   JointImpedanceController joint_impedance_controller{};
 };
+
+// ------------------------------- Friction file -------------------------------
+
+// Reads a friction file ("aidin-hand2-friction/1") into config's Coulomb model and selects it
+// friction_scale is left as it is, actuators the file does not list get zero
+// Throws InvalidArgument when the file cannot be read or is not a friction file
+void load_friction_file(const std::string& path, ControllerConfig::JointImpedanceController& config);
 
 }  // namespace aidin_hand2
