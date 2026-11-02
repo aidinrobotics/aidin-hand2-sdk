@@ -200,8 +200,9 @@ class HandCore {
 
   // ----------------------- Loop internals [RT thread] -----------------------
 
-  // Best effort, silent when the process lacks privileges
-  void apply_realtime_scheduling() const;
+  // Best effort: SCHED_FIFO and affinity for this thread, and in RAM its stack between the two
+  // addresses, this core and the SDK's code; logs what was applied
+  void apply_realtime_scheduling(std::uintptr_t stack_floor, std::uintptr_t stack_top) const;
 
   // One in-loop link retry while Faulted
   [[nodiscard]] bool try_reconnect_once();

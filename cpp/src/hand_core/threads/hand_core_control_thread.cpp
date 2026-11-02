@@ -1,15 +1,18 @@
 #include "hand_core/hand_core.hpp"
 
+#include <link.h>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <limits>
 #include <string>
@@ -34,6 +37,57 @@ constexpr long kStopConfirmationWindowMs = 200;
 // Below the kernel critical threads at 99, above the PREEMPT_RT IRQ threads at 50
 constexpr int kThreadPriority = 90;
 
+// Stack kept in RAM below the loop's frame, far more than the loop uses
+constexpr std::uintptr_t kLockedStackBytes = 512 * 1024;
+
+// Lowest stack address to lock for the calling thread: kLockedStackBytes below `top`, above the
+// guard page
+std::uintptr_t locked_stack_floor(std::uintptr_t top)
+{
+  void* stack = nullptr;
+  std::size_t size = 0;
+  pthread_attr_t attributes;
+  if (pthread_getattr_np(pthread_self(), &attributes) == 0) {
+    (void)pthread_attr_getstack(&attributes, &stack, &size);
+    pthread_attr_destroy(&attributes);
+  }
+  const auto page = static_cast<std::uintptr_t>(sysconf(_SC_PAGESIZE));
+  return std::max(reinterpret_cast<std::uintptr_t>(stack) + page, top - kLockedStackBytes);
+}
+
+// Locks the loaded segments (code, constants, static data) of the object holding `address` for
+// the rest of the process; errno of the first failure, 0 when all are locked
+int lock_segments_holding(const void* address)
+{
+  struct Search {
+    std::uintptr_t address;
+    int error;
+  } search{reinterpret_cast<std::uintptr_t>(address), 0};
+  dl_iterate_phdr(
+      [](dl_phdr_info* info, std::size_t, void* data) -> int {
+        auto& found = *static_cast<Search*>(data);
+        bool holds = false;
+        for (int i = 0; i < info->dlpi_phnum; ++i) {
+          const ElfW(Phdr)& segment = info->dlpi_phdr[i];
+          const std::uintptr_t start = info->dlpi_addr + segment.p_vaddr;
+          if (segment.p_type == PT_LOAD && found.address >= start &&
+              found.address < start + segment.p_memsz) {
+            holds = true;
+          }
+        }
+        if (!holds) return 0;
+        for (int i = 0; i < info->dlpi_phnum; ++i) {
+          const ElfW(Phdr)& segment = info->dlpi_phdr[i];
+          if (segment.p_type != PT_LOAD) continue;
+          const auto* start = reinterpret_cast<const void*>(info->dlpi_addr + segment.p_vaddr);
+          if (mlock(start, segment.p_memsz) != 0 && found.error == 0) found.error = errno;
+        }
+        return 1;
+      },
+      &search);
+  return search.error;
+}
+
 // Fills HandState.commanded with the controller input and the setpoint it produced
 void fill_commanded(CommandedState& echo, const HandCommand& command,
                     const canfd::CommandFrames& frames, bool output_available);
@@ -44,7 +98,10 @@ void fill_commanded(CommandedState& echo, const HandCommand& command,
 
 void HandCore::run_control_loop()
 {
-  apply_realtime_scheduling();
+  // This frame and the ones below it stay in RAM while the loop runs
+  const auto stack_top = reinterpret_cast<std::uintptr_t>(__builtin_frame_address(0));
+  const std::uintptr_t stack_floor = locked_stack_floor(stack_top);
+  apply_realtime_scheduling(stack_floor, stack_top);
 
   // Outside the try, so the failure handler can record the cycle it died on
   std::uint64_t cycle_count = 0;
@@ -207,6 +264,10 @@ void HandCore::run_control_loop()
   } catch (...) {
     handle_control_loop_failure("unknown exception", cycle_count);
   }
+
+  // The SDK's code stays locked for the other hands
+  (void)munlock(reinterpret_cast<const void*>(stack_floor), stack_top - stack_floor);
+  (void)munlock(this, sizeof(*this));
 }
 
 // ------------------------------ Loop internals ------------------------------
@@ -382,9 +443,14 @@ void HandCore::watch_homing(LoopState& loop, std::uint64_t cycle)
 }
 
 // Logs what was applied, once, before the loop starts
-void HandCore::apply_realtime_scheduling() const
+void HandCore::apply_realtime_scheduling(std::uintptr_t stack_floor, std::uintptr_t stack_top) const
 {
-  (void)mlockall(MCL_CURRENT | MCL_FUTURE);
+  // mlock also faults the pages in, so the loop takes no first-touch fault on them
+  int lock_error = 0;
+  if (mlock(reinterpret_cast<const void*>(stack_floor), stack_top - stack_floor) != 0) lock_error = errno;
+  if (mlock(this, sizeof(*this)) != 0 && lock_error == 0) lock_error = errno;
+  const int code_error = lock_segments_holding(&kThreadPriority);
+  if (lock_error == 0) lock_error = code_error;
 
   sched_param param{};
   param.sched_priority = kThreadPriority;
@@ -397,9 +463,14 @@ void HandCore::apply_realtime_scheduling() const
     (void)pthread_setaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
   }
 
+  if (lock_error != 0) {
+    log_warn(hand_side_, std::string("loop memory not locked (") + std::strerror(lock_error) +
+                             ") — raise memlock (ulimit -l) to keep it in RAM");
+  }
   if (fifo_applied) {
     std::string message = "realtime scheduling applied — SCHED_FIFO priority " +
-                          std::to_string(kThreadPriority) + ", memory locked";
+                          std::to_string(kThreadPriority) +
+                          (lock_error == 0 ? ", loop memory locked" : ", loop memory not locked");
     message += rt_cpu_affinity_ >= 0 ? ", CPU affinity " + std::to_string(rt_cpu_affinity_)
                                      : ", no CPU affinity (any core)";
     message += ", running on CPU " + std::to_string(sched_getcpu());

@@ -16,15 +16,23 @@
 //   C. 무수신(silence): connect() 가 자체 첫-수신 timeout 으로 유한 반환(Exception).
 //   D. 미확인 정지의 재시도: 확인이 안 온 stop() 을 다시 불러도 "이미 Stopped" 로 조용히
 //      성공하지 않는다 — lifecycle 이 사실을 담으므로 두 번째 호출도 재확인한다.
+//   E. 제어 루프가 도는 동안 앱의 할당: SDK 는 자기 메모리만 잠그므로 memlock 한도보다 큰
+//      할당도 성공한다.
 //
 // 규약: 익명 namespace, check(bool,const char*)+g_failures, main 이 PASS 출력/ g_failures 반환.
+
+#include <sys/resource.h>
 
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
+#include <new>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include <aidin_hand2/hand/hand.hpp>
 #include <aidin_hand2/hand/hand_manager.hpp>
@@ -200,6 +208,49 @@ void test_unconfirmed_stop_retry_reverifies()
   run_with_watchdog("destroy() [D]", kWatchdog, [&] { manager.destroy(hand); });
 }
 
+// /proc/self/status 의 VmLck(kB). 읽지 못하면 -1
+long locked_kb()
+{
+  std::ifstream status("/proc/self/status");
+  std::string line;
+  while (std::getline(status, line)) {
+    if (line.rfind("VmLck:", 0) == 0) return std::strtol(line.c_str() + 6, nullptr, 10);
+  }
+  return -1;
+}
+
+// E. 루프가 도는 동안 앱의 할당. 프로세스 전체를 앞으로 할당분까지 잠그면 web_bridge 가
+//    시퀀스 문서를 받다가 bad_alloc 으로 죽었다(memlock 64 MiB). SDK 는 자기 스택·core·코드만
+//    잠그므로 한도보다 큰 할당도 된다.
+void test_host_allocation_while_running()
+{
+  rlimit limit{};
+  if (getrlimit(RLIMIT_MEMLOCK, &limit) != 0 || limit.rlim_cur == RLIM_INFINITY) {
+    std::printf("  (memlock unlimited, E skipped)\n");
+    return;
+  }
+  mock::set_mode(mock::Mode::FramesNoQuickStop);
+  HandManager manager;
+  Hand hand = manager.create(make_config());
+  run_with_watchdog("connect() [E]", kWatchdog, [&] { hand.connect(); });
+
+  // 한도가 SDK 몫(수 MiB)을 넉넉히 넘을 때만 잠겼는지 본다
+  if (limit.rlim_cur >= (32u << 20)) {
+    check(locked_kb() > 0, "루프가 쓰는 메모리는 잠겨 있다");
+  }
+  bool allocated = false;
+  try {
+    std::vector<char> block(limit.rlim_cur + (16u << 20), 1);
+    allocated = block.back() == 1;
+  } catch (const std::bad_alloc&) {
+    allocated = false;
+  }
+  std::printf("  (VmLck %ld kB while the loop runs)\n", locked_kb());
+  check(allocated, "루프가 도는 동안 memlock 한도보다 큰 할당이 된다");
+
+  run_with_watchdog("destroy() [E]", kWatchdog, [&] { manager.destroy(hand); });
+}
+
 }  // namespace
 
 int main()
@@ -208,6 +259,7 @@ int main()
   test_destroy_while_running_bounded();
   test_silence_connect_bounded();
   test_unconfirmed_stop_retry_reverifies();
+  test_host_allocation_while_running();
   if (g_failures == 0) {
     std::printf("liveness_test: PASS\n");
   }
