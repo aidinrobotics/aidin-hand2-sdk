@@ -14,7 +14,12 @@ namespace
 using Config = ControllerConfig::JointImpedanceController;
 constexpr std::size_t kTableBins = Config::PositionTableFriction::kBins;
 
-constexpr double kCountPerRevolution = 256.0 * 4.0;
+// 256 CPT x 4 on the motor shaft
+constexpr double kCountPerRevolution = 1024.0;
+constexpr double kMotorRadPerCount   = 2.0 * 3.14159265358979323846 / kCountPerRevolution;
+
+// N·m at effort 1000: maxon ECX SPEED 8 M at the drive's 0.4 A
+constexpr double kRatedMotorTorqueNm = 3.62e-3 * 0.4;
 
 // count/s, below it the impedance effort sets the friction direction
 constexpr double kStickVelocity = 300.0;
@@ -101,6 +106,41 @@ double stick_ramp_of(const Config& config)
 }
 
 }  // namespace
+
+std::array<double, kActiveJointCount> joint_impedance_torque(
+    const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
+    const std::array<double, kActiveJointCount>& velocity, const Config& config,
+    const JointJacobian& count_per_joint)
+{
+  std::array<double, kActiveJointCount> torque{};
+  for (std::size_t j = 0; j < kActiveJointCount; ++j) {
+    double inertia = config.link_inertia_kgm2[j];
+    for (std::size_t i = 0; i < kActuatorCount; ++i) {
+      const double motor_per_joint = count_per_joint[i * kActiveJointCount + j] * kMotorRadPerCount;
+      inertia += motor_per_joint * motor_per_joint * config.motor_inertia_kgm2[i];
+    }
+    const double stiffness = config.stiffness_Nm_per_rad[j];
+    const double damping   = 2.0 * config.damping_ratio[j] * std::sqrt(stiffness * inertia);
+    torque[j] = stiffness * (target[j] - position[j]) - damping * velocity[j];
+  }
+  return torque;
+}
+
+std::array<double, kActuatorCount> joint_torque_to_effort(
+    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count,
+    const Config& config)
+{
+  std::array<double, kActuatorCount> effort{};
+  for (std::size_t i = 0; i < kActuatorCount; ++i) {
+    // Motor torque is the joint torques through d(joint)/d(motor rad)
+    double motor_torque = 0.0;
+    for (std::size_t j = 0; j < kActiveJointCount; ++j) {
+      motor_torque += joint_per_count[j * kActuatorCount + i] / kMotorRadPerCount * torque[j];
+    }
+    effort[i] = motor_torque / (config.efficiency[i] * kRatedMotorTorqueNm) * 1000.0;
+  }
+  return effort;
+}
 
 JointImpedanceController::JointImpedanceController(long period_nanoseconds)
 : dt_seconds_(static_cast<double>(period_nanoseconds) / 1e9)

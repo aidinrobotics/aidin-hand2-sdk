@@ -11,6 +11,23 @@
 namespace aidin_hand2::controllers
 {
 
+// Row-major 16 x 16
+using JointJacobian = std::array<double, kActiveJointCount * kActuatorCount>;
+
+// N·m per active joint: stiffness * (target - position) - damping * velocity
+// damping = 2 * damping_ratio * sqrt(stiffness * inertia), the inertia reflected through
+// count_per_joint (count per rad, row actuator)
+std::array<double, kActiveJointCount> joint_impedance_torque(
+    const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
+    const std::array<double, kActiveJointCount>& velocity, const ControllerConfig::JointImpedanceController& config,
+    const JointJacobian& count_per_joint);
+
+// Effort per actuator for joint torques, before friction and the max_effort clamp
+// joint_per_count is rad per count, row joint
+std::array<double, kActuatorCount> joint_torque_to_effort(
+    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count,
+    const ControllerConfig::JointImpedanceController& config);
+
 // PD impedance in encoder space: effort = stiffness * error - damping * velocity
 // IK gives the target position, and the resulting effort is clamped to max_effort and sent as CST
 // Velocity is the drive's rpm, cross gains and friction compensation come from the config
