@@ -79,6 +79,27 @@ struct ControllerConfig {
     std::array<double, 5> cross_stiffness{};
     std::array<double, 5> cross_damping{};
 
+    // Per active joint, in the order of JointImpedanceCommand::target
+    // damping = 2 * damping_ratio * sqrt(stiffness * inertia), the inertia at the current pose
+    std::array<double, kActiveJointCount> stiffness_Nm_per_rad{
+        4.9, 26.5, 3.2, 2.5, 0.4, 2.5, 1.35, 0.4,
+        2.5, 1.35, 0.4, 2.5, 1.35, 0.4, 2.5, 1.35};
+    // 0..1, 1 = critical
+    std::array<double, kActiveJointCount> damping_ratio{
+        0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+        0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7};
+
+    // Per actuator on the motor shaft: rotor, gearhead, encoder, gears and screw
+    std::array<double, kActuatorCount> motor_inertia_kgm2{
+        3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9,
+        3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9};
+    // Per active joint, added to the motor inertia seen at the joint
+    std::array<double, kActiveJointCount> link_inertia_kgm2{};
+    // Share of the motor torque that reaches the joint, 0 < efficiency <= 1
+    std::array<double, kActuatorCount> efficiency{
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+
     // Friction models, per actuator
     // positive resists motion toward +count and negative toward -count, in effort
     // viscous is effort per count/s

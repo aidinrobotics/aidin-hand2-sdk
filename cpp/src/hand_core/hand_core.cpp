@@ -38,6 +38,10 @@ bool workspace_clamp_enabled();
 template <std::size_t Size>
 bool all_finite(const std::array<double, Size>& values);
 
+// Joint stiffness >= 0, damping ratio in [0, 1], motor inertia > 0, link inertia >= 0,
+// efficiency in (0, 1], all finite
+Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config);
+
 // Every friction value finite, resisting efforts and gains >= 0, the model one of the defined
 Status check_friction(const ControllerConfig::JointImpedanceController& config);
 
@@ -489,6 +493,7 @@ Status HandCore::set_controller_config(const ControllerConfig& config)
               "Cannot set controller config: joint impedance cross_stiffness and cross_damping must be finite"};
     }
   }
+  if (Status joint = check_joint_impedance(impedance); !joint.ok()) return joint;
   if (Status friction = check_friction(impedance); !friction.ok()) return friction;
   std::lock_guard<std::mutex> lock(staging_mutex_);
   staging_controller_config_ = config;
@@ -775,6 +780,30 @@ bool all_non_negative(const std::array<double, Size>& values)
 {
   for (const double value : values) if (!std::isfinite(value) || value < 0.0) return false;
   return true;
+}
+
+Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config)
+{
+  const auto fail = [](const char* what) {
+    return Status{ErrorCode::InvalidArgument,
+                  std::string("Cannot set controller config: joint impedance ") + what};
+  };
+  if (!all_non_negative(config.stiffness_Nm_per_rad)) {
+    return fail("stiffness_Nm_per_rad must be finite and >= 0");
+  }
+  for (const double ratio : config.damping_ratio) {
+    if (!std::isfinite(ratio) || ratio < 0.0 || ratio > 1.0) return fail("damping_ratio must be finite and in [0, 1]");
+  }
+  for (const double inertia : config.motor_inertia_kgm2) {
+    if (!std::isfinite(inertia) || inertia <= 0.0) return fail("motor_inertia_kgm2 must be finite and > 0");
+  }
+  if (!all_non_negative(config.link_inertia_kgm2)) {
+    return fail("link_inertia_kgm2 must be finite and >= 0");
+  }
+  for (const double share : config.efficiency) {
+    if (!std::isfinite(share) || share <= 0.0 || share > 1.0) return fail("efficiency must be finite and in (0, 1]");
+  }
+  return {};
 }
 
 Status check_friction(const ControllerConfig::JointImpedanceController& config)
