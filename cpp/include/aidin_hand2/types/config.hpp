@@ -63,22 +63,6 @@ struct ControllerConfig {
   // Effort is 0.1 % of rated, 1000 = 100%
   // Velocity is the drive's velocity_rpm in count/s
   struct JointImpedanceController {
-    // Effort per count
-    std::array<double, kActuatorCount> stiffness{
-        0.02, 0.02, 0.02, 0.02, 0.01, 0.01, 0.02, 0.01,
-        0.01, 0.02, 0.01, 0.01, 0.02, 0.01, 0.01, 0.02};
-
-    // Effort per count/s
-    std::array<double, kActuatorCount> damping{
-        1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5,
-        1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5};
-
-    // Pairs in order: thumb, index, middle, ring, baby actuator1..2
-    // Each actuator adds kx times the partner's error, |kx| < stiffness
-    // cross_damping does the same with the partner's velocity
-    std::array<double, 5> cross_stiffness{};
-    std::array<double, 5> cross_damping{};
-
     // Per active joint, in the order of JointImpedanceCommand::target
     // damping = 2 * damping_ratio * sqrt(stiffness * inertia), the inertia at the current pose
     std::array<double, kActiveJointCount> stiffness_Nm_per_rad{

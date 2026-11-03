@@ -480,19 +480,6 @@ Status HandCore::set_controller_config(const ControllerConfig& config)
             "Cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0"};
   }
   const ControllerConfig::JointImpedanceController& impedance = config.joint_impedance_controller;
-  for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    if (!std::isfinite(impedance.stiffness[i]) || impedance.stiffness[i] < 0.0 ||
-        !std::isfinite(impedance.damping[i]) || impedance.damping[i] < 0.0) {
-      return {ErrorCode::InvalidArgument,
-              "Cannot set controller config: joint impedance stiffness and damping must be finite and >= 0"};
-    }
-  }
-  for (std::size_t i = 0; i < impedance.cross_stiffness.size(); ++i) {
-    if (!std::isfinite(impedance.cross_stiffness[i]) || !std::isfinite(impedance.cross_damping[i])) {
-      return {ErrorCode::InvalidArgument,
-              "Cannot set controller config: joint impedance cross_stiffness and cross_damping must be finite"};
-    }
-  }
   if (Status joint = check_joint_impedance(impedance); !joint.ok()) return joint;
   if (Status friction = check_friction(impedance); !friction.ok()) return friction;
   std::lock_guard<std::mutex> lock(staging_mutex_);

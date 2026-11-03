@@ -105,6 +105,32 @@ double stick_ramp_of(const Config& config)
   return std::max(kMinStickRamp, 2.0 * largest);
 }
 
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
+// The 21-joint FK output without each digit's passive q4
+std::array<double, kActiveJointCount> active_joints_of(const std::array<double, kJointCount>& joints)
+{
+  std::array<double, kActiveJointCount> active{};
+  for (std::size_t k = 0; k < 4; ++k) active[k] = joints[k];
+  for (std::size_t finger = 0; finger < 4; ++finger) {
+    for (std::size_t k = 0; k < 3; ++k) active[4 + 3 * finger + k] = joints[5 + 4 * finger + k];
+  }
+  return active;
+}
+
+// rad/s from the drives' velocity_rpm
+std::array<double, kActiveJointCount> joint_velocity(const HandState& state, const JointJacobian& joint_per_count)
+{
+  std::array<double, kActiveJointCount> velocity{};
+  for (std::size_t j = 0; j < kActiveJointCount; ++j) {
+    for (std::size_t i = 0; i < kActuatorCount; ++i) {
+      const double count_rate = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
+      velocity[j] += joint_per_count[j * kActuatorCount + i] * count_rate;
+    }
+  }
+  return velocity;
+}
+#endif
+
 }  // namespace
 
 std::array<double, kActiveJointCount> joint_impedance_torque(
@@ -158,46 +184,51 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
                                        const std::array<double, kActuatorCount>& max_effort,
                                        canfd::CommandFrames& frames)
 {
-  // 1) IK: active joint target(rad) → actuator target position (count).
-  std::array<int, kActuatorCount> desired_cnt{};
-  kinematics::ik_joint_to_actuator(command.target, desired_cnt);
+  std::array<double, kActuatorCount> effort{};
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
+  // 1) Joint position from FK and both Jacobians at it
+  const std::array<double, kActiveJointCount> position = active_joints_of(state.joints.position_rad);
+  JointJacobian joint_per_count{};
+  JointJacobian count_per_joint{};
+  kinematics::jacobian_actuator_to_joint(position, joint_per_count);
+  kinematics::jacobian_joint_to_actuator(position, count_per_joint);
 
-  // 2) Error (count) and velocity (count/s) of all actuators first
-  //    A pair's cross gains read the partner's
-  std::array<double, kActuatorCount> error{};
-  std::array<double, kActuatorCount> velocity{};
+  // 2) Joint law, then its effort through the transposed Jacobian
+  const std::array<double, kActiveJointCount> velocity = joint_velocity(state, joint_per_count);
+  const std::array<double, kActiveJointCount> torque =
+      joint_impedance_torque(command.target, position, velocity, config, count_per_joint);
+  const std::array<double, kActuatorCount> impedance_effort = joint_torque_to_effort(torque, joint_per_count, config);
+
+  // 3) Friction compensation per actuator
+  const std::array<double, kActuatorCount> compensation = friction_compensation(config, state, impedance_effort);
+  for (std::size_t i = 0; i < kActuatorCount; ++i) effort[i] = impedance_effort[i] + compensation[i];
+#else
+  (void)command;
+  (void)config;
+  (void)state;
+#endif
+
+  // 4) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
+  //    An effort that is not finite, such as before homing, sends 0
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    error[i]    = static_cast<double>(desired_cnt[i]) - state.actuators.position_count[i];
-    velocity[i] = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
+    const double value = std::isfinite(effort[i]) ? effort[i] : 0.0;
+    frames.mode_of_operation[i] = canfd::mode_of_operation::kCST;
+    frames.target_effort[i]     = static_cast<std::int16_t>(std::clamp(value, -max_effort[i], max_effort[i]));
   }
+}
 
-  // 3) Cross gains within each two-rod pair
-  //    An actuator outside a pair is its own partner with gain 0
-  constexpr std::array<std::array<std::size_t, 2>, 5> kCrossPairs{{{1, 2}, {4, 5}, {7, 8}, {10, 11}, {13, 14}}};
-  std::array<std::size_t, kActuatorCount> partner{};
-  std::array<double, kActuatorCount> cross_k{}, cross_d{};
-  for (std::size_t i = 0; i < kActuatorCount; ++i) partner[i] = i;
-  for (std::size_t p = 0; p < kCrossPairs.size(); ++p) {
-    const auto [a, b] = kCrossPairs[p];
-    partner[a] = b;  partner[b] = a;
-    cross_k[a] = cross_k[b] = config.cross_stiffness[p];
-    cross_d[a] = cross_d[b] = config.cross_damping[p];
-  }
-
+std::array<double, kActuatorCount> JointImpedanceController::friction_compensation(
+    const ControllerConfig::JointImpedanceController& config, const HandState& state,
+    const std::array<double, kActuatorCount>& impedance_effort)
+{
+  std::array<double, kActuatorCount> compensation{};
   const bool compensate = config.friction_scale > 0.0;
   const bool lugre = config.friction_model == Config::FrictionModel::LuGre;
   const double stick_ramp = compensate && !lugre ? stick_ramp_of(config) : kMinStickRamp;
   if (!compensate || !lugre) bristle_.fill(0.0);
 
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    // 4) Stiffness and damping, each with the partner's cross term
-    const std::size_t j = partner[i];
-    const double v = velocity[i];
-    const double impedance_effort = config.stiffness[i] * error[i] + cross_k[i] * error[j] -
-                                    config.damping[i] * v - cross_d[i] * velocity[j];
-
-    // 5) Friction compensation
-    double compensation = 0.0;
+    const double v = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
     if (compensate && lugre) {
       // Implicit step of the bristle, stable for any bristle stiffness
       const Config::LuGreFriction& f = config.lugre_friction;
@@ -215,25 +246,21 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
                               : 0.0;
       bristle_[i] = next;
       const double rate = (next - previous) / dt_seconds_;
-      compensation = config.friction_scale * (sigma0 * next + f.bristle_damping[i] * rate + curve.viscous[i] * v);
+      compensation[i] = config.friction_scale * (sigma0 * next + f.bristle_damping[i] * rate + curve.viscous[i] * v);
     } else if (compensate) {
       // The impedance effort sets the direction at rest, ramping over ±stick_ramp
       const StaticFriction f =
           static_friction_of(config, i, state.actuators.position_count[i], std::abs(v));
       const bool moving = std::abs(v) > kStickVelocity;
       const double direction =
-          moving ? (v > 0.0 ? 1.0 : -1.0) : std::clamp(impedance_effort / stick_ramp, -1.0, 1.0);
+          moving ? (v > 0.0 ? 1.0 : -1.0) : std::clamp(impedance_effort[i] / stick_ramp, -1.0, 1.0);
       const double bias = 0.5 * (f.positive - f.negative);
       const double friction = 0.5 * (f.positive + f.negative);
       const double bias_weight = moving ? 1.0 : std::abs(direction);
-      compensation = config.friction_scale * (bias * bias_weight + friction * direction + f.viscous * v);
+      compensation[i] = config.friction_scale * (bias * bias_weight + friction * direction + f.viscous * v);
     }
-    const double effort = impedance_effort + compensation;
-
-    // 6) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
-    frames.mode_of_operation[i] = canfd::mode_of_operation::kCST;
-    frames.target_effort[i]     = static_cast<std::int16_t>(std::clamp(effort, -max_effort[i], max_effort[i]));
   }
+  return compensation;
 }
 
 }  // namespace aidin_hand2::controllers

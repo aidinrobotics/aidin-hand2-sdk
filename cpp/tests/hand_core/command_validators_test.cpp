@@ -1,7 +1,7 @@
 // 목적(Tier 1, HW 무관): HandCore 의 command 입력 검증기(is_command_valid 오버로드)와
 // set_max_effort 의 [0, 2000] clamp 를 host 에서 black-box 로 점검한다. 소켓은 열지 않는다.
 //   - is_command_valid: NaN/Inf 거부 · ActuatorPosition int32 범위 밖 거부 · 유효 command 수락.
-//   - set_controller_config: filter·gain 의 NaN/Inf·음수 거부 · 0 수락.
+//   - set_controller_config: filter 의 NaN/Inf·음수 거부, joint impedance 값의 기본값과 범위.
 //   - set_max_effort: 범위 내 유지 · 음수 → 0 · 2000 초과 → 2000 · NaN/Inf 거부.
 //
 // 접근 seam: is_command_valid 는 hand_core.cpp 의 anonymous namespace 자유함수라 직접 호출 불가.
@@ -159,34 +159,7 @@ void test_controller_config_filter_rejected(HandCore& core)
   }
 }
 
-// ── Test 4: set_controller_config — gain 은 유한·음수 아님 ──
-void test_controller_config_gains_rejected(HandCore& core)
-{
-  {
-    ControllerConfig config{};  config.joint_impedance_controller.stiffness[0] = kNaN;
-    check(rejected(core.set_controller_config(config)), "stiffness NaN rejected");
-  }
-  {
-    ControllerConfig config{};  config.joint_impedance_controller.damping[1] = kInf;
-    check(rejected(core.set_controller_config(config)), "damping Inf rejected");
-  }
-  {
-    ControllerConfig config{};  config.joint_impedance_controller.stiffness[0] = -1.0;
-    check(rejected(core.set_controller_config(config)), "stiffness negative rejected");
-  }
-  {
-    ControllerConfig config{};  config.joint_impedance_controller.damping[5] = -1e-6;
-    check(rejected(core.set_controller_config(config)), "damping negative rejected");
-  }
-  {
-    ControllerConfig config{};  // 경계: 0 gain 허용
-    config.joint_impedance_controller.stiffness.fill(0.0);
-    config.joint_impedance_controller.damping.fill(0.0);
-    check(core.set_controller_config(config).ok(), "zero gains accepted");
-  }
-}
-
-// ── Test 4b: set_controller_config — joint 공간 impedance 값의 기본값과 범위 ──
+// ── Test 4: set_controller_config — joint 공간 impedance 값의 기본값과 범위 ──
 // 기본 stiffness 는 count 기본값을 기준 자세에서 환산한 임시값, ζ 0.7, 관성 0.033 g·cm², 효율 1, 링크 관성 0.
 void test_joint_impedance_config(HandCore& core)
 {
@@ -211,6 +184,10 @@ void test_joint_impedance_config(HandCore& core)
   using Gains = ControllerConfig::JointImpedanceController;
   check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness_Nm_per_rad[3] = -1.0; }))),
         "negative joint stiffness rejected");
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness_Nm_per_rad[1] = kInf; }))),
+        "infinite joint stiffness rejected");
+  check(core.set_controller_config(with([](Gains& g) { g.stiffness_Nm_per_rad.fill(0.0); })).ok(),
+        "zero joint stiffness accepted");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.damping_ratio[0] = 1.5; }))),
         "damping ratio above 1 rejected");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.damping_ratio[0] = kNaN; }))),
@@ -291,7 +268,6 @@ int main()
   test_valid_commands_accepted(core);
   test_non_finite_rejected(core);
   test_controller_config_filter_rejected(core);
-  test_controller_config_gains_rejected(core);
   test_joint_impedance_config(core);
   test_actuator_position_int32_range(core);
   test_set_max_effort_clamp(core);

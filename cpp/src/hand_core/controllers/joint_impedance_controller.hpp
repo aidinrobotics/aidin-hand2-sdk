@@ -28,9 +28,9 @@ std::array<double, kActuatorCount> joint_torque_to_effort(
     const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count,
     const ControllerConfig::JointImpedanceController& config);
 
-// PD impedance in encoder space: effort = stiffness * error - damping * velocity
-// IK gives the target position, and the resulting effort is clamped to max_effort and sent as CST
-// Velocity is the drive's rpm, cross gains and friction compensation come from the config
+// Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort
+// Friction compensation is added per actuator, and the effort is clamped to max_effort and sent as CST
+// Hand type c has no Jacobian and sends 0
 class JointImpedanceController
 {
  public:
@@ -40,6 +40,12 @@ class JointImpedanceController
   void compute(const JointImpedanceCommand& command,
                const ControllerConfig::JointImpedanceController& config, const HandState& state,
                const std::array<double, kActuatorCount>& max_effort, canfd::CommandFrames& frames);
+
+  // Effort per actuator added to the impedance effort, which sets the direction at rest
+  // The LuGre model advances its bristle state by one period
+  std::array<double, kActuatorCount> friction_compensation(
+      const ControllerConfig::JointImpedanceController& config, const HandState& state,
+      const std::array<double, kActuatorCount>& impedance_effort);
 
   // Next entry starts the LuGre bristles relaxed
   void reset();

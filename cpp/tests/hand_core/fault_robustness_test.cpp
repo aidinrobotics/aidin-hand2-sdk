@@ -143,8 +143,14 @@ void test_fault_mask_defends_active_actuator(HandCore& core)
 
   // JointImpedance (CST 경로): impedance 법칙이 0 이 아닌 토크를 낼 상황에서도 faulted → 0.
   {
+    // 모든 관절 20° 자세 → target 0 과 큰 오차, 기본 stiffness 로 큰 토크 유발
+    std::array<double, kActiveJointCount> bent{};
+    bent.fill(20.0 * 3.14159265358979323846 / 180.0);
+    std::array<int, kActuatorCount> count{};
+    kinematics::ik_joint_to_actuator(bent, count);
     HandState state = healthy_state();
-    state.actuators.position_count[kFaulted] = 2000.0;  // target 0 과 큰 오차 → K항 큰 토크 유발
+    for (std::size_t i = 0; i < kActuatorCount; ++i) state.actuators.position_count[i] = count[i];
+    HandCoreTestPeer::fill_joint_state(core, state);
     ActuatorHealth health = all_enabled_health();
     health.fault[kFaulted] = ActuatorFault::FollowingError;
 
@@ -154,11 +160,7 @@ void test_fault_mask_defends_active_actuator(HandCore& core)
     command.controller = impedance;
     command.max_effort_pct.fill(30000.0);
 
-    ControllerConfig config{};
-    config.joint_impedance_controller.stiffness.fill(1.0);
-    config.joint_impedance_controller.damping.fill(0.0);
-
-    const auto frames = HandCoreTestPeer::command_to_frames(core, command, state, health, config);
+    const auto frames = HandCoreTestPeer::command_to_frames(core, command, state, health);
     check(frames.target_effort[kFaulted] == 0,
           "JointImpedance: faulted actuator masked to zero torque");
   }
