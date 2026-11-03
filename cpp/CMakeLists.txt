@@ -92,7 +92,6 @@ add_library(aidin_hand2 SHARED
   src/hand_core/comms/canfd/transport.cpp
   src/hand_core/comms/state_machine/homing_sequence.cpp
   src/hand_core/kinematics/hand_kinematics_public.cpp
-  src/hand_core/kinematics/hand_state_joint_vel_eff.cpp
   src/hand_core/kinematics/joint_clamp.cpp
   src/logging/logging.cpp
 )
@@ -212,6 +211,13 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_include_directories(joint_position_controller_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
   add_test(NAME joint_position_controller COMMAND joint_position_controller_test)
 
+  # controllers: joint 공간 impedance 법칙과 그 도우미.
+  add_executable(joint_impedance_controller_test tests/controllers/joint_impedance_controller_test.cpp)
+  target_link_libraries(joint_impedance_controller_test PRIVATE aidin_hand2 aidin_hand2_kinematics)
+  target_include_directories(joint_impedance_controller_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_compile_definitions(joint_impedance_controller_test PRIVATE ${_clamp_type_definition})
+  add_test(NAME joint_impedance_controller COMMAND joint_impedance_controller_test)
+
   # hand_core: command 검증기(NaN/Inf/범위) + set_max_effort 클램프 (HandCoreTestPeer 시임).
   add_executable(command_validators_test tests/hand_core/command_validators_test.cpp)
   target_link_libraries(command_validators_test PRIVATE aidin_hand2 aidin_hand2_kinematics)
@@ -287,6 +293,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
   )
   # The kinematics source is not here, so aidin_hand2_kinematics is linked in below.
   target_compile_features(liveness_test PRIVATE cxx_std_17)
+  target_compile_definitions(liveness_test PRIVATE ${_clamp_type_definition})
   target_include_directories(liveness_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
