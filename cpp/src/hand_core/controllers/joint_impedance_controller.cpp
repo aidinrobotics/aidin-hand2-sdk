@@ -209,7 +209,7 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
 #endif
 
   // 4) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
-  //    An effort that is not finite, such as before homing, sends 0
+  //    An effort that is not finite sends 0
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     const double value = std::isfinite(effort[i]) ? effort[i] : 0.0;
     frames.mode_of_operation[i] = canfd::mode_of_operation::kCST;

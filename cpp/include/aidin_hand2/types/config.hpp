@@ -60,8 +60,6 @@ struct ControllerConfig {
     // rad
     double deadband{0.000873};
   };
-  // Effort is 0.1 % of rated, 1000 = 100%
-  // Velocity is the drive's velocity_rpm in count/s
   struct JointImpedanceController {
     // Per active joint, in the order of JointImpedanceCommand::target
     // damping = 2 * damping_ratio * sqrt(stiffness * inertia), the inertia at the current pose
@@ -85,6 +83,8 @@ struct ControllerConfig {
         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 
     // Friction models, per actuator
+    // Effort is 0.1 % of rated, 1000 = 100%
+    // Velocity is the drive's velocity_rpm in count/s
     // positive resists motion toward +count and negative toward -count, in effort
     // viscous is effort per count/s
 

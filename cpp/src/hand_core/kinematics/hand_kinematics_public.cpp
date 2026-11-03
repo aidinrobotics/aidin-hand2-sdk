@@ -9,6 +9,7 @@
 
 // Wraps the internal flat-array core, turning its out-parameters into return values
 // FK is exposed twice, once returning joints and once returning the fingertip task
+// compute_joint_vel_eff maps the drives' velocity and effort to the joints through the Jacobian
 
 namespace aidin_hand2
 {
