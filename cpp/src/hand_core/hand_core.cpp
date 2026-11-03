@@ -408,6 +408,9 @@ Status HandCore::set_command(const JointPositionCommand& command)
 
 Status HandCore::set_command(const JointImpedanceCommand& command)
 {
+#if defined(AIDIN_HAND2_HAND_TYPE_C)
+  return {ErrorCode::InvalidArgument, "Cannot set command: joint impedance needs the hand type a or b kinematics"};
+#endif
   if (Status allowed = check_allowed(HandAction::SetCommand); !allowed.ok()) return allowed;
   if (!is_command_valid(command)) {
     return drop_invalid_command(hand_side_, count_nan_command_, last_command_was_nan_);

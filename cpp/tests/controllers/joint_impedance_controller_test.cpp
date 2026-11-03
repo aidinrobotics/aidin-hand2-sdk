@@ -258,6 +258,23 @@ void test_compute()
   for (std::size_t i = 0; i < kActuatorCount; ++i) bounded = bounded && std::abs(edge.target_effort[i]) <= 1000;
   check(bounded && edge.target_effort[0] > 0, "compute: the home pose gives a bounded effort toward the target");
 }
+#else
+// ── Test 3: type c 는 Jacobian 이 없어 모든 actuator 에 CST 0 ──
+void test_compute_type_c()
+{
+  JointImpedanceCommand command{};
+  command.target.fill(0.3);
+  std::array<double, kActuatorCount> max_effort{};
+  max_effort.fill(1000.0);
+  controllers::JointImpedanceController controller(kPeriodNs);
+  canfd::CommandFrames frames{};
+  controller.compute(command, Config{}, HandState{}, max_effort, frames);
+  bool zero = true;
+  for (std::size_t i = 0; i < kActuatorCount; ++i) {
+    zero = zero && frames.mode_of_operation[i] == canfd::mode_of_operation::kCST && frames.target_effort[i] == 0;
+  }
+  check(zero, "compute: type c sends CST 0 to every actuator");
+}
 #endif
 
 // ── Test 4: 마찰 보상 (impedance effort 를 직접 넣는다) ──
@@ -363,6 +380,8 @@ int main()
   test_joint_torque_to_effort();
   test_joint_impedance_torque();
   test_compute();
+#else
+  test_compute_type_c();
 #endif
   test_friction_compensation();
 

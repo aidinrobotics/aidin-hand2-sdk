@@ -94,8 +94,12 @@ void test_valid_commands_accepted(HandCore& core)
     check(core.set_command(cmd).ok(), "valid JointPosition accepted");
   }
   {
-    JointImpedanceCommand cmd{};     // 기본 gain(양수), target 0 — 유효
+    JointImpedanceCommand cmd{};     // target 0 — 유효. type c 는 Jacobian 이 없어 거부
+#if defined(AIDIN_HAND2_HAND_TYPE_C)
+    check(rejected(core.set_command(cmd)), "JointImpedance refused on hand type c");
+#else
     check(core.set_command(cmd).ok(), "valid JointImpedance accepted");
+#endif
   }
   {
     ActuatorPositionCommand cmd{};   // target 0 (int32 범위 안) — 유효
@@ -118,10 +122,12 @@ void test_non_finite_rejected(HandCore& core)
     JointPositionCommand cmd{};  cmd.target[3] = kInf;
     check(dropped(core, cmd), "JointPosition Inf target rejected");
   }
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
   {
     JointImpedanceCommand cmd{};  cmd.target[2] = kInf;
     check(dropped(core, cmd), "JointImpedance Inf target rejected");
   }
+#endif
   {
     ActuatorPositionCommand cmd{};  cmd.target[0] = kNaN;
     check(dropped(core, cmd), "ActuatorPosition NaN target rejected");

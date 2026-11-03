@@ -222,6 +222,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
   add_executable(command_validators_test tests/hand_core/command_validators_test.cpp)
   target_link_libraries(command_validators_test PRIVATE aidin_hand2 aidin_hand2_kinematics)
   target_include_directories(command_validators_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_compile_definitions(command_validators_test PRIVATE ${_clamp_type_definition})
   add_test(NAME command_validators COMMAND command_validators_test)
 
   # kinematics: 조립 FK(passive/thumb q4) + 공개 task IK(thumb orient) 라운드트립.
