@@ -4,7 +4,7 @@
 //   3) compute(): FK 각도·rpm 에서 frame 까지, clamp, NaN 자세, home 자세.
 //   4) 마찰 보상: Coulomb·위치 표·Stribeck·LuGre 를 impedance effort 를 직접 넣어 본다.
 // 기준값은 kinematics archive(type a)로 기준 자세(엄지 20/20/0/20°, 긴 손가락 0/20/20°)에서 구했다.
-// type c 에는 Jacobian 이 없으므로 그 빌드에서는 a·b 전용 시험을 건너뛴다.
+// type b 는 엄지 d1·d2 리드만 다르다. type c 에는 Jacobian 이 없으므로 a·b 전용 시험을 건너뛴다.
 
 #include <array>
 #include <cmath>
@@ -34,6 +34,13 @@ constexpr double kDeg = 3.14159265358979323846 / 180.0;
 constexpr double kCountPerRad = 1024.0 / (2.0 * 3.14159265358979323846);
 constexpr double kRatedMotorTorqueNm = 3.62e-3 * 0.4;
 constexpr long kPeriodNs = 2'000'000;  // 500 Hz
+
+// type b 의 엄지 d1·d2 는 리드 2 mm(type a 는 1 mm)라 같은 torque 에 effort 가 두 배다.
+#if defined(AIDIN_HAND2_HAND_TYPE_B)
+constexpr double kThumbPairLeadScale = 2.0;
+#else
+constexpr double kThumbPairLeadScale = 1.0;
+#endif
 
 using Config = ControllerConfig::JointImpedanceController;
 using Active = std::array<double, kActiveJointCount>;
@@ -98,8 +105,9 @@ void test_joint_torque_to_effort()
     return controllers::joint_torque_to_effort(torque_on(joint, k * kDeg), j.joint_per_count, config);
   };
   check(efforts_are(effort(0, 27), {{0, 319.57}}), "thumb j0 1 deg at K 27");
-  check(efforts_are(effort(1, 90), {{1, 323.94}, {2, 323.94}}), "thumb j1 is the common mode of d1 d2");
-  check(efforts_are(effort(2, 24), {{1, -248.06}, {2, 248.06}}), "thumb j2 is the differential mode of d1 d2");
+  const double s = kThumbPairLeadScale;
+  check(efforts_are(effort(1, 90), {{1, 323.94 * s}, {2, 323.94 * s}}), "thumb j1 is the common mode of d1 d2");
+  check(efforts_are(effort(2, 24), {{1, -248.06 * s}, {2, 248.06 * s}}), "thumb j2 is the differential mode of d1 d2");
   check(efforts_are(effort(3, 5), {{3, 82.76}}), "thumb j3 1 deg at K 5");
   check(efforts_are(effort(4, 3.75), {{4, 77.52}, {5, -77.52}}), "index j1 is the differential mode");
   check(efforts_are(effort(5, 22.5), {{4, 186.75}, {5, 186.75}}), "index j2 is the common mode");
@@ -113,7 +121,7 @@ void test_joint_torque_to_effort()
   // 엄지 q2 20°: 두 rod 의 몫이 갈라져도 j1 torque 는 j1 에만 걸린다.
   const Jacobians tilted = jacobians_at(pose_deg({20, 20, 20, 20}, {0, 20, 20}));
   const auto split = controllers::joint_torque_to_effort(torque_on(1, 90 * kDeg), tilted.joint_per_count, config);
-  check(efforts_are(split, {{1, 308.99}, {2, 373.60}}), "thumb j1 at j2 20 deg splits 308.99 / 373.60");
+  check(efforts_are(split, {{1, 308.99 * s}, {2, 373.60 * s}}), "thumb j1 at j2 20 deg splits 308.99 / 373.60 (x2 on type b)");
   Active back{};
   for (std::size_t q = 0; q < kActiveJointCount; ++q) {
     for (std::size_t i = 0; i < kActuatorCount; ++i) {
@@ -241,7 +249,7 @@ void test_compute()
   far[0] += 10.0 * kDeg;
   check(run_once(far, thumb_j0_gains(0.0), state, 1000.0).target_effort[0] == 1000, "compute: clamped to max_effort");
 
-  // d. homing 전처럼 joint 가 NaN 이면 effort 0
+  // d. joint 가 NaN 이면 effort 0
   HandState unknown = state;
   unknown.joints.position_rad.fill(std::nan(""));
   const auto blind = run_once(target, thumb_j0_gains(0.7), unknown, 1000.0);

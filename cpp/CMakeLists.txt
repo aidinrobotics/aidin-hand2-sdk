@@ -99,7 +99,8 @@ add_library(aidin_hand2 SHARED
 target_compile_features(aidin_hand2 PUBLIC cxx_std_17)
 
 # The workspace clamp was measured again on a type a hand only, so type c keeps the clamp tables
-# of 0.7.0. joint_clamp.cpp and its test pick their tables by this definition.
+# of 0.7.0. Type c kinematics also has no Jacobian. The clamp, the Jacobian users and their tests
+# read this definition.
 if(_kin_type STREQUAL "c")
   set(_clamp_type_definition AIDIN_HAND2_HAND_TYPE_C)
   target_compile_definitions(aidin_hand2 PRIVATE ${_clamp_type_definition})
@@ -216,6 +217,9 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_link_libraries(joint_impedance_controller_test PRIVATE aidin_hand2 aidin_hand2_kinematics)
   target_include_directories(joint_impedance_controller_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
   target_compile_definitions(joint_impedance_controller_test PRIVATE ${_clamp_type_definition})
+  if(_kin_type STREQUAL "b")
+    target_compile_definitions(joint_impedance_controller_test PRIVATE AIDIN_HAND2_HAND_TYPE_B)
+  endif()
   add_test(NAME joint_impedance_controller COMMAND joint_impedance_controller_test)
 
   # hand_core: command 검증기(NaN/Inf/범위) + set_max_effort 클램프 (HandCoreTestPeer 시임).
