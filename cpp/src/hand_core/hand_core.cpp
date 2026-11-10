@@ -41,8 +41,7 @@ bool workspace_clamp_enabled();
 template <std::size_t Size>
 bool all_finite(const std::array<double, Size>& values);
 
-// Joint stiffness in [0, 1], cutoff_freq >= 0, motor inertia > 0, link inertia >= 0,
-// efficiency in (0, 1], all finite
+// Joint stiffness in [0, 1] and cutoff_freq >= 0, all finite
 Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config);
 
 
@@ -765,13 +764,6 @@ bool all_finite(const std::array<double, Size>& values)
   return true;
 }
 
-template <std::size_t Size>
-bool all_non_negative(const std::array<double, Size>& values)
-{
-  for (const double value : values) if (!std::isfinite(value) || value < 0.0) return false;
-  return true;
-}
-
 Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config)
 {
   const auto fail = [](const char* what) {
@@ -785,15 +777,6 @@ Status check_joint_impedance(const ControllerConfig::JointImpedanceController& c
   }
   if (!std::isfinite(config.cutoff_freq) || config.cutoff_freq < 0.0) {
     return fail("cutoff_freq must be finite and >= 0");
-  }
-  for (const double inertia : config.motor_inertia_kgm2) {
-    if (!std::isfinite(inertia) || inertia <= 0.0) return fail("motor_inertia_kgm2 must be finite and > 0");
-  }
-  if (!all_non_negative(config.link_inertia_kgm2)) {
-    return fail("link_inertia_kgm2 must be finite and >= 0");
-  }
-  for (const double share : config.efficiency) {
-    if (!std::isfinite(share) || share <= 0.0 || share > 1.0) return fail("efficiency must be finite and in (0, 1]");
   }
   return {};
 }

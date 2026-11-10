@@ -101,9 +101,8 @@ bool efforts_are(const std::array<double, kActuatorCount>& effort,
 void test_joint_torque_to_effort()
 {
   const Jacobians j = jacobians_at(reference_pose());
-  const Config config{};
   auto effort = [&](std::size_t joint, double k) {
-    return controllers::joint_torque_to_effort(torque_on(joint, k * kDeg), j.joint_per_count, config);
+    return controllers::joint_torque_to_effort(torque_on(joint, k * kDeg), j.joint_per_count);
   };
   check(efforts_are(effort(0, 27), {{0, 319.57}}), "thumb j0 1 deg at K 27");
   const double s = kThumbPairLeadScale;
@@ -115,14 +114,9 @@ void test_joint_torque_to_effort()
   // d3 링크의 반작용(d1·d2 로 5.64 씩 상쇄하던 몫)은 보내지 않는다. j2 가 자기 강성으로 버틴다.
   check(efforts_are(effort(6, 6.75), {{6, 151.90}}), "index j3 drives d3 only");
 
-  Config half = config;
-  half.efficiency[0] = 0.5;
-  check(efforts_are(controllers::joint_torque_to_effort(torque_on(0, 27 * kDeg), j.joint_per_count, half), {{0, 639.14}}),
-        "half the efficiency doubles the effort");
-
   // 엄지 q2 20°: 두 rod 의 몫이 갈라져도 j1 torque 는 j1 에만 걸린다.
   const Jacobians tilted = jacobians_at(pose_deg({20, 20, 20, 20}, {0, 20, 20}));
-  const auto split = controllers::joint_torque_to_effort(torque_on(1, 90 * kDeg), tilted.joint_per_count, config);
+  const auto split = controllers::joint_torque_to_effort(torque_on(1, 90 * kDeg), tilted.joint_per_count);
   check(efforts_are(split, {{1, 308.99 * s}, {2, 373.60 * s}}), "thumb j1 at j2 20 deg splits 308.99 / 373.60 (x2 on type b)");
   Active back{};
   for (std::size_t q = 0; q < kActiveJointCount; ++q) {
@@ -147,14 +141,14 @@ void test_joint_impedance_torque()
   Active target = q;
   target[0] += 1.0 * kDeg;
   const Active still{};
-  const Active spring = controllers::joint_impedance_torque(target, q, still, config.stiffness, config, j.count_per_joint);
+  const Active spring = controllers::joint_impedance_torque(target, q, still, config.stiffness, j.count_per_joint);
   bool others_zero = true;
   for (std::size_t k = 1; k < kActiveJointCount; ++k) others_zero = others_zero && spring[k] == 0.0;
   check(std::abs(spring[0] - 0.478220) < 1e-6 && others_zero, "stiffness 1 is the hard stiffness times the joint error");
 
   Config middle = config;
   middle.stiffness[0] = 0.5;
-  check(std::abs(controllers::joint_impedance_torque(target, q, still, middle.stiffness, middle, j.count_per_joint)[0] -
+  check(std::abs(controllers::joint_impedance_torque(target, q, still, middle.stiffness, j.count_per_joint)[0] -
                  0.239110) < 1e-6,
         "stiffness scales the hard stiffness linearly");
 
@@ -162,19 +156,13 @@ void test_joint_impedance_torque()
   // 엄지 j0 의 감쇠비는 0.62 로 고정이라 D = 0.37972.
   Active moving{};
   moving[0] = 0.61698;
-  const Active damped = controllers::joint_impedance_torque(q, q, moving, config.stiffness, config, j.count_per_joint);
+  const Active damped = controllers::joint_impedance_torque(q, q, moving, config.stiffness, j.count_per_joint);
   check(std::abs(damped[0] - (-0.234279)) < 1e-4, "thumb j0 damping ratio is 0.62");
 
   Config soft = config;
   soft.stiffness[0] = 0.0;
-  check(controllers::joint_impedance_torque(q, q, moving, soft.stiffness, soft, j.count_per_joint)[0] == 0.0,
+  check(controllers::joint_impedance_torque(q, q, moving, soft.stiffness, j.count_per_joint)[0] == 0.0,
         "no stiffness, no damping");
-
-  Config heavy = config;
-  heavy.link_inertia_kgm2[0] = 3.4224e-3;
-  check(std::abs(controllers::joint_impedance_torque(q, q, moving, heavy.stiffness, heavy, j.count_per_joint)[0] -
-                 (-0.331321)) < 1e-4,
-        "link inertia adds to the motor inertia");
 
   // 긴 손가락 j3 의 hard 는 모터 쪽 강성 3.62e-5 N·m/rad 를 지킨다. middle j3(9) 는 (0, 20, 20) 에서
   // J⁻¹ 536 이라 10.40 N·m/rad, (0, 80, 0) 에서는 J⁻¹ 744 가 상한 652 에서 멈춰 15.39 N·m/rad.
@@ -183,14 +171,14 @@ void test_joint_impedance_torque()
   j3.stiffness[9] = 1.0;
   Active bent = q;
   bent[9] += 1.0 * kDeg;
-  check(std::abs(controllers::joint_impedance_torque(bent, q, still, j3.stiffness, j3, j.count_per_joint)[9] - 0.18151) <
+  check(std::abs(controllers::joint_impedance_torque(bent, q, still, j3.stiffness, j.count_per_joint)[9] - 0.18151) <
             1e-3,
         "long finger j3 stiffness 1 holds the motor-side stiffness at (0, 20, 20)");
   const Active flexed = pose_deg({20, 20, 0, 20}, {0, 80, 0});
   Active flexed_target = flexed;
   flexed_target[9] += 1.0 * kDeg;
   const Jacobians at_flexed = jacobians_at(flexed);
-  check(std::abs(controllers::joint_impedance_torque(flexed_target, flexed, still, j3.stiffness, j3,
+  check(std::abs(controllers::joint_impedance_torque(flexed_target, flexed, still, j3.stiffness,
                                                      at_flexed.count_per_joint)[9] -
                  0.26859) < 1e-4,
         "long finger j3 hard stiffness stops at the cap");

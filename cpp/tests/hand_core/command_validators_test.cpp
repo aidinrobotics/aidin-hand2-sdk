@@ -166,17 +166,12 @@ void test_controller_config_filter_rejected(HandCore& core)
 }
 
 // ── Test 4: set_controller_config — joint 공간 impedance 값의 기본값과 범위 ──
-// 기본 stiffness 1(hard), 목표 필터 켬·10 Hz, 관성 0.033 g·cm², 효율 1, 링크 관성 0.
+// 기본 stiffness 1(hard), 목표 필터 켬·10 Hz.
 void test_joint_impedance_config(HandCore& core)
 {
   const ControllerConfig::JointImpedanceController defaults{};
   bool defaults_ok = defaults.filter_enabled && defaults.cutoff_freq == 10.0;
-  for (std::size_t j = 0; j < kActiveJointCount; ++j) {
-    defaults_ok = defaults_ok && defaults.stiffness[j] == 1.0 && defaults.link_inertia_kgm2[j] == 0.0;
-  }
-  for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    defaults_ok = defaults_ok && defaults.motor_inertia_kgm2[i] == 3.3e-9 && defaults.efficiency[i] == 1.0;
-  }
+  for (std::size_t j = 0; j < kActiveJointCount; ++j) defaults_ok = defaults_ok && defaults.stiffness[j] == 1.0;
   check(defaults_ok, "joint impedance defaults");
   check(core.set_controller_config(ControllerConfig{}).ok(), "default config accepted");
 
@@ -200,14 +195,6 @@ void test_joint_impedance_config(HandCore& core)
         "negative target cutoff rejected");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.cutoff_freq = kNaN; }))),
         "target cutoff NaN rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.efficiency[2] = 0.0; }))),
-        "zero efficiency rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.efficiency[2] = 1.2; }))),
-        "efficiency above 1 rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.motor_inertia_kgm2[5] = 0.0; }))),
-        "zero motor inertia rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.link_inertia_kgm2[7] = -1e-6; }))),
-        "negative link inertia rejected");
 }
 
 // ── Test 5: ActuatorPosition int32 범위 밖은 거부 ──

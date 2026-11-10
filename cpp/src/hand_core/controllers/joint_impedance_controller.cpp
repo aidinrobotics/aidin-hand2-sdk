@@ -21,18 +21,20 @@ constexpr double kMotorRadPerCount   = 2.0 * 3.14159265358979323846 / kCountPerR
 // N·m at effort 1000: maxon ECX SPEED 8 M at the drive's 0.4 A
 constexpr double kRatedMotorTorqueNm = 3.62e-3 * 0.4;
 
-// N·m/rad per active joint at stiffness 1, 0.6 x the lowest that oscillated
-// The long finger j3 takes its hard stiffness from kHardMotorStiffnessJ3 instead
+// kg·m² per actuator on the motor shaft
+constexpr double kMotorInertia = 3.3e-9;
+
+// N·m/rad per active joint at stiffness 1; the long finger j3 uses kHardMotorStiffnessJ3 instead
 constexpr std::array<double, kActiveJointCount> kHardStiffness{
     27.4, 60.0, 11.6, 14.5, 5.33, 20.1, 0.0, 5.33, 20.1, 0.0, 5.33, 20.1, 0.0, 5.33, 20.1, 0.0};
 
-// N·m/rad on the motor shaft at long finger j3 stiffness 1, 0.6 x the lowest that oscillated
+// N·m/rad on the motor shaft at long finger j3 stiffness 1
 constexpr double kHardMotorStiffnessJ3 = 3.62e-5;
 
 // Motor rad per long finger j3 rad, the most the j3 hard stiffness follows
 constexpr double kMaxMotorPerJ3 = 652.0;
 
-// Damping ratio per active joint, 0.6 x the lowest that oscillated at hard stiffness, at most 0.7
+// Damping ratio per active joint
 constexpr std::array<double, kActiveJointCount> kDampingRatio{
     0.62, 0.49, 0.49, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7};
 
@@ -133,14 +135,14 @@ std::array<double, kActiveJointCount> joint_velocity(const HandState& state, con
 std::array<double, kActiveJointCount> joint_impedance_torque(
     const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
     const std::array<double, kActiveJointCount>& velocity, const std::array<double, kActiveJointCount>& stiffness,
-    const Config& config, const JointJacobian& count_per_joint)
+    const JointJacobian& count_per_joint)
 {
   std::array<double, kActiveJointCount> torque{};
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
-    double inertia = config.link_inertia_kgm2[j];
+    double inertia = 0.0;
     for (std::size_t i = 0; i < kActuatorCount; ++i) {
       const double motor_per_joint = count_per_joint[i * kActiveJointCount + j] * kMotorRadPerCount;
-      inertia += motor_per_joint * motor_per_joint * config.motor_inertia_kgm2[i];
+      inertia += motor_per_joint * motor_per_joint * kMotorInertia;
     }
     const double k           = hard_stiffness(j, count_per_joint) * stiffness[j];
     const double coefficient = 2.0 * kDampingRatio[j] * std::sqrt(k * inertia);
@@ -150,8 +152,7 @@ std::array<double, kActiveJointCount> joint_impedance_torque(
 }
 
 std::array<double, kActuatorCount> joint_torque_to_effort(
-    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count,
-    const Config& config)
+    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count)
 {
   std::array<double, kActuatorCount> effort{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
@@ -162,7 +163,7 @@ std::array<double, kActuatorCount> joint_torque_to_effort(
       if (is_long_finger_j3(j) && i != j) continue;
       motor_torque += joint_per_count[j * kActuatorCount + i] / kMotorRadPerCount * torque[j];
     }
-    effort[i] = motor_torque / (config.efficiency[i] * kRatedMotorTorqueNm) * 1000.0;
+    effort[i] = motor_torque / kRatedMotorTorqueNm * 1000.0;
   }
   return effort;
 }
@@ -239,8 +240,8 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
   // 3) Joint law, then its effort through the transposed Jacobian
   const std::array<double, kActiveJointCount> velocity = joint_velocity(state, joint_per_count);
   const std::array<double, kActiveJointCount> torque =
-      joint_impedance_torque(target, position, velocity, stiffness_, config, count_per_joint);
-  effort = joint_torque_to_effort(torque, joint_per_count, config);
+      joint_impedance_torque(target, position, velocity, stiffness_, count_per_joint);
+  effort = joint_torque_to_effort(torque, joint_per_count);
 #else
   (void)command;
   (void)config;

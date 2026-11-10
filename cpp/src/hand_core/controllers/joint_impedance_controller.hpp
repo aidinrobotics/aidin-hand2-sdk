@@ -14,26 +14,19 @@ namespace aidin_hand2::controllers
 // Row-major 16 x 16
 using JointJacobian = std::array<double, kActiveJointCount * kActuatorCount>;
 
-// N·m per active joint: K * (target - position) - coefficient * velocity
-// K = hard stiffness * stiffness (0..1), coefficient = 2 * damping ratio * sqrt(K * inertia)
-// The long finger j3 hard stiffness holds one motor-side stiffness, so it follows the pose
-// The inertia is reflected through count_per_joint (count per rad, row actuator)
+// N·m per active joint, K * (target - position) - 2 * damping ratio * sqrt(K * inertia) * velocity
+// K is the hard stiffness times stiffness (0..1); count_per_joint is count per rad, row actuator
 std::array<double, kActiveJointCount> joint_impedance_torque(
     const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
     const std::array<double, kActiveJointCount>& velocity, const std::array<double, kActiveJointCount>& stiffness,
-    const ControllerConfig::JointImpedanceController& config, const JointJacobian& count_per_joint);
+    const JointJacobian& count_per_joint);
 
-// Effort per actuator for joint torques, before the max_effort clamp
-// joint_per_count is rad per count, row joint; the long finger j3 torque reaches its own actuator only
+// Effort per actuator for joint torques, before the max_effort clamp; joint_per_count is rad per count, row joint
 std::array<double, kActuatorCount> joint_torque_to_effort(
-    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count,
-    const ControllerConfig::JointImpedanceController& config);
+    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count);
 
-// Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort
-// The target passes a low-pass and a 250 deg/s limit, and a new stiffness is approached over 0.2 s
-// The effort is clamped to max_effort and sent as CST
-// Near the hard stop the target keeps off it and the effort toward it tapers
-// Hand type c has no Jacobian and sends 0
+// Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort, sent as CST
+// The target passes a low-pass and a 250 deg/s limit and keeps off the hard stop; hand type c sends 0
 class JointImpedanceController
 {
  public:

@@ -72,17 +72,6 @@ struct ControllerConfig {
 
     // Hz
     double cutoff_freq{10.0};
-
-    // Per actuator on the motor shaft: rotor, gearhead, encoder, gears and screw
-    std::array<double, kActuatorCount> motor_inertia_kgm2{
-        3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9,
-        3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9};
-    // Per active joint, added to the motor inertia seen at the joint
-    std::array<double, kActiveJointCount> link_inertia_kgm2{};
-    // Share of the motor torque that reaches the joint, 0 < efficiency <= 1
-    std::array<double, kActuatorCount> efficiency{
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
   };
 
   JointPositionController  joint_position_controller{};
