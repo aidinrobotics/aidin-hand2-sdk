@@ -10,7 +10,7 @@
 // create() twice with configs that differ in interface_name and hand_side is the whole of it.
 // destroy_all() releases both, and the destructor would do the same.
 //
-// Run as: 02_two_hands [left_interface=can0] [right_interface=can1]
+// Run as: 02_two_hands [left_interface=can0] [right_interface=can1] [hand_type=gen2|gen2-b]
 // Needs two hands, one per interface. Nothing moves: no run(), no home(), no set_command().
 
 #include <atomic>
@@ -37,15 +37,19 @@ int main(int argc, char** argv)
 
   const std::string left_interface  = argc > 1 ? argv[1] : "can0";
   const std::string right_interface = argc > 2 ? argv[2] : "can1";
+  const std::optional<HandType> parsed = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!parsed) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  const HandType hand_type = *parsed;
 
   try {
     // 1) Two configs. The side tells the SDK which CAN IDs to expect — left answers on 0x2xx
     //    and right on 0x1xx — so a swapped pair shows up as no data rather than as odd motion.
-    HandConfig left_config{left_interface, HandSide::Left};
+    //    The hand type picks the kinematics; both hands here are of the same type.
+    HandConfig left_config{left_interface, HandSide::Left, hand_type};
     left_config.control_rate = 500;    // Hz
     left_config.auto_home    = false;  // nothing here asks for control
 
-    HandConfig right_config{right_interface, HandSide::Right};
+    HandConfig right_config{right_interface, HandSide::Right, hand_type};
     right_config.control_rate = 500;
     right_config.auto_home    = false;
 

@@ -112,7 +112,7 @@ constexpr std::chrono::milliseconds kWatchdog{5000};
 
 HandConfig make_config()
 {
-  HandConfig config{"mock0", HandSide::Left};
+  HandConfig config{"mock0", HandSide::Left, HandType::Gen2};
   config.control_rate = 500;
   config.auto_home = false;   // no homing — run() enables directly (per task)
   config.auto_reconnect = false;

@@ -7,7 +7,7 @@
 // One try around the whole thing, because there is nothing to recover for: a calibration run,
 // a diagnostic readout or a rehearsal fails, someone fixes the cause, and it runs again
 //
-// Run as: 20_exit_on_failure [right|left] [interface=can0]
+// Run as: 20_exit_on_failure [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. auto_home is on, so run() drives every finger into its hard stop:
 // clear the space around the hand before running
 
@@ -37,6 +37,8 @@ int main(int argc, char** argv)
   set_log_to_console(true);
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   // Declared before the try so the destructor still runs on the failure path, where it
   // confirms the quick stop and closes the link
@@ -44,7 +46,7 @@ int main(int argc, char** argv)
   int exit_code = 0;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate = 500;    // Hz
     config.auto_home    = true;   // run() homes before it enables control
 

@@ -14,7 +14,7 @@
 //
 // The example then asks for more than the cap allows, to show which of the two wins.
 //
-// Run as: 12_actuator_effort [right|left] [interface=can0]
+// Run as: 12_actuator_effort [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. home() drives every finger into its hard stop, and the index finger then
 // pulls in each direction until it reaches its own stops. Keep the cap low, as it is here.
 
@@ -44,13 +44,15 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   // One of the index finger's three actuators, which are 4, 5 and 6. Everything this example
   // prints is in actuator space, so no index mapping comes up.
   constexpr std::size_t kActuator = 5;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate = 500;    // Hz
     config.auto_home    = false;
 

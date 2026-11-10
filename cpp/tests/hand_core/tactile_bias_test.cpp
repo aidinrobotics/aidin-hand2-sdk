@@ -49,7 +49,7 @@ void check(bool ok, const char* what)
 // 소켓을 열지 않는다. 생성만 한다.
 HandConfig make_config()
 {
-  HandConfig config{"ah2_no_such_iface", HandSide::Right};
+  HandConfig config{"ah2_no_such_iface", HandSide::Right, HandType::Gen2};
   config.control_rate = 500;
   config.auto_reconnect = false;
   return config;

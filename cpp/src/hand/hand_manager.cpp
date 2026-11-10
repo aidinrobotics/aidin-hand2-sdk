@@ -28,7 +28,7 @@ HandManager& HandManager::operator=(HandManager&& other) noexcept = default;
 Hand HandManager::create(const HandConfig& config)
 {
   return guard_boundary("create()", [&] {
-    // interface_name and hand_side are already checked by the HandConfig constructor
+    // interface_name, hand_side and hand_type are already checked by the HandConfig constructor
     if (config.control_rate <= 0) {
       throw_error(ErrorCode::InvalidArgument, "Cannot create hand: control_rate must be positive");
     }

@@ -17,8 +17,8 @@ namespace aidin_hand2
 // ------------------------------- Hand config --------------------------------
 
 struct HandConfig {
-  HandConfig(std::string interface_name, HandSide hand_side)
-  : interface_name(std::move(interface_name)), hand_side(hand_side)
+  HandConfig(std::string interface_name, HandSide hand_side, HandType hand_type)
+  : interface_name(std::move(interface_name)), hand_side(hand_side), hand_type(hand_type)
   {
     if (this->interface_name.empty()) {
       throw Exception(ErrorCode::InvalidArgument, "HandConfig: interface_name must not be empty");
@@ -27,11 +27,16 @@ struct HandConfig {
       throw Exception(ErrorCode::InvalidArgument,
                       "HandConfig: hand_side must be HandSide::Left or HandSide::Right");
     }
+    if (hand_type != HandType::Gen2 && hand_type != HandType::Gen2_B) {
+      throw Exception(ErrorCode::InvalidArgument,
+                      "HandConfig: hand_type must be HandType::Gen2 or HandType::Gen2_B");
+    }
   }
 
   // "can0", or "auto" to scan for this hand's channel
   std::string interface_name;
   HandSide    hand_side;
+  HandType    hand_type;
 
   // Hz
   int control_rate{500};

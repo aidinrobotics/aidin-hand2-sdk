@@ -75,7 +75,7 @@ void check(bool ok, const char* what)
 // 열리지 않는 이름이어야 한다 — connect() 가 성공하면 이 테스트의 전제가 무너진다.
 HandConfig make_config()
 {
-  HandConfig config{"ah2_no_such_iface", HandSide::Right};
+  HandConfig config{"ah2_no_such_iface", HandSide::Right, HandType::Gen2};
   config.control_rate = 500;
   config.auto_reconnect = false;
   return config;

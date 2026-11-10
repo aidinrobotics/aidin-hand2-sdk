@@ -11,7 +11,7 @@
 // was running into. Leave the hand alone and the current stays near 0 at every step, because
 // nothing was asking for torque in the first place.
 //
-// Run as: 05_max_effort [right|left] [interface=can0]
+// Run as: 05_max_effort [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. home() drives every finger into its hard stop, and the fingers then flex
 // against whatever is in the way — including your hand, gently, which is the point.
 
@@ -40,9 +40,11 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate = 500;    // Hz
     config.auto_home    = false;
 

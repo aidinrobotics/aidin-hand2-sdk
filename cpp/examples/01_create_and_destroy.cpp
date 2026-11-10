@@ -10,7 +10,7 @@
 // Nothing moves: no run(), no home(), no set_command(). It does not even connect, because
 // ownership is decided before any CAN traffic.
 //
-// Run as: 01_create_and_destroy [right|left] [interface=can0]
+// Run as: 01_create_and_destroy [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Runs without a hand attached, since create() validates the config and allocates only.
 
 #include <atomic>
@@ -34,10 +34,12 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   // 1) A config is checked twice: the constructor rejects an empty interface name or a side
   //    outside the enum, and create() rejects a control_rate of 0 or less.
-  HandConfig config{argc > 2 ? argv[2] : "can0", side};
+  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
   config.control_rate = 500;    // Hz
   config.auto_home    = false;  // nothing here asks for control, so homing never comes up
 

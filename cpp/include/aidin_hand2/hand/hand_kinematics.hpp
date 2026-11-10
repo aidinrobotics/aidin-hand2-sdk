@@ -10,35 +10,35 @@
 
 namespace aidin_hand2
 {
-// Angles in rad, actuators in encoder count
+// Angles in rad, actuators in encoder count, hand_type the HandConfig::hand_type of the hand
 
 // ---------------------------- Forward kinematics ----------------------------
 
 // Actuator encoders to joint angles
 std::array<double, kJointCount> fk_actuator_to_joint(
-    const std::array<int, kActuatorCount>& encoder);
+    HandType hand_type, const std::array<int, kActuatorCount>& encoder);
 
 // Actuator encoders to fingertip positions (not using)
 std::array<double, kTaskCount> fk_actuator_to_task(
-    const std::array<int, kActuatorCount>& encoder);
+    HandType hand_type, const std::array<int, kActuatorCount>& encoder);
 
 // ---------------------------- Inverse kinematics ----------------------------
 
 // Joint angles to actuator encoders
 std::array<int, kActuatorCount> ik_joint_to_actuator(
-    const std::array<double, kActiveJointCount>& active_joint);
+    HandType hand_type, const std::array<double, kActiveJointCount>& active_joint);
 
 // Fingertip positions to joint angles (not using)
 std::array<double, kActiveJointCount> ik_task_to_joint(
-    const std::array<double, kTaskCount>& task);
+    HandType hand_type, const std::array<double, kTaskCount>& task);
 
 // Thumb pose and fingertip positions to joint angles (not using)
 std::array<double, kActiveJointCount> ik_oriented_task_to_joint(
-    const std::array<double, kOrientedTaskCount>& oriented_task);
+    HandType hand_type, const std::array<double, kOrientedTaskCount>& oriented_task);
 
 // ------------------------- Joint velocity and effort ------------------------
 
 // Velocity and effort of the active joints at the pose in state
-HandStateJointVelEff compute_joint_vel_eff(const HandState& state);
+HandStateJointVelEff compute_joint_vel_eff(HandType hand_type, const HandState& state);
 
 }  // namespace aidin_hand2

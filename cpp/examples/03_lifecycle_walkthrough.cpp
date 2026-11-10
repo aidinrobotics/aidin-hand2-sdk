@@ -13,7 +13,7 @@
 // nothing is typed. Pull the CAN cable out and it turns to Faulted on its own about 100 ms after
 // RX stops, and from there reconnect() is the only call that gets you out.
 //
-// Run as: 03_lifecycle_walkthrough [right|left] [interface=can0]
+// Run as: 03_lifecycle_walkthrough [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. run() and home() enable the drives — keep the surroundings clear, and
 // remember that home() drives every finger into its hard stop. Keys 8 and 9 move the fingers.
 
@@ -249,6 +249,8 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   try {
     // Both halves matter: the console sink has to go, or it writes to stderr from the control
@@ -260,7 +262,7 @@ int main(int argc, char** argv)
       if (level >= LogLevel::Info) queue_log_line(level, message);
     });
 
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate   = 500;    // Hz
     config.auto_home      = false;  // home() is on the menu, so run() should not do it for you
     config.auto_reconnect = false;  // recovery stays manual here, or Faulted would clear itself

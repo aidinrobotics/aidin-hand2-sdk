@@ -19,15 +19,13 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.runner }} · type ${{ matrix.type }}
+    name: ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        # Every hand type ships, so every one is built and tested here. A type that CI skipped
-        # would go out having never been linked or run on the architecture it runs on.
+        # Every build carries both hand types, so one build per runner links and tests both.
         runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
-        type: [a, b, c]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -48,8 +46,7 @@ jobs:
 
       - name: Configure
         run: |
-          cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DAIDIN_HAND2_HAND_TYPE=${{ matrix.type }}
+          cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
       - name: Build
         run: cmake --build build -j"$(nproc)"

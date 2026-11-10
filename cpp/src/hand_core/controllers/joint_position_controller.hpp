@@ -7,6 +7,7 @@
 #include <aidin_hand2/types/description.hpp>
 #include <aidin_hand2/types/state.hpp>
 #include "hand_core/comms/canfd/protocol.hpp"
+#include "hand_core/hand_model.hpp"
 
 namespace aidin_hand2::controllers
 {
@@ -17,7 +18,7 @@ namespace aidin_hand2::controllers
 class JointPositionController
 {
  public:
-  explicit JointPositionController(long period_nanoseconds);
+  JointPositionController(long period_nanoseconds, const HandModel& model);
 
   void compute(const JointPositionCommand& command,
                const ControllerConfig::JointPositionController& config, const HandState& state,
@@ -27,6 +28,7 @@ class JointPositionController
   void reset();
 
  private:
+  const HandModel& model_;
   const double dt_seconds_;
 
   // The cutoff alpha_ was derived from, -1 forcing the first derivation

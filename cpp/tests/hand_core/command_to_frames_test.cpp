@@ -46,7 +46,7 @@ void check(bool ok, const char* what)
 
 HandConfig make_config()
 {
-  HandConfig config{"can0", HandSide::Right};  // 절대 open 안 함 (생성만); Right = CAN index identity
+  HandConfig config{"can0", HandSide::Right, HandType::Gen2};  // 절대 open 안 함 (생성만); Right = CAN index identity
   config.control_rate   = 500;
   return config;
 }

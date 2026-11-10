@@ -12,7 +12,7 @@
 // the first cycle. With it on, the same step is spread over cycles, and a lower cutoff spreads
 // it further. The deadband pass then shows targets small enough to be dropped entirely.
 //
-// Run as: 06_position_controller [right|left] [interface=can0]
+// Run as: 06_position_controller [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. home() drives every finger into its hard stop, and the index finger flexes
 // repeatedly afterwards, so clear the space around the hand.
 
@@ -42,6 +42,8 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
 
@@ -53,7 +55,7 @@ int main(int argc, char** argv)
   constexpr std::size_t kActuator = 5;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate = 500;    // Hz
     config.auto_home    = false;
 

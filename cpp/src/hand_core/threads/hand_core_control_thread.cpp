@@ -545,7 +545,7 @@ void HandCore::fill_joint_state(HandState& hand_state)
 
   // Fingertip positions are not carried in HandState
   std::array<double, kinematics::TASK_NUM>  task{};
-  kinematics::fk_actuator_to_joint(encoder, joint_rad, task);
+  kinematics::fk_actuator_to_joint(model_.kinematics, encoder, joint_rad, task);
   for (std::size_t i = 0; i < kJointCount; ++i) {
     if (std::isfinite(joint_rad[i])) {
       last_valid_joint_rad_[i] = joint_rad[i];

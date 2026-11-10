@@ -7,7 +7,7 @@
 // difference from the bias per finger and palm region until Ctrl-C. reset_tactile_bias() at the
 // end brings the raw values back. Stays in Connected, so nothing moves.
 //
-// Run as: 15_tactile [right|left] [interface=can0]
+// Run as: 15_tactile [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. Keep your hands off it until the bias is taken.
 
 #include <array>
@@ -36,12 +36,14 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   // Finger index follows the Finger enum: Thumb, Index, Middle, Ring, Baby
   const std::array<const char*, kFingerCount> finger_name = {"thumb", "index", "middle", "ring", "baby"};
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate = 500;    // Hz
     config.auto_home    = false;  // this example stays in Connected, so homing never comes up
 

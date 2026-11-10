@@ -16,6 +16,7 @@
 #include "hand_core/comms/hand_comms.hpp"
 #include "hand_core/controllers/joint_impedance_controller.hpp"
 #include "hand_core/controllers/joint_position_controller.hpp"
+#include "hand_core/hand_model.hpp"
 #include "hand_core/lifecycle/action_check.hpp"
 #include "types/hand_command.hpp"
 #include "types/realtime_buffer.hpp"
@@ -263,6 +264,9 @@ class HandCore {
 
   std::string interface_name_;
   HandSide    hand_side_;
+
+  // Kinematics and hard stiffness of this hand's type
+  const HandModel& model_;
 
   // ---------------- Single thread: plain [RT, user, logging] ----------------
 

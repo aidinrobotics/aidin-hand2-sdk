@@ -46,8 +46,9 @@ double lowpass_alpha(double cutoff_freq, double dt_seconds)
 
 }  // namespace
 
-JointPositionController::JointPositionController(long period_nanoseconds)
-: dt_seconds_(static_cast<double>(period_nanoseconds) / 1e9)
+JointPositionController::JointPositionController(long period_nanoseconds, const HandModel& model)
+: model_(model),
+  dt_seconds_(static_cast<double>(period_nanoseconds) / 1e9)
 {
   reset();
 }
@@ -98,7 +99,7 @@ void JointPositionController::compute(const JointPositionCommand& command,
 
   // 3) IK: active_joint(rad) → actuator position (count).
   std::array<int, kActuatorCount> actuator_cnt{};
-  kinematics::ik_joint_to_actuator(filtered, actuator_cnt);
+  kinematics::ik_joint_to_actuator(model_.kinematics, filtered, actuator_cnt);
 
   // 4) CSP command.
   for (std::size_t i = 0; i < kActuatorCount; ++i) {

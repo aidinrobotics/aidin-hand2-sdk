@@ -6,7 +6,7 @@
 // create -> connect -> set_max_effort -> run -> home -> joint sweep -> stop -> destroy
 // One header to include and one library to link, and every failure arrives as an Exception
 //
-// Run as: basic_control [right|left] [interface=can0]
+// Run as: basic_control [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand, and the fingers move during home() and the sweep
 
 #include <array>
@@ -22,7 +22,9 @@ using namespace aidin_hand2;
 int main(int argc, char** argv)
 {
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  HandConfig config{argc > 2 ? argv[2] : "can0", side};
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
   config.control_rate   = 500;  // Hz
 
   try {

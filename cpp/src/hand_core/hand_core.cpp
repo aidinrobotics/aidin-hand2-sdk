@@ -79,8 +79,9 @@ HandCore::HandCore(const HandConfig& config)
   workspace_clamp_(workspace_clamp_enabled()),
   interface_name_(config.interface_name),
   hand_side_(config.hand_side),
-  joint_position_controller_(period_nanoseconds_),
-  joint_impedance_controller_(period_nanoseconds_)
+  model_(hand_model_of(config.hand_type)),
+  joint_position_controller_(period_nanoseconds_, model_),
+  joint_impedance_controller_(period_nanoseconds_, model_)
 {
   // Seed the buffer so the RT first cycle reads Idle at the default effort
   staging_command_.max_effort_pct.fill(kDefaultMaxEffort);
@@ -408,9 +409,6 @@ Status HandCore::set_command(const JointPositionCommand& command)
 
 Status HandCore::set_command(const JointImpedanceCommand& command)
 {
-#if defined(AIDIN_HAND2_HAND_TYPE_C)
-  return {ErrorCode::InvalidArgument, "Cannot set command: joint impedance needs the hand type a or b kinematics"};
-#endif
   if (Status allowed = check_allowed(HandAction::SetCommand); !allowed.ok()) return allowed;
   if (!is_command_valid(command)) {
     return drop_invalid_command(hand_side_, count_nan_command_, last_command_was_nan_);

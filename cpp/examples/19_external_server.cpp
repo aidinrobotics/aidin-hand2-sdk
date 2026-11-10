@@ -8,7 +8,7 @@
 // its own. A command that fails comes back as a reason, not a retry, and the state is published
 // on its own schedule because the hand can reach Faulted while no command is in flight
 //
-// Run as: 19_external_server [right|left] [interface=can0] [port=5555]
+// Run as: 19_external_server [right|left] [interface=can0] [port=5555] [hand_type=gen2|gen2-b]
 // Needs a real hand. Drive it with 19_external_client, or by hand:
 //   nc localhost 5555
 //   connect / run / home / grip 0.4 / stop / disconnect / reconnect / quit
@@ -129,6 +129,8 @@ int main(int argc, char** argv)
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
   const int      port = argc > 3 ? std::atoi(argv[3]) : 5555;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 4 ? argv[4] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[4]); return 1; }
 
   const int listener = open_listener(port);
   if (listener < 0) {
@@ -138,7 +140,7 @@ int main(int argc, char** argv)
   int client = -1;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate   = 500;     // Hz
     config.auto_home      = false;   // the client decides when to home
     config.auto_reconnect = false;   // and when to recover

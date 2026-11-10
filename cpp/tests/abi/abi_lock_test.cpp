@@ -66,6 +66,7 @@ static_assert(static_cast<int>(CommandMode::ActuatorEffort) == 4, "CommandMode r
 static_assert(static_cast<int>(CommandSource::Homing) == 3, "CommandSource renumbered");
 static_assert(static_cast<int>(ErrorCode::UnexpectedError) == 7, "ErrorCode renumbered");
 static_assert(static_cast<int>(HandSide::Right) == 1, "HandSide renumbered");
+static_assert(static_cast<int>(HandType::Gen2_B) == 1, "HandType renumbered");
 static_assert(static_cast<int>(Finger::Baby) == 4, "Finger renumbered");
 static_assert(static_cast<int>(LogLevel::Off) == 6, "LogLevel renumbered");
 

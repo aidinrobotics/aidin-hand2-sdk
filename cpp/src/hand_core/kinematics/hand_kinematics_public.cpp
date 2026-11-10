@@ -14,45 +14,74 @@
 namespace aidin_hand2
 {
 
+// ------------------------------- C boundary --------------------------------
+
+namespace kinematics
+{
+
+namespace
+{
+
+constexpr Boundary kGen2{
+    aidin_hand2_kin_a_fk_actuator_to_joint,       aidin_hand2_kin_a_ik_joint_to_actuator,
+    aidin_hand2_kin_a_ik_task_to_joint,           aidin_hand2_kin_a_ik_oriented_task_to_joint,
+    aidin_hand2_kin_a_jacobian_actuator_to_joint, aidin_hand2_kin_a_jacobian_joint_to_actuator};
+
+constexpr Boundary kGen2B{
+    aidin_hand2_kin_b_fk_actuator_to_joint,       aidin_hand2_kin_b_ik_joint_to_actuator,
+    aidin_hand2_kin_b_ik_task_to_joint,           aidin_hand2_kin_b_ik_oriented_task_to_joint,
+    aidin_hand2_kin_b_jacobian_actuator_to_joint, aidin_hand2_kin_b_jacobian_joint_to_actuator};
+
+}  // namespace
+
+const Boundary& boundary_of(HandType type)
+{
+  return type == HandType::Gen2_B ? kGen2B : kGen2;
+}
+
+}  // namespace kinematics
+
+// ------------------------------- Public API --------------------------------
+
 std::array<double, kJointCount> fk_actuator_to_joint(
-    const std::array<int, kActuatorCount>& encoder)
+    HandType hand_type, const std::array<int, kActuatorCount>& encoder)
 {
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM> task{};
-  kinematics::fk_actuator_to_joint(encoder, joint, task);
+  kinematics::fk_actuator_to_joint(kinematics::boundary_of(hand_type), encoder, joint, task);
   return joint;
 }
 
 std::array<double, kTaskCount> fk_actuator_to_task(
-    const std::array<int, kActuatorCount>& encoder)
+    HandType hand_type, const std::array<int, kActuatorCount>& encoder)
 {
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM> task{};
-  kinematics::fk_actuator_to_joint(encoder, joint, task);
+  kinematics::fk_actuator_to_joint(kinematics::boundary_of(hand_type), encoder, joint, task);
   return task;
 }
 
 std::array<int, kActuatorCount> ik_joint_to_actuator(
-    const std::array<double, kActiveJointCount>& active_joint)
+    HandType hand_type, const std::array<double, kActiveJointCount>& active_joint)
 {
   std::array<int, kinematics::ACTUATOR_NUM> encoder{};
-  kinematics::ik_joint_to_actuator(active_joint, encoder);
+  kinematics::ik_joint_to_actuator(kinematics::boundary_of(hand_type), active_joint, encoder);
   return encoder;
 }
 
 std::array<double, kActiveJointCount> ik_task_to_joint(
-    const std::array<double, kTaskCount>& task)
+    HandType hand_type, const std::array<double, kTaskCount>& task)
 {
   std::array<double, kinematics::ACTIVE_JOINT_NUM> active_joint{};
-  kinematics::ik_task_to_joint(task, active_joint);
+  kinematics::ik_task_to_joint(kinematics::boundary_of(hand_type), task, active_joint);
   return active_joint;
 }
 
 std::array<double, kActiveJointCount> ik_oriented_task_to_joint(
-    const std::array<double, kOrientedTaskCount>& oriented_task)
+    HandType hand_type, const std::array<double, kOrientedTaskCount>& oriented_task)
 {
   std::array<double, kinematics::ACTIVE_JOINT_NUM> active_joint{};
-  kinematics::ik_oriented_task_to_joint(oriented_task, active_joint);
+  kinematics::ik_oriented_task_to_joint(kinematics::boundary_of(hand_type), oriented_task, active_joint);
   return active_joint;
 }
 
@@ -72,7 +101,6 @@ constexpr double kRatedMotorTorqueNm   = kTorqueConstantNmPerA * kRatedCurrentA;
 constexpr double kCountPerRevolution = 1024.0;
 constexpr double kMotorRadPerCount   = 2.0 * 3.14159265358979323846 / kCountPerRevolution;
 
-#if !defined(AIDIN_HAND2_HAND_TYPE_C)
 // The 21-joint FK output without each digit's passive q4
 std::array<double, kActiveJointCount> active_joints_of(const std::array<double, kJointCount>& joints)
 {
@@ -83,28 +111,21 @@ std::array<double, kActiveJointCount> active_joints_of(const std::array<double, 
   }
   return active;
 }
-#endif
 
 }  // namespace
 
-HandStateJointVelEff compute_joint_vel_eff(const HandState& state)
+HandStateJointVelEff compute_joint_vel_eff(HandType hand_type, const HandState& state)
 {
   HandStateJointVelEff out{};
   const double nan = std::numeric_limits<double>::quiet_NaN();
-#if defined(AIDIN_HAND2_HAND_TYPE_C)
-  (void)state;
-  out.velocity_rad_s.fill(nan);
-  out.effort_Nm.fill(nan);
-  out.commanded_effort_Nm.fill(nan);
-  out.rated_effort_Nm.fill(nan);
-#else
+  const kinematics::Boundary& kin = kinematics::boundary_of(hand_type);
   const std::array<double, kActiveJointCount> active = active_joints_of(state.joints.position_rad);
 
   // Row = joint for joint_per_count, row = actuator for count_per_joint
   std::array<double, kActiveJointCount * kActuatorCount> joint_per_count{};
   std::array<double, kActuatorCount * kActiveJointCount> count_per_joint{};
-  kinematics::jacobian_actuator_to_joint(active, joint_per_count);
-  kinematics::jacobian_joint_to_actuator(active, count_per_joint);
+  kinematics::jacobian_actuator_to_joint(kin, active, joint_per_count);
+  kinematics::jacobian_joint_to_actuator(kin, active, count_per_joint);
 
   std::array<double, kActuatorCount> count_rate{};
   std::array<double, kActuatorCount> motor_torque{};
@@ -132,7 +153,6 @@ HandStateJointVelEff compute_joint_vel_eff(const HandState& state)
     out.commanded_effort_Nm[j] = setpoint != nullptr ? commanded : nan;
     out.rated_effort_Nm[j]     = kRatedMotorTorqueNm * kMotorRadPerCount / largest;
   }
-#endif
   return out;
 }
 

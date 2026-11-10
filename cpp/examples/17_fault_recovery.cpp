@@ -7,7 +7,7 @@
 // Every failure arrives as one type, Exception, and its code() says what to check;
 // reconnect() is the only public way out of Faulted, and it costs the homing and the command
 //
-// Run as: 17_fault_recovery [right|left] [interface=can0]
+// Run as: 17_fault_recovery [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand, and home() drives every finger into its hard stop, so clear the space
 // around the hand before running. Nothing here provokes a fault on purpose: to watch the
 // recovery path, unplug the CAN cable or switch the hand power off while the loop is running,
@@ -64,7 +64,9 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  HandConfig config{argc > 2 ? argv[2] : "can0", side};
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
   config.control_rate = 500;  // Hz
 
   // Off, because home() is called explicitly below; with true it is run() that homes

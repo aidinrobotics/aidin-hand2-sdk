@@ -35,17 +35,10 @@ void check(bool ok, const char* what)
 
 constexpr double kDeg2Rad = 3.14159265358979323846 / 180.0;
 
-// joint_clamp.cpp 가 이 hand type 으로 빌드한 상수. type c 는 0.7.0 의 표와 상수를 쓰고 long j3 하한이
-// 없다(CMake 가 AIDIN_HAND2_HAND_TYPE_C 를 라이브러리와 이 테스트에 같이 넘긴다).
-#if defined(AIDIN_HAND2_HAND_TYPE_C)
-constexpr double kThumbFlexionMaxDeg = 76.23, kLongFlexionMaxDeg = 95.46;
-constexpr double kThumbJ0MaxDeg = 110.0, kThumbJ3MaxDeg = 70.0, kLongDistalMaxDeg = 90.0;
-constexpr bool kLongDistalFloorApplies = false;
-#else
+// joint_clamp.cpp 의 상수와 같은 값. Gen2 와 Gen2_B 는 같은 표를 쓴다.
 constexpr double kThumbFlexionMaxDeg = 59.00, kLongFlexionMaxDeg = 96.20;
 constexpr double kThumbJ0MaxDeg = 108.8, kThumbJ3MaxDeg = 75.0, kLongDistalMaxDeg = 80.0;
 constexpr bool kLongDistalFloorApplies = true;
-#endif
 
 // 검사 대상 finger — active_joint 슬롯과 굽힘 절대상한(joint_clamp.cpp 와 같은 값).
 struct FingerUnderTest
@@ -330,10 +323,10 @@ void test_long_distal_floor()
           command.target[base + 2] = distal_deg * kDeg2Rad;
         }
         command.clamp();
-        const std::array<int, kActuatorCount> at_clamped = ik_joint_to_actuator(command.target);
+        const std::array<int, kActuatorCount> at_clamped = ik_joint_to_actuator(HandType::Gen2, command.target);
         std::array<double, kActiveJointCount> bent_further = command.target;
         for (int base : kLongBases) bent_further[base + 2] += 0.05 * kDeg2Rad;
-        const std::array<int, kActuatorCount> at_bent_further = ik_joint_to_actuator(bent_further);
+        const std::array<int, kActuatorCount> at_bent_further = ik_joint_to_actuator(HandType::Gen2, bent_further);
         for (int base : kLongBases) {
           // 능동 슬롯과 actuator 번호가 long finger 에서는 같다(d3 = base + 2).
           if (command.target[base + 2] > 1e-12 && at_clamped[base + 2] > kHomeStopCount) ++raised_past_floor;

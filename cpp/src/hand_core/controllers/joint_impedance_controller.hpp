@@ -7,6 +7,7 @@
 #include <aidin_hand2/types/description.hpp>
 #include <aidin_hand2/types/state.hpp>
 #include "hand_core/comms/canfd/protocol.hpp"
+#include "hand_core/hand_model.hpp"
 
 namespace aidin_hand2::controllers
 {
@@ -15,8 +16,9 @@ namespace aidin_hand2::controllers
 using JointJacobian = std::array<double, kActiveJointCount * kActuatorCount>;
 
 // N·m per active joint, K * (target - position) - 2 * damping ratio * sqrt(K * inertia) * velocity
-// K is the hard stiffness times stiffness (0..1); count_per_joint is count per rad, row actuator
+// K is hard_stiffness times stiffness (0..1); count_per_joint is count per rad, row actuator
 std::array<double, kActiveJointCount> joint_impedance_torque(
+    const std::array<double, kActiveJointCount>& hard_stiffness,
     const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
     const std::array<double, kActiveJointCount>& velocity, const std::array<double, kActiveJointCount>& stiffness,
     const JointJacobian& count_per_joint);
@@ -26,11 +28,11 @@ std::array<double, kActuatorCount> joint_torque_to_effort(
     const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count);
 
 // Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort, sent as CST
-// The target passes a low-pass and a 250 deg/s limit and keeps off the hard stop; hand type c sends 0
+// The target passes a low-pass and a 250 deg/s limit and keeps off the hard stop
 class JointImpedanceController
 {
  public:
-  explicit JointImpedanceController(long period_nanoseconds);
+  JointImpedanceController(long period_nanoseconds, const HandModel& model);
 
   // Fills mode_of_operation and target_effort in frames
   void compute(const JointImpedanceCommand& command,
@@ -47,6 +49,7 @@ class JointImpedanceController
       const ControllerConfig::JointImpedanceController& config,
       const std::array<double, kActiveJointCount>& measured);
 
+  const HandModel& model_;
   const double dt_seconds_;
 
   // Per cycle share of the way to a new stiffness

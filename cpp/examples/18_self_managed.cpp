@@ -8,7 +8,7 @@
 // same handler, the first cycle performs the initial connect from Disconnected, and a lifecycle
 // change that arrives without an exception (auto-reconnect finishing, for one) is picked up too
 //
-// Run as: 18_self_managed [right|left] [interface=can0]
+// Run as: 18_self_managed [right|left] [interface=can0] [hand_type=gen2|gen2-b]
 // Needs a real hand. auto_home is on, so the first run() drives every finger into its hard stop:
 // clear the space around the hand before running. Ctrl-C leaves the loop and the HandManager
 // destructor confirms the quick stop on the way out
@@ -17,6 +17,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdio>
 #include <string>
 #include <thread>
 #include <vector>
@@ -104,9 +105,11 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
+  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
     config.control_rate        = 500;    // Hz
     config.auto_home           = true;   // run() homes before it enables control
     config.auto_reconnect      = true;   // the control loop rebuilds a dropped link by itself

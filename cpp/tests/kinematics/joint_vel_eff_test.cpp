@@ -3,7 +3,7 @@
 //   effort     virtual work, joint power equals motor power
 //   rated      thumb j0 has one actuator, so rated current there gives rated_effort_Nm
 //   commanded  NaN without an effort output, the output's torque with one
-// Hand type c expects NaN everywhere
+// Hand type Gen2; Gen2_B differs in the thumb d1·d2 Jacobian only
 
 #include <array>
 #include <cmath>
@@ -28,6 +28,7 @@ void check(bool ok, const char* what)
 }
 
 constexpr double kDeg = 3.14159265358979323846 / 180.0;
+constexpr HandType kType = HandType::Gen2;
 
 // A pose inside the workspace, away from the home stops
 HandState state_at_pose(const std::array<std::int32_t, kActuatorCount>& rpm)
@@ -38,11 +39,11 @@ HandState state_at_pose(const std::array<std::int32_t, kActuatorCount>& rpm)
     pose[5 + 3 * f] = 40 * kDeg;
     pose[6 + 3 * f] = 30 * kDeg;
   }
-  const auto encoder = ik_joint_to_actuator(pose);
+  const auto encoder = ik_joint_to_actuator(kType, pose);
   HandState state{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) state.actuators.position_count[i] = encoder[i];
   state.actuators.velocity_rpm = rpm;
-  state.joints.position_rad = fk_actuator_to_joint(encoder);
+  state.joints.position_rad = fk_actuator_to_joint(kType, encoder);
   return state;
 }
 
@@ -55,18 +56,6 @@ std::array<std::int32_t, kActuatorCount> test_rpm()
   return rpm;
 }
 
-#if defined(AIDIN_HAND2_HAND_TYPE_C)
-void test_type_c()
-{
-  const HandStateJointVelEff out = compute_joint_vel_eff(state_at_pose(test_rpm()));
-  bool all_nan = true;
-  for (std::size_t j = 0; j < kActiveJointCount; ++j) {
-    all_nan = all_nan && std::isnan(out.velocity_rad_s[j]) && std::isnan(out.effort_Nm[j]) &&
-              std::isnan(out.commanded_effort_Nm[j]) && std::isnan(out.rated_effort_Nm[j]);
-  }
-  check(all_nan, "hand type c gives NaN");
-}
-#else
 constexpr double kTorqueConstantNmPerA = 3.62e-3;
 
 std::array<double, kActiveJointCount> active_of(const std::array<double, kJointCount>& joints)
@@ -89,9 +78,9 @@ void test_velocity()
     plus[i]  = state.actuators.position_count[i] + rpm[i];
     minus[i] = state.actuators.position_count[i] - rpm[i];
   }
-  const auto qp = active_of(fk_actuator_to_joint(plus));
-  const auto qm = active_of(fk_actuator_to_joint(minus));
-  const HandStateJointVelEff out = compute_joint_vel_eff(state);
+  const auto qp = active_of(fk_actuator_to_joint(kType, plus));
+  const auto qm = active_of(fk_actuator_to_joint(kType, minus));
+  const HandStateJointVelEff out = compute_joint_vel_eff(kType, state);
   double worst = 0.0, largest = 0.0;
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
     const double fd = (qp[j] - qm[j]) / (2.0 * 60.0 / 1024.0);
@@ -109,7 +98,7 @@ void test_virtual_work()
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     state.actuators.current_mA[i] = static_cast<std::int16_t>((i % 3 == 0 ? -1 : 1) * (50 + 15 * static_cast<int>(i)));
   }
-  const HandStateJointVelEff out = compute_joint_vel_eff(state);
+  const HandStateJointVelEff out = compute_joint_vel_eff(kType, state);
   double joint_power = 0.0, motor_power = 0.0;
   for (std::size_t j = 0; j < kActiveJointCount; ++j) joint_power += out.effort_Nm[j] * out.velocity_rad_s[j];
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
@@ -123,7 +112,7 @@ void test_rated_and_commanded()
 {
   HandState state = state_at_pose({});
   state.actuators.current_mA[0] = 400;
-  const HandStateJointVelEff idle = compute_joint_vel_eff(state);
+  const HandStateJointVelEff idle = compute_joint_vel_eff(kType, state);
   check(std::abs(std::abs(idle.effort_Nm[0]) - idle.rated_effort_Nm[0]) < 1e-9 * idle.rated_effort_Nm[0],
         "rated current on thumb_actuator0 gives rated_effort_Nm on thumb_joint0");
   check(std::isnan(idle.commanded_effort_Nm[0]), "no effort output gives NaN");
@@ -131,24 +120,19 @@ void test_rated_and_commanded()
   ActuatorEffortSetpoint output{};
   output.target_effort_pct[0] = 1000.0;
   state.commanded.controller_output = output;
-  const HandStateJointVelEff driven = compute_joint_vel_eff(state);
+  const HandStateJointVelEff driven = compute_joint_vel_eff(kType, state);
   check(std::abs(driven.commanded_effort_Nm[0] - idle.effort_Nm[0]) < 1e-9 * idle.rated_effort_Nm[0],
         "effort output 1000 gives the torque of rated current");
   std::printf("  thumb_joint0 rated %.3f N m\n", idle.rated_effort_Nm[0]);
 }
-#endif
 
 }  // namespace
 
 int main()
 {
-#if defined(AIDIN_HAND2_HAND_TYPE_C)
-  test_type_c();
-#else
   test_velocity();
   test_virtual_work();
   test_rated_and_commanded();
-#endif
   std::printf("joint_vel_eff test: %s\n", g_failures == 0 ? "OK" : "FAIL");
   return g_failures == 0 ? 0 : 1;
 }
