@@ -33,39 +33,13 @@ sudo apt install -y build-essential cmake libspdlog-dev can-utils
 cd aidin-hand2-sdk
 ```
 
-> [!IMPORTANT]
-> **AIDIN Hand Gen2에는 hand type A·B·C가 있고, 빌드할 때 type을 선택합니다.** type에 따라
-> kinematics가 다르게 계산됩니다. type은 로봇 핸드 전달과 함께 알려드립니다.
-
-아래 셋 중 해당하는 쪽만 실행하십시오.
-
-**a) type A**
+> [!NOTE]
+> hand type(`Gen2`·`Gen2_B`)은 빌드할 때 고르지 않습니다. 한 빌드가 두 type의 kinematics를 모두
+> 담고, 프로그램이 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)의 `hand_type` 필드로
+> 고릅니다.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#   -- aidin_hand2: hand type = a
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_a.a
-```
-
-**b) type B**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=b
-#   -- aidin_hand2: hand type = b
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_b.a
-```
-
-**c) type C**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=c
-#   -- aidin_hand2: hand type = c
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_c.a
-```
-
-출력 두 줄로 선택된 값을 확인한 뒤 빌드합니다.
-
-```bash
 cmake --build cpp/build -j"$(nproc)"
 ```
 

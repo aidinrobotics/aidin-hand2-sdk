@@ -23,7 +23,7 @@ The documents for each header file are below.
 &nbsp;&nbsp;[**`hand/hand_manager.hpp`**](08_cpp_api_reference/hand_manager.md) — `HandManager`<br>
 &nbsp;&nbsp;[**`hand/hand.hpp`**](08_cpp_api_reference/hand.md) — `Hand`<br>
 &nbsp;&nbsp;[**`hand/hand_kinematics.hpp`**](08_cpp_api_reference/hand_kinematics.md) — FK / IK<br>
-&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — constants, `HandSide`, `Finger`, array conventions<br>
+&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — constants, `HandSide`, `HandType`, `Finger`, array conventions<br>
 &nbsp;&nbsp;[**`types/config.hpp`**](08_cpp_api_reference/types_config.md) — `HandConfig`, `ControllerConfig`<br>
 &nbsp;&nbsp;[**`types/command.hpp`**](08_cpp_api_reference/types_command.md) — `CommandMode` and the 5 commands<br>
 &nbsp;&nbsp;[**`types/state.hpp`**](08_cpp_api_reference/types_state.md) — `HandLifecycle`, `HomingState`, `HandState`, `ActuatorFault`<br>
@@ -83,6 +83,13 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 | [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | 16 actuator encoders → 21 joints |
 | [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | 16 active joints → 16 actuator encoders |
 | [`compute_joint_vel_eff()`](08_cpp_api_reference/hand_kinematics.md#compute_joint_vel_eff) | one `HandState` → velocity and effort of 16 active joints |
+
+**[`types/description.hpp`](08_cpp_api_reference/types_description.md)**
+
+| Function | Role |
+|---|---|
+| [`parse_hand_type()`](08_cpp_api_reference/types_description.md#parse_hand_type) | string → `HandType` |
+| [`to_string()`](08_cpp_api_reference/types_description.md#to_string) | `HandType` → string |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
 
@@ -147,6 +154,7 @@ Every enum, struct, class and alias, grouped by the file that declares it. A nes
 |---|---|---|
 | [constants](08_cpp_api_reference/types_description.md#constants) | `constexpr` | The actuator, joint and tactile counts |
 | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | enum | Left or right |
+| [`HandType`](08_cpp_api_reference/types_description.md#enum-handtype) | enum | The hand type |
 | [`Finger`](08_cpp_api_reference/types_description.md#enum-finger) | enum | The tactile finger index |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**

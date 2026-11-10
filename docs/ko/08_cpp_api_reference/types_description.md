@@ -6,6 +6,9 @@
 |---|---|---|
 | [상수](#constants) | `constexpr` | actuator·joint·tactile 개수 |
 | [`HandSide`](#enum-handside) | enum | 왼손 / 오른손 |
+| [`HandType`](#enum-handtype) | enum | 로봇 핸드 type |
+| [`parse_hand_type()`](#parse_hand_type) | function | 문자열 → `HandType` |
+| [`to_string()`](#to_string) | function | `HandType` → 문자열 |
 | [`Finger`](#enum-finger) | enum | tactile finger index |
 
 ---
@@ -36,6 +39,34 @@ inline constexpr std::size_t kPalm2Count             = 18;
 ```cpp
 enum class HandSide { Left, Right };
 ```
+
+---
+
+## enum `HandType`
+
+```cpp
+enum class HandType { Gen2, Gen2_B };
+```
+
+`Gen2_B`는 엄지 d1·d2의 screw lead가 2 mm인 모델입니다. 어느 type인지는 로봇 핸드 전달과 함께
+알려드립니다.
+
+### `parse_hand_type()`
+
+```cpp
+std::optional<HandType> parse_hand_type(std::string_view text);
+```
+
+`"gen2"`·`"gen2-b"`를 대소문자 구분 없이 읽고(`"gen2_b"`도 허용), 그 밖의 문자열이면 `std::nullopt`를
+돌려줍니다.
+
+### `to_string()`
+
+```cpp
+const char* to_string(HandType type);
+```
+
+`"gen2"` 또는 `"gen2-b"`를 돌려줍니다.
 
 ---
 

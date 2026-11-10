@@ -13,11 +13,11 @@ alias. For the list of symbols and fields, see the [API reference](08_cpp_api_re
 
 Each chapter ends with the examples that run what the chapter describes. The examples are in
 [`cpp/examples/`](../../cpp/examples) and the SDK build produces them, so run the executable of the
-same name under `cpp/build/`. Each takes two arguments, the side and the interface, and the defaults
-are `right` and `can0`.
+same name under `cpp/build/`. Each takes three arguments, the side, the interface and the hand type,
+and the defaults are `right`, `can0` and `gen2`.
 
 ```bash
-./cpp/build/04_homing left can0      # [right|left] [interface]
+./cpp/build/04_homing left can0 gen2-b      # [right|left] [interface] [gen2|gen2-b]
 ```
 
 Every example prints its results to the terminal, and on `Ctrl-C` it leaves the loop it is running,
@@ -87,14 +87,14 @@ do not define it, so you cannot create or reference it directly. `HandManager` o
 
 ### 1.2 HandConfig
 
-[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig) configures how a `Hand` behaves. The `interface_name` and `hand_side` fields are
-constructor arguments, and the remaining fields have defaults.
+[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig) configures how a `Hand` behaves. The `interface_name`, `hand_side` and
+`hand_type` fields are constructor arguments, and the remaining fields have defaults.
 
 The following example builds a config with every field written out.
 
 ```cpp
 // These values are an example, not the defaults. The table below lists the defaults.
-ah2::HandConfig config{"can0", ah2::HandSide::Left};   // the 2 constructor arguments are required
+ah2::HandConfig config{"can0", ah2::HandSide::Left, ah2::HandType::Gen2};   // the 3 constructor arguments are required
 config.control_rate              = 500;                // Hz
 config.auto_home                 = false;
 config.rt_cpu_affinity           = -1;
@@ -108,6 +108,7 @@ config.disabled_actuators        = {};                 // for example, {3, 7}
 |---|---|---|---|
 | `interface_name` | `std::string` | required | The name of the CAN interface |
 | `hand_side` | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | required | Which side the robot hand is, left or right |
+| `hand_type` | [`HandType`](08_cpp_api_reference/types_description.md#enum-handtype) | required | The robot hand's type (`Gen2` or `Gen2_B`). AIDIN tells you the type with the robot hand |
 | `control_rate` | `int` | `500` | The control rate [Hz] |
 | `auto_home` | `bool` | `true` | Whether [`run()`](08_cpp_api_reference/hand.md#handrun) also homes.</br> It homes only when the `homing_state` value is not `Succeeded` |
 | `rt_cpu_affinity` | `int` | `-1` | The CPU that the SDK pins the thread of the control and communication loop to.</br> `-1` pins nothing.|
@@ -441,11 +442,6 @@ hand.set_controller_config(controller);
 | `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
 | `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the low-pass filter [Hz], 0 or more |
 
-> [!IMPORTANT]
-> Hand type C has no joint impedance controller. If you pass a `JointImpedanceCommand`,
-> `set_command()` throws `InvalidArgument`. You choose the type when you build the SDK, see
-> [SDK build & install](06_sdk_build_and_install.md).
-
 > [!NOTE]
 > The SDK does not yet reduce the error at which friction stops a joint short of its target. The
 > behavior may change in a later version.
@@ -645,19 +641,20 @@ or to convert recorded encoder values into joint angles later.
 ### 6.1 Conversion functions
 
 There are two conversion functions, one for forward kinematics and one for inverse kinematics, and
-their input and output units are the reverse of each other.
+their input and output units are the reverse of each other. Both take the hand type you put into
+`HandConfig` as their first argument.
 
 | Function | Input | Output |
 |---|---|---|
-| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `std::array<int, kActuatorCount>`, encoder count | `std::array<double, kJointCount>`, rad |
-| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `std::array<double, kActiveJointCount>`, rad | `std::array<int, kActuatorCount>`, encoder count |
+| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `HandType`, `std::array<int, kActuatorCount>` encoder count | `std::array<double, kJointCount>`, rad |
+| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `HandType`, `std::array<double, kActiveJointCount>` rad | `std::array<int, kActuatorCount>`, encoder count |
 
 The following example converts a target into an actuator position and then converts it back into
 joint angles.
 
 ```cpp
-const auto encoder = ah2::ik_joint_to_actuator(command.target);
-const auto joints  = ah2::fk_actuator_to_joint(encoder);
+const auto encoder = ah2::ik_joint_to_actuator(config.hand_type, command.target);
+const auto joints  = ah2::fk_actuator_to_joint(config.hand_type, encoder);
 ```
 
 The SDK fills `get_state().joints.position_rad` with `fk_actuator_to_joint()`. If you pass the same
@@ -1083,7 +1080,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     config.auto_home           = true;   // run() also handles homing
     config.auto_reconnect      = true;   // the control and communication loop recovers from errors
     config.auto_reconnect_home = true;
@@ -1188,7 +1185,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     config.auto_home      = false;   // let the user decide when homing runs
     config.auto_reconnect = false;   // let the user issue the recovery as well
 
@@ -1259,7 +1256,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     config.auto_home = true;
 
     ah2::Hand hand = manager.create(config);

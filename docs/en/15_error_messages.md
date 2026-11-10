@@ -65,6 +65,7 @@ The issue tracker to report through is in [SDK build & install](06_sdk_build_and
 |---|---|---|
 | `HandConfig: interface_name must not be empty` | First constructor argument is an empty string | Pass a CAN interface name |
 | `HandConfig: hand_side must be HandSide::Left or HandSide::Right` | `hand_side` out of range | Use the enum values |
+| `HandConfig: hand_type must be HandType::Gen2 or HandType::Gen2_B` | `hand_type` out of range | Use the enum values. Convert a string with [`parse_hand_type()`](08_cpp_api_reference/types_description.md#parse_hand_type) |
 | `Cannot create hand: control_rate must be positive` | `control_rate` is `0` or less | Set a positive value. The default is `500` |
 | `Cannot set max effort: limit contains NaN/Inf` | A NaN or Inf passed to [`set_max_effort()`](08_cpp_api_reference/hand.md#handset_max_effort) | Validate the values. The accepted range is `[0, 2000]` |
 | `Cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0` | One of the two is non-finite or negative | The previous settings are kept. Fix the value and call again |

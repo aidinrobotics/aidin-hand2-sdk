@@ -166,8 +166,7 @@ workspace 안으로 자동 투영됩니다. 범위 모델은 [Workspace limits](
 
 **Parameters**     ｜ `command` — command 5종 중 하나<br>
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
-`WrongCallOrder`(`Running` 상태가 아니거나 `homing_state != Succeeded`. [`Idle`](types_command.md#idle)은 후자에서 예외) ·
-`InvalidArgument`(hand type C에 [`JointImpedanceCommand`](types_command.md#jointimpedancecommand) 전달)<br>
+`WrongCallOrder`(`Running` 상태가 아니거나 `homing_state != Succeeded`. [`Idle`](types_command.md#idle)은 후자에서 예외)<br>
 **Preconditions**  ｜ `Running` — actuator enable이 확인된 상태여야 하므로 [`run()`](#handrun)이 성공한 뒤입니다<br>
 **Notes**          ｜ 값이 잘못돼도 예외를 던지지 않습니다. 직전 command가 유지되고
 `Diagnostics::nan_command_count`가 늘며 warning log가 남습니다. 조건은 [Validation](types_command.md#validation) 참조

@@ -122,7 +122,7 @@ enum class CommandSource {
 ## `HandStateJointVelEff`
 
 What [`compute_joint_vel_eff()`](hand_kinematics.md#compute_joint_vel_eff) returns. Every field holds
-the 16 active joints, and on hand type C every value is NaN.
+the 16 active joints.
 
 | Field | Type | Description |
 |---|---|---|

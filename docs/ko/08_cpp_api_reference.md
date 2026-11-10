@@ -22,7 +22,7 @@ header 파일별 문서는 다음과 같습니다.
 &nbsp;&nbsp;[**`hand/hand_manager.hpp`**](08_cpp_api_reference/hand_manager.md) — `HandManager`<br>
 &nbsp;&nbsp;[**`hand/hand.hpp`**](08_cpp_api_reference/hand.md) — `Hand`<br>
 &nbsp;&nbsp;[**`hand/hand_kinematics.hpp`**](08_cpp_api_reference/hand_kinematics.md) — FK / IK<br>
-&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — 상수, `HandSide`, `Finger`, 배열 규약<br>
+&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — 상수, `HandSide`, `HandType`, `Finger`, 배열 규약<br>
 &nbsp;&nbsp;[**`types/config.hpp`**](08_cpp_api_reference/types_config.md) — `HandConfig`, `ControllerConfig`<br>
 &nbsp;&nbsp;[**`types/command.hpp`**](08_cpp_api_reference/types_command.md) — `CommandMode`, command 5종<br>
 &nbsp;&nbsp;[**`types/state.hpp`**](08_cpp_api_reference/types_state.md) — `HandLifecycle`, `HomingState`, `HandState`, `ActuatorFault`<br>
@@ -81,6 +81,13 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 | [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | actuator encoder 16개 → joint 21개 |
 | [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | active joint 16개 → actuator encoder 16개 |
 | [`compute_joint_vel_eff()`](08_cpp_api_reference/hand_kinematics.md#compute_joint_vel_eff) | `HandState` 하나 → active joint 16개의 속도와 effort |
+
+**[`types/description.hpp`](08_cpp_api_reference/types_description.md)**
+
+| 함수 | 역할 |
+|---|---|
+| [`parse_hand_type()`](08_cpp_api_reference/types_description.md#parse_hand_type) | 문자열 → `HandType` |
+| [`to_string()`](08_cpp_api_reference/types_description.md#to_string) | `HandType` → 문자열 |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
 
@@ -144,6 +151,7 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 |---|---|---|
 | [상수](08_cpp_api_reference/types_description.md#constants) | `constexpr` | actuator·joint·tactile 개수 |
 | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | enum | 왼손 / 오른손 |
+| [`HandType`](08_cpp_api_reference/types_description.md#enum-handtype) | enum | 로봇 핸드 type |
 | [`Finger`](08_cpp_api_reference/types_description.md#enum-finger) | enum | tactile finger index |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**

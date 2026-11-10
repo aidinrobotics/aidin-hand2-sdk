@@ -33,40 +33,13 @@ Run all following commands from the SDK repo root.
 cd aidin-hand2-sdk
 ```
 
-> [!IMPORTANT]
-> **The AIDIN Hand Gen2 comes in hand types A, B and C, and you select the type at build time.**
-> The kinematics computes differently for each type. AIDIN tells you the type when it delivers
-> the robot hand.
-
-Run only the one below that matches your hand.
-
-**a) type A**
+> [!NOTE]
+> The hand type (`Gen2` or `Gen2_B`) is not a build choice. One build carries the kinematics of
+> both types, and the program picks one through the `hand_type` field of
+> [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig).
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#   -- aidin_hand2: hand type = a
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_a.a
-```
-
-**b) type B**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=b
-#   -- aidin_hand2: hand type = b
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_b.a
-```
-
-**c) type C**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=c
-#   -- aidin_hand2: hand type = c
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_c.a
-```
-
-Confirm the selection from those two lines, then build.
-
-```bash
 cmake --build cpp/build -j"$(nproc)"
 ```
 

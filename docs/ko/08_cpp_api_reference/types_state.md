@@ -139,7 +139,7 @@ enum class CommandSource {
 ## `HandStateJointVelEff`
 
 [`compute_joint_vel_eff()`](hand_kinematics.md#compute_joint_vel_eff)의 결과입니다. 모두 active joint
-16개의 값이고 hand type C에서는 모두 NaN입니다.
+16개의 값입니다.
 
 | Field | Type | Description |
 |---|---|---|

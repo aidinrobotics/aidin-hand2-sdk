@@ -3,6 +3,7 @@
 # `hand/hand_kinematics.hpp`
 
 Conversion functions that work without a [`Hand`](hand.md#hand). Angles are in rad, actuators in encoder counts.
+The first argument, `hand_type`, is the value you put into [`HandConfig`](types_config.md#handconfig).
 
 | Symbol | Description |
 |---|---|
@@ -14,38 +15,38 @@ Conversion functions that work without a [`Hand`](hand.md#hand). Angles are in r
 
 ```cpp
 std::array<double, kJointCount> fk_actuator_to_joint(
-    const std::array<int, kActuatorCount>& encoder);
+    HandType hand_type, const std::array<int, kActuatorCount>& encoder);
 ```
 
 Computes joint angles from encoder values. Each finger has one passive joint `q4` carried by its
 four-bar linkage, and the result includes it.
 
-**Parameters**     ｜ `encoder` — 16 actuator encoder counts<br>
+**Parameters**     ｜ `hand_type` — the robot hand's type · `encoder` — 16 actuator encoder counts<br>
 **Returns**        ｜ 21 joint angles [rad]
 
 ### `ik_joint_to_actuator()`
 
 ```cpp
 std::array<int, kActuatorCount> ik_joint_to_actuator(
-    const std::array<double, kActiveJointCount>& active_joint);
+    HandType hand_type, const std::array<double, kActiveJointCount>& active_joint);
 ```
 
 Computes encoder values from active joint angles.
 
-**Parameters**     ｜ `active_joint` — 16 active joint angles [rad]<br>
+**Parameters**     ｜ `hand_type` — the robot hand's type · `active_joint` — 16 active joint angles [rad]<br>
 **Returns**        ｜ 16 actuator encoder counts
 
 ### `compute_joint_vel_eff()`
 
 ```cpp
-HandStateJointVelEff compute_joint_vel_eff(const HandState& state);
+HandStateJointVelEff compute_joint_vel_eff(HandType hand_type, const HandState& state);
 ```
 
 Converts the actuator velocity, current and effort setpoint in a `HandState` into values of the 16
 active joints through the kinematics at that posture. The effort is the motor torque constant,
 3.62 mN·m/A, times the current, and it does not include the gear losses.
 
-**Parameters**     ｜ `state` — what [`Hand::get_state()`](hand.md#handget_state) returned<br>
-**Returns**        ｜ [`HandStateJointVelEff`](types_state.md#handstatejointveleff). All NaN on hand type C
+**Parameters**     ｜ `hand_type` — the robot hand's type · `state` — what [`Hand::get_state()`](hand.md#handget_state) returned<br>
+**Returns**        ｜ [`HandStateJointVelEff`](types_state.md#handstatejointveleff)
 
 ---

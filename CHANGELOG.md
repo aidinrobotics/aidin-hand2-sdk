@@ -8,21 +8,37 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
-The joint impedance controller works in joint space: each active joint takes a stiffness from 0 to 1
-of a measured hard stiffness, and the damping follows it. Encoder count 0 is now the hard stop, so
-actuator positions read 1000 higher than in 0.8 at the same pose. `ControllerConfig` changes size:
+The hand type is chosen at run time: `HandConfig` takes a `HandType`, one build serves `Gen2` and
+`Gen2_B`, and the build option is gone. Hand type C is no longer shipped. The joint impedance
+controller works in joint space: each active joint takes a stiffness from 0 to 1 of a measured hard
+stiffness, and the damping follows it. Encoder count 0 is now the hard stop, so actuator positions
+read 1000 higher than in 0.8 at the same pose. `HandConfig` and `ControllerConfig` change shape:
 request 0.9 and rebuild.
 
 ### Added
+
+- **`HandType` names the hand: `Gen2` or `Gen2_B`.** `parse_hand_type()` reads `"gen2"` and
+  `"gen2-b"` in any letter case (`"gen2_b"` too) and `to_string(HandType)` writes them back, so a
+  launch argument or a settings file carries the same word everywhere. Both are in
+  `types/description.hpp`.
 
 - **`compute_joint_vel_eff()` turns one `HandState` into the velocity and the effort of the 16
   active joints.** `HandStateJointVelEff` carries `velocity_rad_s` from `velocity_rpm`, `effort_Nm`
   from `current_mA` through the motor torque constant and the kinematics (gear losses not included),
   `commanded_effort_Nm` from the effort setpoint of that cycle (NaN when the controller sent
   positions) and `rated_effort_Nm`, the joint torque at which the most loaded actuator reaches its
-  rated current. On hand type C every value is NaN. The function is in `hand/hand_kinematics.hpp`.
+  rated current. The function is in `hand/hand_kinematics.hpp`.
 
 ### Changed
+
+- **Breaking: the hand type is a `HandConfig` field, not a build option.** `HandConfig(interface_name,
+  hand_side, hand_type)` takes `HandType::Gen2` or `HandType::Gen2_B`, and the conversion functions
+  `fk_actuator_to_joint()`, `fk_actuator_to_task()`, `ik_joint_to_actuator()`, `ik_task_to_joint()`,
+  `ik_oriented_task_to_joint()` and `compute_joint_vel_eff()` take the `HandType` as their first
+  argument. One build carries the kinematics of both types, so `-DAIDIN_HAND2_HAND_TYPE` is gone; a
+  build directory that still holds it configures with a warning and the value is dropped. Until a
+  `Gen2_B` hand is measured, its thumb j1 and j2 hard stiffness is a quarter of `Gen2`'s, the lead
+  ratio squared.
 
 - **Breaking: the joint impedance controller takes a stiffness level per active joint, and
   `ControllerConfig::JointImpedanceController` changed shape.** The per-actuator `stiffness` and
@@ -31,12 +47,16 @@ request 0.9 and rebuild.
   hard stiffness and the SDK sets the damping to match; the default is 0.8, and
   `set_controller_config()` rejects a value above 1. The target passes the joint position controller's low-pass (`filter_enabled` and
   `cutoff_freq`, on at 10 Hz by default). The controller works in joint space so that one value
-  means the same stiffness in every pose. Hand types A and B carry the Jacobians this needs; on
-  hand type C `set_command()` rejects a `JointImpedanceCommand` with `InvalidArgument`.
+  means the same stiffness in every pose.
 - **Breaking: encoder count 0 is the hard stop.** The SDK no longer places its origin 1000 counts
   off the hard stop at the wire. After homing the robot hand holds 1000 counts off the stop, and the
   joint angles there are a fraction of a degree rather than 0. An `ActuatorPositionCommand` written
   for 0.8 now lands 1000 counts closer to the stop, so add 1000 to stored targets.
+
+### Removed
+
+- **Hand type C.** Its kinematics archive and its 0.7.0 workspace clamp tables are no longer in the
+  SDK, and `HandType` has no value for it. 0.8.0 is the last release for a type C hand.
 
 ### Fixed
 

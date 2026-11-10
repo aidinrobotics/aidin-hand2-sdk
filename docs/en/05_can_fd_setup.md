@@ -158,7 +158,7 @@ Put the interface name you confirmed in section 1 and the side into
 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig).
 
 ```cpp
-ah2::HandConfig config{"can0", ah2::HandSide::Left};    // interface name, side
+ah2::HandConfig config{"can0", ah2::HandSide::Left, ah2::HandType::Gen2};    // interface name, side, hand type
 ```
 
 Next, build the SDK in [SDK build & install](06_sdk_build_and_install.md).

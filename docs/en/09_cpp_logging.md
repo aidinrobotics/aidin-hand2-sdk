@@ -238,7 +238,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     ah2::Hand hand = manager.create(config);
     hand.connect();
     hand.run();

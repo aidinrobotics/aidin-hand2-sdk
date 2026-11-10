@@ -156,7 +156,7 @@ state 네 줄(왼손 `0x221`~`0x224`, 오른손 `0x121`~`0x124`)이 각각 500Hz
 side를 씁니다.
 
 ```cpp
-ah2::HandConfig config{"can0", ah2::HandSide::Left};    // interface 이름, side
+ah2::HandConfig config{"can0", ah2::HandSide::Left, ah2::HandType::Gen2};    // interface 이름, side, hand type
 ```
 
 이어서 [SDK build & install](06_sdk_build_and_install.md)에서 SDK를 빌드하십시오.

@@ -11,11 +11,11 @@ AIDIN Hand Gen2는 5 손가락을 actuator 16개로 joint 21개(active 16 + pass
 
 각 장 끝에는 장에서 설명한 내용을 실행해 확인하는 예제를 적었습니다. 예제는
 [`cpp/examples/`](../../cpp/examples)에 있고 SDK를 빌드할 때 함께 만들어지므로, `cpp/build/` 아래의
-같은 이름 실행 파일을 실행하면 됩니다. 인자는 왼손·오른손 구분과 interface 두 개이고, 기본값은
-`right`와 `can0`입니다.
+같은 이름 실행 파일을 실행하면 됩니다. 인자는 왼손·오른손 구분, interface, hand type 세 개이고,
+기본값은 `right`·`can0`·`gen2`입니다.
 
 ```bash
-./cpp/build/04_homing left can0      # [right|left] [interface]
+./cpp/build/04_homing left can0 gen2-b      # [right|left] [interface] [gen2|gen2-b]
 ```
 
 모든 예제는 결과를 터미널에 출력하고, `Ctrl-C`를 받으면 진행 중인 반복을 중단한 뒤 quick stop을 확인하고
@@ -84,14 +84,14 @@ SDK는 [`HandManager`](08_cpp_api_reference/hand_manager.md#handmanager)와 [`Ha
 
 ### 1.2 HandConfig
 
-[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)는 `Hand`의 동작을 설정합니다. `interface_name`과 `hand_side` 필드는 생성자
-인자이고, 나머지 필드는 기본값이 존재합니다.
+[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)는 `Hand`의 동작을 설정합니다. `interface_name`, `hand_side`, `hand_type`
+필드는 생성자 인자이고, 나머지 필드는 기본값이 존재합니다.
 
 다음은 모든 필드를 명시하여 config를 구성하는 예입니다.
 
 ```cpp
 // 기본값이 아니라 설정 예시입니다. 기본값은 아래 표에 있습니다.
-ah2::HandConfig config{"can0", ah2::HandSide::Left};   // 생성자 인자 2개는 필수
+ah2::HandConfig config{"can0", ah2::HandSide::Left, ah2::HandType::Gen2};   // 생성자 인자 3개는 필수
 config.control_rate              = 500;                // Hz
 config.auto_home                 = false;
 config.rt_cpu_affinity           = -1;
@@ -105,6 +105,7 @@ config.disabled_actuators        = {};                 // 예: {3, 7}
 |---|---|---|---|
 | `interface_name` | `std::string` | 필수 | CAN interface 이름 |
 | `hand_side` | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | 필수 | 로봇 핸드 좌우 구분 (왼손/오른손) |
+| `hand_type` | [`HandType`](08_cpp_api_reference/types_description.md#enum-handtype) | 필수 | 로봇 핸드 type (`Gen2`/`Gen2_B`). 로봇 핸드 전달과 함께 알려드립니다 |
 | `control_rate` | `int` | `500` | 제어 주기 [Hz] |
 | `auto_home` | `bool` | `true` | [`run()`](08_cpp_api_reference/hand.md#handrun)의 자동 homing 여부.</br> `homing_state` 값이 `Succeeded`가 아닐 때만 수행 |
 | `rt_cpu_affinity` | `int` | `-1` | 제어·통신 루프를 실행하는 thread를 고정할 CPU 번호.</br> `-1`은 고정 안 함.|
@@ -415,11 +416,6 @@ hand.set_controller_config(controller);
 | `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
 | `cutoff_freq` | `double` | `10.0` | low-pass filter의 차단 주파수 [Hz], 0 이상 |
 
-> [!IMPORTANT]
-> hand type C에는 이 controller가 없습니다. `JointImpedanceCommand`를 전달하면 `set_command()`가
-> `InvalidArgument` 예외를 던집니다. type은 [SDK build & install](06_sdk_build_and_install.md)에서
-> 빌드할 때 선택합니다.
-
 > [!NOTE]
 > 마찰 때문에 목표 앞에서 멈추는 오차를 줄이는 기능은 아직 없습니다. 거동은 이후 버전에서 바뀔 수
 > 있습니다.
@@ -608,18 +604,18 @@ kinematics 함수는 joint 공간과 actuator 공간을 변환하는 free functi
 ### 6.1 Conversion functions
 
 변환 함수는 forward kinematics와 inverse kinematics 두 개이며, 입력과 출력의 단위가 서로
-반대입니다.
+반대입니다. 두 함수 모두 첫 인자로 `HandConfig`에 넣은 것과 같은 hand type을 받습니다.
 
 | Function | Input | Output |
 |---|---|---|
-| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `std::array<int, kActuatorCount>`, encoder count | `std::array<double, kJointCount>`, rad |
-| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `std::array<double, kActiveJointCount>`, rad | `std::array<int, kActuatorCount>`, encoder count |
+| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `HandType`, `std::array<int, kActuatorCount>` encoder count | `std::array<double, kJointCount>`, rad |
+| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `HandType`, `std::array<double, kActiveJointCount>` rad | `std::array<int, kActuatorCount>`, encoder count |
 
 다음은 target을 actuator position으로 변환한 뒤 다시 joint 각도로 되돌리는 예입니다.
 
 ```cpp
-const auto encoder = ah2::ik_joint_to_actuator(command.target);
-const auto joints  = ah2::fk_actuator_to_joint(encoder);
+const auto encoder = ah2::ik_joint_to_actuator(config.hand_type, command.target);
+const auto joints  = ah2::fk_actuator_to_joint(config.hand_type, encoder);
 ```
 
 `get_state().joints.position_rad` 필드는 SDK가 `fk_actuator_to_joint()`로 채운 값입니다. 같은 encoder
@@ -1025,7 +1021,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     config.auto_home           = true;   // run()이 homing까지 처리합니다
     config.auto_reconnect      = true;   // 통신 오류는 제어·통신 루프가 복구합니다
     config.auto_reconnect_home = true;
@@ -1127,7 +1123,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     config.auto_home      = false;   // homing 시점을 사용자가 지시하게 둡니다
     config.auto_reconnect = false;   // 복구도 사용자가 지시하게 둡니다
 
@@ -1198,7 +1194,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
     config.auto_home = true;
 
     ah2::Hand hand = manager.create(config);

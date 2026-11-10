@@ -156,8 +156,7 @@ joint command goes through the workspace projection automatically. The range mod
 
 **Parameters**     ｜ `command` — one of the five command types<br>
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
-`WrongCallOrder` (not `Running`, or `homing_state != Succeeded`, from which [`Idle`](types_command.md#idle) is exempt) ·
-`InvalidArgument` (a [`JointImpedanceCommand`](types_command.md#jointimpedancecommand) on hand type C)<br>
+`WrongCallOrder` (not `Running`, or `homing_state != Succeeded`, from which [`Idle`](types_command.md#idle) is exempt)<br>
 **Preconditions**  ｜ `Running` — the actuator enable must be confirmed, so this comes after
 [`run()`](#handrun) succeeds<br>
 **Notes**          ｜ A bad value does not throw. The previous command keeps going out,

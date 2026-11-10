@@ -60,6 +60,7 @@ error code는 붙지 않습니다. message와 error code를 함께 남기십시�
 |---|---|---|
 | `HandConfig: interface_name must not be empty` | 생성자 첫 인자가 빈 문자열 | CAN interface 이름을 넘깁니다 |
 | `HandConfig: hand_side must be HandSide::Left or HandSide::Right` | `hand_side` 값이 범위 밖 | enum 값을 그대로 씁니다 |
+| `HandConfig: hand_type must be HandType::Gen2 or HandType::Gen2_B` | `hand_type` 값이 범위 밖 | enum 값을 그대로 씁니다. 문자열은 [`parse_hand_type()`](08_cpp_api_reference/types_description.md#parse_hand_type)으로 바꿉니다 |
 | `Cannot create hand: control_rate must be positive` | `control_rate` 값이 `0` 이하 | 양수로 설정합니다(기본값 `500`) |
 | `Cannot set max effort: limit contains NaN/Inf` | [`set_max_effort()`](08_cpp_api_reference/hand.md#handset_max_effort) 인자에 NaN·Inf | 값을 검사합니다(유효 범위 `[0, 2000]`) |
 | `Cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0` | 두 값 중 하나가 non-finite이거나 음수 | 기존 설정이 유지됩니다. 값을 고쳐 다시 호출합니다 |

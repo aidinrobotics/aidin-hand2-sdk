@@ -6,6 +6,9 @@
 |---|---|---|
 | [Constants](#constants) | `constexpr` | Actuator, joint, and tactile counts |
 | [`HandSide`](#enum-handside) | enum | Left / right |
+| [`HandType`](#enum-handtype) | enum | The robot hand's type |
+| [`parse_hand_type()`](#parse_hand_type) | function | string → `HandType` |
+| [`to_string()`](#to_string) | function | `HandType` → string |
 | [`Finger`](#enum-finger) | enum | Tactile finger index |
 
 ## Constants
@@ -32,6 +35,32 @@ inline constexpr std::size_t kPalm2Count             = 18;
 ```cpp
 enum class HandSide { Left, Right };
 ```
+
+## enum `HandType`
+
+```cpp
+enum class HandType { Gen2, Gen2_B };
+```
+
+`Gen2_B` is the model whose thumb d1 and d2 screws have a 2 mm lead. AIDIN tells you the type when it
+delivers the robot hand.
+
+### `parse_hand_type()`
+
+```cpp
+std::optional<HandType> parse_hand_type(std::string_view text);
+```
+
+Reads `"gen2"` and `"gen2-b"` in any letter case (`"gen2_b"` too) and returns `std::nullopt` for any
+other string.
+
+### `to_string()`
+
+```cpp
+const char* to_string(HandType type);
+```
+
+Returns `"gen2"` or `"gen2-b"`.
 
 ## enum `Finger`
 
