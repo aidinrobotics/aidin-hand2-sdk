@@ -237,7 +237,8 @@ Config thumb_j0_gains()
   return config;
 }
 
-canfd::CommandFrames run_once(const Active& target, const Config& config, const HandState& state, double max_effort)
+// 상태를 고정한 채 100 주기(목표가 250°/s 제한 아래 50° 까지 닿는 시간) 돌린 마지막 frame.
+canfd::CommandFrames run_settled(const Active& target, const Config& config, const HandState& state, double max_effort)
 {
   controllers::JointImpedanceController controller(kPeriodNs);
   JointImpedanceCommand command{};
@@ -245,7 +246,7 @@ canfd::CommandFrames run_once(const Active& target, const Config& config, const 
   std::array<double, kActuatorCount> limit{};
   limit.fill(max_effort);
   canfd::CommandFrames frames{};
-  controller.compute(command, config, state, limit, frames);
+  for (int n = 0; n < 100; ++n) controller.compute(command, config, state, limit, frames);
   return frames;
 }
 
@@ -266,7 +267,7 @@ void test_compute()
   // a. 엄지 j0 1° 오차 → 324.30, int16 절단
   Active target = pose;
   target[0] += 1.0 * kDeg;
-  const auto stiff = run_once(target, thumb_j0_gains(), state, 30000.0);
+  const auto stiff = run_settled(target, thumb_j0_gains(), state, 30000.0);
   bool others_zero = true;
   for (std::size_t i = 1; i < kActuatorCount; ++i) others_zero = others_zero && stiff.target_effort[i] == 0;
   check(stiff.target_effort[0] >= 323 && stiff.target_effort[0] <= 325 && others_zero && all_cst(stiff),
@@ -275,18 +276,18 @@ void test_compute()
   // b. 오차 0, d0 6000 rpm, ζ 0.62 → −158.87
   HandState moving = state;
   moving.actuators.velocity_rpm[0] = 6000;
-  const auto damped = run_once(pose, thumb_j0_gains(), moving, 30000.0);
+  const auto damped = run_settled(pose, thumb_j0_gains(), moving, 30000.0);
   check(damped.target_effort[0] >= -160 && damped.target_effort[0] <= -158, "compute: damping from the drive rpm");
 
   // c. 10° 오차는 max_effort 에서 잘린다
   Active far = pose;
   far[0] += 10.0 * kDeg;
-  check(run_once(far, thumb_j0_gains(), state, 1000.0).target_effort[0] == 1000, "compute: clamped to max_effort");
+  check(run_settled(far, thumb_j0_gains(), state, 1000.0).target_effort[0] == 1000, "compute: clamped to max_effort");
 
   // d. joint 가 NaN 이면 effort 0
   HandState unknown = state;
   unknown.joints.position_rad.fill(std::nan(""));
-  const auto blind = run_once(target, thumb_j0_gains(), unknown, 1000.0);
+  const auto blind = run_settled(target, thumb_j0_gains(), unknown, 1000.0);
   bool zero = all_cst(blind);
   for (std::size_t i = 0; i < kActuatorCount; ++i) zero = zero && blind.target_effort[i] == 0;
   check(zero, "compute: a NaN pose sends zero effort");
@@ -295,7 +296,7 @@ void test_compute()
   HandState home{};
   Active home_target{};
   home_target[0] = 1.0 * kDeg;
-  const auto edge = run_once(home_target, thumb_j0_gains(), home, 1000.0);
+  const auto edge = run_settled(home_target, thumb_j0_gains(), home, 1000.0);
   bool bounded = all_cst(edge);
   for (std::size_t i = 0; i < kActuatorCount; ++i) bounded = bounded && std::abs(edge.target_effort[i]) <= 1000;
   check(bounded && edge.target_effort[0] > 0, "compute: the home pose gives a bounded effort toward the target");
@@ -317,12 +318,19 @@ void test_compute()
           "compute: the target filter starts at the measured pose and settles on the target");
   }
 
-  // g. 목표 속도 제한 1 rad/s 는 한 주기에 목표를 0.002 rad 만 옮긴다 → 324.30 × 0.1146 = 37.2.
+  // g. 목표는 250°/s 로만 움직인다: 1° 계단은 첫 주기에 0.5°(162.15), 두 번째 주기에 1°(324.30).
   {
-    Config limited = thumb_j0_gains();
-    limited.max_target_velocity = 1.0;
-    const auto slow = run_once(target, limited, state, 30000.0);
-    check(slow.target_effort[0] >= 36 && slow.target_effort[0] <= 38, "compute: the target moves at most max_target_velocity");
+    controllers::JointImpedanceController controller(kPeriodNs);
+    JointImpedanceCommand command{};
+    command.target = target;
+    std::array<double, kActuatorCount> limit{};
+    limit.fill(30000.0);
+    canfd::CommandFrames frames{};
+    controller.compute(command, thumb_j0_gains(), state, limit, frames);
+    const int half = frames.target_effort[0];
+    controller.compute(command, thumb_j0_gains(), state, limit, frames);
+    check(half >= 161 && half <= 163 && frames.target_effort[0] >= 323 && frames.target_effort[0] <= 325,
+          "compute: the target moves at most 250 deg/s");
   }
 
   // h. 새 stiffness 는 0.2 s 시정수로 다가간다: 1 → 0.5 로 바꾼 다음 주기는 0.995 → 322.7.
@@ -353,8 +361,8 @@ void test_compute()
     margin_count[0] = 1000;
     Active margin = below;
     margin[0] = active_of(state_from_counts(margin_count))[0];
-    const int raised = run_once(below, thumb_j0_gains(), at_2deg, 30000.0).target_effort[0];
-    const int direct = run_once(margin, thumb_j0_gains(), at_2deg, 30000.0).target_effort[0];
+    const int raised = run_settled(below, thumb_j0_gains(), at_2deg, 30000.0).target_effort[0];
+    const int direct = run_settled(margin, thumb_j0_gains(), at_2deg, 30000.0).target_effort[0];
     check(std::abs(raised - direct) <= 1, "compute: a target below count 1000 is raised to it");
   }
 
@@ -368,15 +376,15 @@ void test_compute()
       return s;
     };
     const HandState zone = at(500, 30000);
-    check(run_once(active_of(zone), thumb_j0_gains(), zone, 1000.0).target_effort[0] == -500,
+    check(run_settled(active_of(zone), thumb_j0_gains(), zone, 1000.0).target_effort[0] == -500,
           "compute: the effort toward the stop tapers below count 1000");
     const HandState resting = at(500, 0);
     Active out = active_of(resting);
     out[0] += 10.0 * kDeg;
-    check(run_once(out, thumb_j0_gains(), resting, 1000.0).target_effort[0] == 1000,
+    check(run_settled(out, thumb_j0_gains(), resting, 1000.0).target_effort[0] == 1000,
           "compute: the effort away from the stop keeps max_effort");
     const HandState beyond = at(-200, 30000);
-    check(run_once(active_of(beyond), thumb_j0_gains(), beyond, 1000.0).target_effort[0] == 0,
+    check(run_settled(active_of(beyond), thumb_j0_gains(), beyond, 1000.0).target_effort[0] == 0,
           "compute: past the stop nothing pushes toward it");
   }
 }

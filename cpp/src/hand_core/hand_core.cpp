@@ -41,7 +41,7 @@ bool workspace_clamp_enabled();
 template <std::size_t Size>
 bool all_finite(const std::array<double, Size>& values);
 
-// Joint stiffness in [0, 1], target filter values >= 0, motor inertia > 0, link inertia >= 0,
+// Joint stiffness in [0, 1], cutoff_freq >= 0, motor inertia > 0, link inertia >= 0,
 // efficiency in (0, 1], all finite
 Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config);
 
@@ -783,9 +783,8 @@ Status check_joint_impedance(const ControllerConfig::JointImpedanceController& c
       return fail("stiffness must be finite and in [0, 1]");
     }
   }
-  if (!std::isfinite(config.cutoff_freq) || config.cutoff_freq < 0.0 ||
-      !std::isfinite(config.max_target_velocity) || config.max_target_velocity < 0.0) {
-    return fail("cutoff_freq and max_target_velocity must be finite and >= 0");
+  if (!std::isfinite(config.cutoff_freq) || config.cutoff_freq < 0.0) {
+    return fail("cutoff_freq must be finite and >= 0");
   }
   for (const double inertia : config.motor_inertia_kgm2) {
     if (!std::isfinite(inertia) || inertia <= 0.0) return fail("motor_inertia_kgm2 must be finite and > 0");

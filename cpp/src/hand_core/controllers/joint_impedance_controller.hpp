@@ -30,7 +30,7 @@ std::array<double, kActuatorCount> joint_torque_to_effort(
     const ControllerConfig::JointImpedanceController& config);
 
 // Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort
-// The target passes a low-pass and a velocity limit, and a new stiffness is approached over 0.2 s
+// The target passes a low-pass and a 250 deg/s limit, and a new stiffness is approached over 0.2 s
 // The effort is clamped to max_effort and sent as CST
 // Near the hard stop the target keeps off it and the effort toward it tapers
 // Hand type c has no Jacobian and sends 0

@@ -166,11 +166,11 @@ void test_controller_config_filter_rejected(HandCore& core)
 }
 
 // ── Test 4: set_controller_config — joint 공간 impedance 값의 기본값과 범위 ──
-// 기본 stiffness 1(hard), 목표 필터 켬·10 Hz·속도 제한 없음, 관성 0.033 g·cm², 효율 1, 링크 관성 0.
+// 기본 stiffness 1(hard), 목표 필터 켬·10 Hz, 관성 0.033 g·cm², 효율 1, 링크 관성 0.
 void test_joint_impedance_config(HandCore& core)
 {
   const ControllerConfig::JointImpedanceController defaults{};
-  bool defaults_ok = defaults.filter_enabled && defaults.cutoff_freq == 10.0 && defaults.max_target_velocity == 0.0;
+  bool defaults_ok = defaults.filter_enabled && defaults.cutoff_freq == 10.0;
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
     defaults_ok = defaults_ok && defaults.stiffness[j] == 1.0 && defaults.link_inertia_kgm2[j] == 0.0;
   }
@@ -200,10 +200,6 @@ void test_joint_impedance_config(HandCore& core)
         "negative target cutoff rejected");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.cutoff_freq = kNaN; }))),
         "target cutoff NaN rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.max_target_velocity = -0.5; }))),
-        "negative max target velocity rejected");
-  check(core.set_controller_config(with([](Gains& g) { g.max_target_velocity = 3.0; })).ok(),
-        "max target velocity accepted");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.efficiency[2] = 0.0; }))),
         "zero efficiency rejected");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.efficiency[2] = 1.2; }))),

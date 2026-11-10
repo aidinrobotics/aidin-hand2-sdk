@@ -73,9 +73,6 @@ struct ControllerConfig {
     // Hz
     double cutoff_freq{10.0};
 
-    // rad/s, the most a target moves, 0 = off
-    double max_target_velocity{0.0};
-
     // Per actuator on the motor shaft: rotor, gearhead, encoder, gears and screw
     std::array<double, kActuatorCount> motor_inertia_kgm2{
         3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9, 3.3e-9,

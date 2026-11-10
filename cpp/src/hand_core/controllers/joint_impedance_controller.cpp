@@ -39,6 +39,9 @@ constexpr std::array<double, kActiveJointCount> kDampingRatio{
 // s, the time constant a new stiffness is approached with
 constexpr double kStiffnessTimeConstant = 0.2;
 
+// rad/s, 250 deg/s, the most a target moves per second
+constexpr double kMaxTargetVelocity = 250.0 * 3.14159265358979323846 / 180.0;
+
 // count, the least a target keeps each actuator off its hard stop at 0
 constexpr int kMinTargetCount = 1000;
 
@@ -186,8 +189,7 @@ std::array<double, kActiveJointCount> JointImpedanceController::filtered_target(
     alpha_       = lowpass_alpha(cutoff_freq_, dt_seconds_);
   }
   const double alpha    = config.filter_enabled ? alpha_ : 1.0;
-  const double max_step = config.max_target_velocity > 0.0 ? config.max_target_velocity * dt_seconds_
-                                                           : std::numeric_limits<double>::infinity();
+  const double max_step = kMaxTargetVelocity * dt_seconds_;
 
   for (std::size_t i = 0; i < kActiveJointCount; ++i) {
     // Seed from the measured pose on (re-)entry; from the target if FK gave NaN
