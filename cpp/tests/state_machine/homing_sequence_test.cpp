@@ -103,8 +103,8 @@ int main()
     check(count_problem(seq) == 0, "성공: problem actuator 없음");
   }
 
-  // ── 1-pass: Homing 트리거는 한 번만 관측된다(재영점 없음). 하드스톱에서 뗀 자리는 encoder
-  //    경계의 home offset 이 담당하므로 시퀀스는 영점 한 번으로 끝난다. ──
+  // ── 1-pass: Homing 트리거는 한 번만 관측된다(재영점 없음). 하드스톱에서 떼는 것은 homing 뒤의
+  //    대기 명령이 담당하므로 시퀀스는 영점 한 번으로 끝난다. ──
   {
     HomingSequence seq;
     seq.start();

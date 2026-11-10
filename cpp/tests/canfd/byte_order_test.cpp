@@ -56,9 +56,8 @@ int main()
     put_le32(rx.data, 0x01020304);
     StateFrames sf{};
     check(protocol.decode(rx, sf) == DecodeResult::Decoded, "decode position: result");
-    // position 은 wire(드라이브 원점) → SDK 원점 변환이 붙는다.
-    check(sf.actual_position[0] == 0x01020304 - canfd::kHomeOffsetCount,
-          "decode position: LE int32 minus home offset");
+    // position 은 드라이브 원점 그대로다.
+    check(sf.actual_position[0] == 0x01020304, "decode position: LE int32");
   }
 
   // 2) decode: statusword frame의 두 영역 — status(0~31B), error(32~63B).
@@ -83,8 +82,7 @@ int main()
     TxFrames tx{};
     protocol.init_tx(tx);
     protocol.encode(cf, tx);
-    check(get_le32(tx.target_position.data) == 0x0A0B0C0D + canfd::kHomeOffsetCount,
-          "encode position: LE int32 plus home offset");
+    check(get_le32(tx.target_position.data) == 0x0A0B0C0D, "encode position: LE int32");
     check(get_le16(tx.target_effort.data + 0)  == 0x1122, "encode effort: target section");
     check(get_le16(tx.target_effort.data + 32) == 0x3344, "encode effort: max section");
   }
@@ -99,8 +97,7 @@ int main()
     protocol.encode(cf, tx);
     bool ok = true;
     for (std::size_t i = 0; i < kActuatorCount; ++i)
-      ok &= (get_le32(tx.target_position.data + i * 4) ==
-             static_cast<std::int32_t>(1000 + i) + canfd::kHomeOffsetCount);
+      ok &= (get_le32(tx.target_position.data + i * 4) == static_cast<std::int32_t>(1000 + i));
     check(ok, "encode scatter: SDK i -> wire slot i");
   }
 

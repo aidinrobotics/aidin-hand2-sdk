@@ -224,7 +224,7 @@ ControlWordMode HomingSequence::step(const canfd::StateFrames& rx, canfd::Comman
       break;
 
     case Stage::TriggerWait:
-      // Completion means the drive origin is the hard stop, and kHomeOffsetCount backs off from it
+      // Completion means the drive origin, the SDK's count 0, is the hard stop
       fill_homing_command(out, present_, canfd::mode_of_operation::kHoming, kPreloadEffort);
       control_word_mode = ControlWordMode::Homing;
       if (evaluate_homing_trigger(rx)) {

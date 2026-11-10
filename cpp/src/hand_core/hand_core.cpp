@@ -31,6 +31,9 @@ namespace
 constexpr double kDefaultMaxEffort = 1000.0;
 constexpr double kMaxEffortLimit   = 2000.0;
 
+// count, where every actuator holds after homing, off the hard stop at 0
+constexpr double kHomeHoldCount = 1000.0;
+
 // Off only under AIDIN_HAND2_WORKSPACE_CLAMP=0, for measuring the reachable limits
 bool workspace_clamp_enabled();
 
@@ -723,11 +726,11 @@ void HandCore::reset_command_to_idle()
   command_buffer_.write(staging_command_);
 }
 
-// The home offset at the encoder boundary puts 0 off the hard stop, so the hand backs out of the
-// push pose and holds there
+// Count 0 is the hard stop, so the hand backs out of the push pose by kHomeHoldCount and holds there
 void HandCore::set_command_to_home_hold()
 {
   ActuatorPositionCommand hold{};
+  hold.target.fill(kHomeHoldCount);
   std::lock_guard<std::mutex> lock(staging_mutex_);
   staging_command_.controller = hold;
   command_buffer_.write(staging_command_);
