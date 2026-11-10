@@ -28,8 +28,8 @@ request 0.9 and rebuild.
   `ControllerConfig::JointImpedanceController` changed shape.** The per-actuator `stiffness` and
   `damping` gains in encoder space are gone. `stiffness` is now 16 values from 0 to 1, one per
   active joint in the order of `JointImpedanceCommand::target`, where 1 is the joint's measured
-  hard stiffness and the SDK sets the damping to match; `set_controller_config()` rejects a value
-  above 1. The target passes the joint position controller's low-pass (`filter_enabled` and
+  hard stiffness and the SDK sets the damping to match; the default is 0.8, and
+  `set_controller_config()` rejects a value above 1. The target passes the joint position controller's low-pass (`filter_enabled` and
   `cutoff_freq`, on at 10 Hz by default). The controller works in joint space so that one value
   means the same stiffness in every pose. Hand types A and B carry the Jacobians this needs; on
   hand type C `set_command()` rejects a `JointImpedanceCommand` with `InvalidArgument`.

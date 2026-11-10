@@ -171,7 +171,7 @@ void test_joint_impedance_config(HandCore& core)
 {
   const ControllerConfig::JointImpedanceController defaults{};
   bool defaults_ok = defaults.filter_enabled && defaults.cutoff_freq == 10.0;
-  for (std::size_t j = 0; j < kActiveJointCount; ++j) defaults_ok = defaults_ok && defaults.stiffness[j] == 1.0;
+  for (std::size_t j = 0; j < kActiveJointCount; ++j) defaults_ok = defaults_ok && defaults.stiffness[j] == 0.8;
   check(defaults_ok, "joint impedance defaults");
   check(core.set_controller_config(ControllerConfig{}).ok(), "default config accepted");
 

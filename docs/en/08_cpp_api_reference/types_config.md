@@ -66,7 +66,7 @@ non-finite or negative, [`set_controller_config()`](hand.md#handset_controller_c
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActiveJointCount>` | all `1.0` | Stiffness per active joint, 0 to 1. 1 = the joint's hard stiffness |
+| `stiffness` | `std::array<double, kActiveJointCount>` | all `0.8` | Stiffness per active joint, 0 to 1. 1 = the joint's hard stiffness |
 | `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
 | `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the target low-pass filter [Hz] |
 

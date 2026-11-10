@@ -76,7 +76,7 @@ non-finite이거나 음수면 [`set_controller_config()`](hand.md#handset_contro
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `1.0` | active joint별 stiffness, 0~1. 1 = joint의 hard stiffness |
+| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `0.8` | active joint별 stiffness, 0~1. 1 = joint의 hard stiffness |
 | `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
 | `cutoff_freq` | `double` | `10.0` | 목표 low-pass filter의 차단 주파수 [Hz] |
 

@@ -426,8 +426,8 @@ effort is proportional to the displacement from the target, use this controller 
 finger yield to an external force or control the grasping force. `stiffness` is 0 to 1 per joint,
 and the SDK sets the damping.
 
-The following example lowers only the j2 of the index finger to half and leaves the other joints at
-the default `1.0`.
+The following example sets the j2 of the index finger to `0.5` and the other joints to the default
+`0.8`.
 
 ```cpp
 ah2::ControllerConfig controller;
@@ -437,7 +437,7 @@ hand.set_controller_config(controller);
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActiveJointCount>` | all `1.0` | Stiffness per joint, 0 to 1 |
+| `stiffness` | `std::array<double, kActiveJointCount>` | all `0.8` | Stiffness per joint, 0 to 1 |
 | `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
 | `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the low-pass filter [Hz], 0 or more |
 

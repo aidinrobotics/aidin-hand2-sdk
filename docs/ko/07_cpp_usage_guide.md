@@ -401,7 +401,7 @@ joint impedance controller는 joint 각도 명령을 actuator effort로 변환�
 변위에 비례하므로 finger가 외력에 밀리게 두거나 파지력을 제어할 때 사용합니다. `stiffness`는
 joint별 0~1이고 damping은 SDK가 정합니다.
 
-다음은 index finger의 j2만 절반으로 낮추고 나머지 joint는 기본값 `1.0`으로 두는 예입니다.
+다음은 index finger의 j2를 `0.5`로, 나머지 joint를 기본값 `0.8`로 설정하는 예입니다.
 
 ```cpp
 ah2::ControllerConfig controller;
@@ -411,7 +411,7 @@ hand.set_controller_config(controller);
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `1.0` | joint별 stiffness, 0~1 |
+| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `0.8` | joint별 stiffness, 0~1 |
 | `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
 | `cutoff_freq` | `double` | `10.0` | low-pass filter의 차단 주파수 [Hz], 0 이상 |
 

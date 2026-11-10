@@ -64,8 +64,8 @@ struct ControllerConfig {
     // Per active joint, in the order of JointImpedanceCommand::target
     // 0..1, 1 = the joint's hard stiffness; the damping follows from it at a fixed damping ratio
     std::array<double, kActiveJointCount> stiffness{
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+        0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+        0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8};
 
     // Target low-pass, the joint position controller's without the deadband
     bool filter_enabled{true};
