@@ -1,8 +1,9 @@
 // 목적(Tier 1, HW 무관): joint 공간 impedance 제어기를 host 에서 회귀 점검한다.
-//   1) joint torque → actuator effort: Jacobian 전치와 효율, 2-rod 쌍과 d3 결합.
+//   1) joint torque → actuator effort: Jacobian 전치와 효율, 2-rod 쌍, 긴 손가락 j3 는 d3 에만.
 //   2) joint impedance torque: stiffness 항, 현재 자세 관성에서 구한 damping 항.
-//   3) compute(): FK 각도·rpm 에서 frame 까지, clamp, NaN 자세, home 자세.
-//   4) 마찰 보상: Coulomb·위치 표·Stribeck·LuGre 를 impedance effort 를 직접 넣어 본다.
+//   3) compute(): FK 각도·rpm 에서 frame 까지, clamp, NaN 자세, home 자세, 목표 필터·속도 제한,
+//      stiffness 램프, hard stop 여유.
+//   4) 마찰 보상: Coulomb + 점성을 impedance effort 를 직접 넣어 보고, compute() 가 더하는지 본다.
 // 기준값은 kinematics archive(type a)로 기준 자세(엄지 20/20/0/20°, 긴 손가락 0/20/20°)에서 구했다.
 // type b 는 엄지 d1·d2 리드만 다르다. type c 에는 Jacobian 이 없으므로 a·b 전용 시험을 건너뛴다.
 
@@ -111,7 +112,8 @@ void test_joint_torque_to_effort()
   check(efforts_are(effort(3, 5), {{3, 82.76}}), "thumb j3 1 deg at K 5");
   check(efforts_are(effort(4, 3.75), {{4, 77.52}, {5, -77.52}}), "index j1 is the differential mode");
   check(efforts_are(effort(5, 22.5), {{4, 186.75}, {5, 186.75}}), "index j2 is the common mode");
-  check(efforts_are(effort(6, 6.75), {{4, 5.64}, {5, 5.64}, {6, 151.90}}), "index j3 pulls d1 d2 through the d3 coupling");
+  // d3 링크의 반작용(d1·d2 로 5.64 씩 상쇄하던 몫)은 보내지 않는다. j2 가 자기 강성으로 버틴다.
+  check(efforts_are(effort(6, 6.75), {{6, 151.90}}), "index j3 drives d3 only");
 
   Config half = config;
   half.efficiency[0] = 0.5;
@@ -138,48 +140,80 @@ void test_joint_impedance_torque()
   const Active q = reference_pose();
   const Jacobians j = jacobians_at(q);
   Config config{};
-  config.stiffness_Nm_per_rad.fill(0.0);
-  config.stiffness_Nm_per_rad[0] = 27.0;
+  config.stiffness.fill(0.0);
+  config.stiffness[0] = 1.0;
 
+  // 엄지 j0 stiffness 1 은 hard 27.4 N·m/rad.
   Active target = q;
   target[0] += 1.0 * kDeg;
   const Active still{};
-  config.damping_ratio.fill(0.0);
-  const Active spring = controllers::joint_impedance_torque(target, q, still, config, j.count_per_joint);
+  const Active spring = controllers::joint_impedance_torque(target, q, still, config.stiffness, config, j.count_per_joint);
   bool others_zero = true;
   for (std::size_t k = 1; k < kActiveJointCount; ++k) others_zero = others_zero && spring[k] == 0.0;
-  check(std::abs(spring[0] - 0.471239) < 1e-6 && others_zero, "stiffness term is K times the joint error");
+  check(std::abs(spring[0] - 0.478220) < 1e-6 && others_zero, "stiffness 1 is the hard stiffness times the joint error");
 
-  // q̇0 0.61698 rad/s 는 d0 6000 rpm. 관성 1018.4² × 3.3e-9 = 3.4224e-3 kg·m², D = 0.42557.
-  config.damping_ratio.fill(0.7);
+  Config middle = config;
+  middle.stiffness[0] = 0.5;
+  check(std::abs(controllers::joint_impedance_torque(target, q, still, middle.stiffness, middle, j.count_per_joint)[0] -
+                 0.239110) < 1e-6,
+        "stiffness scales the hard stiffness linearly");
+
+  // q̇0 0.61698 rad/s 는 d0 6000 rpm. 관성 1018.4² × 3.3e-9 = 3.4224e-3 kg·m².
+  // 엄지 j0 의 감쇠비는 0.62 로 고정이라 D = 0.37972.
   Active moving{};
   moving[0] = 0.61698;
-  const Active damped = controllers::joint_impedance_torque(q, q, moving, config, j.count_per_joint);
-  check(std::abs(damped[0] - (-0.26257)) < 1e-4, "damping from the reflected motor inertia");
+  const Active damped = controllers::joint_impedance_torque(q, q, moving, config.stiffness, config, j.count_per_joint);
+  check(std::abs(damped[0] - (-0.234279)) < 1e-4, "thumb j0 damping ratio is 0.62");
 
   Config soft = config;
-  soft.stiffness_Nm_per_rad[0] = 0.0;
-  check(controllers::joint_impedance_torque(q, q, moving, soft, j.count_per_joint)[0] == 0.0,
+  soft.stiffness[0] = 0.0;
+  check(controllers::joint_impedance_torque(q, q, moving, soft.stiffness, soft, j.count_per_joint)[0] == 0.0,
         "no stiffness, no damping");
 
   Config heavy = config;
   heavy.link_inertia_kgm2[0] = 3.4224e-3;
-  check(std::abs(controllers::joint_impedance_torque(q, q, moving, heavy, j.count_per_joint)[0] - (-0.37133)) < 1e-4,
+  check(std::abs(controllers::joint_impedance_torque(q, q, moving, heavy.stiffness, heavy, j.count_per_joint)[0] -
+                 (-0.331321)) < 1e-4,
         "link inertia adds to the motor inertia");
+
+  // 긴 손가락 j3 의 hard 는 모터 쪽 강성 3.62e-5 N·m/rad 를 지킨다. middle j3(9) 는 (0, 20, 20) 에서
+  // J⁻¹ 536 이라 10.40 N·m/rad, (0, 80, 0) 에서는 J⁻¹ 744 가 상한 652 에서 멈춰 15.39 N·m/rad.
+  Config j3{};
+  j3.stiffness.fill(0.0);
+  j3.stiffness[9] = 1.0;
+  Active bent = q;
+  bent[9] += 1.0 * kDeg;
+  check(std::abs(controllers::joint_impedance_torque(bent, q, still, j3.stiffness, j3, j.count_per_joint)[9] - 0.18151) <
+            1e-3,
+        "long finger j3 stiffness 1 holds the motor-side stiffness at (0, 20, 20)");
+  const Active flexed = pose_deg({20, 20, 0, 20}, {0, 80, 0});
+  Active flexed_target = flexed;
+  flexed_target[9] += 1.0 * kDeg;
+  const Jacobians at_flexed = jacobians_at(flexed);
+  check(std::abs(controllers::joint_impedance_torque(flexed_target, flexed, still, j3.stiffness, j3,
+                                                     at_flexed.count_per_joint)[9] -
+                 0.26859) < 1e-4,
+        "long finger j3 hard stiffness stops at the cap");
 }
 
-// 자세 q 의 IK count 를 actuator 에, 그 count 의 FK 를 joint 에 채운 상태. 실제 루프와 같은 경로다.
-HandState state_at(const Active& q)
+// count 를 actuator 에, 그 count 의 FK 를 joint 에 채운 상태. 실제 루프와 같은 경로다.
+HandState state_from_counts(const std::array<int, kActuatorCount>& count)
 {
   HandState state{};
-  std::array<int, kActuatorCount> count{};
-  kinematics::ik_joint_to_actuator(q, count);
   for (std::size_t i = 0; i < kActuatorCount; ++i) state.actuators.position_count[i] = count[i];
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM> task{};
   kinematics::fk_actuator_to_joint(count, joint, task);
   for (std::size_t k = 0; k < kJointCount; ++k) state.joints.position_rad[k] = joint[k];
   return state;
+}
+
+// 자세 q 의 IK count 로 만든 상태.
+HandState state_at(const Active& q)
+{
+  std::array<int, kActuatorCount> count{};
+  kinematics::ik_joint_to_actuator(q, count);
+  return state_from_counts(count);
 }
 
 // 21 개 FK 각도에서 passive q4 를 뺀 16 개.
@@ -193,13 +227,13 @@ Active active_of(const HandState& state)
   return active;
 }
 
-// 엄지 j0 에만 K 27, 나머지 0, 마찰 없음.
-Config thumb_j0_gains(double damping_ratio)
+// 엄지 j0 에만 stiffness 1(27.4 N·m/rad), 나머지 0, 마찰 없음. 목표 필터를 꺼서 한 주기에 법칙만 본다.
+Config thumb_j0_gains()
 {
   Config config{};
-  config.stiffness_Nm_per_rad.fill(0.0);
-  config.stiffness_Nm_per_rad[0] = 27.0;
-  config.damping_ratio.fill(damping_ratio);
+  config.stiffness.fill(0.0);
+  config.stiffness[0] = 1.0;
+  config.filter_enabled = false;
   return config;
 }
 
@@ -229,30 +263,30 @@ void test_compute()
   const HandState state = state_at(reference_pose());
   const Active pose = active_of(state);
 
-  // a. 엄지 j0 1° 오차 → 319.57, int16 절단
+  // a. 엄지 j0 1° 오차 → 324.30, int16 절단
   Active target = pose;
   target[0] += 1.0 * kDeg;
-  const auto stiff = run_once(target, thumb_j0_gains(0.0), state, 30000.0);
+  const auto stiff = run_once(target, thumb_j0_gains(), state, 30000.0);
   bool others_zero = true;
   for (std::size_t i = 1; i < kActuatorCount; ++i) others_zero = others_zero && stiff.target_effort[i] == 0;
-  check(stiff.target_effort[0] >= 318 && stiff.target_effort[0] <= 320 && others_zero && all_cst(stiff),
-        "compute: thumb j0 1 deg gives 318..320 on d0 only, CST");
+  check(stiff.target_effort[0] >= 323 && stiff.target_effort[0] <= 325 && others_zero && all_cst(stiff),
+        "compute: thumb j0 1 deg gives 323..325 on d0 only, CST");
 
-  // b. 오차 0, d0 6000 rpm, ζ 0.7 → −178.06
+  // b. 오차 0, d0 6000 rpm, ζ 0.62 → −158.87
   HandState moving = state;
   moving.actuators.velocity_rpm[0] = 6000;
-  const auto damped = run_once(pose, thumb_j0_gains(0.7), moving, 30000.0);
-  check(damped.target_effort[0] >= -179 && damped.target_effort[0] <= -177, "compute: damping from the drive rpm");
+  const auto damped = run_once(pose, thumb_j0_gains(), moving, 30000.0);
+  check(damped.target_effort[0] >= -160 && damped.target_effort[0] <= -158, "compute: damping from the drive rpm");
 
   // c. 10° 오차는 max_effort 에서 잘린다
   Active far = pose;
   far[0] += 10.0 * kDeg;
-  check(run_once(far, thumb_j0_gains(0.0), state, 1000.0).target_effort[0] == 1000, "compute: clamped to max_effort");
+  check(run_once(far, thumb_j0_gains(), state, 1000.0).target_effort[0] == 1000, "compute: clamped to max_effort");
 
   // d. joint 가 NaN 이면 effort 0
   HandState unknown = state;
   unknown.joints.position_rad.fill(std::nan(""));
-  const auto blind = run_once(target, thumb_j0_gains(0.7), unknown, 1000.0);
+  const auto blind = run_once(target, thumb_j0_gains(), unknown, 1000.0);
   bool zero = all_cst(blind);
   for (std::size_t i = 0; i < kActuatorCount; ++i) zero = zero && blind.target_effort[i] == 0;
   check(zero, "compute: a NaN pose sends zero effort");
@@ -261,10 +295,90 @@ void test_compute()
   HandState home{};
   Active home_target{};
   home_target[0] = 1.0 * kDeg;
-  const auto edge = run_once(home_target, thumb_j0_gains(0.7), home, 1000.0);
+  const auto edge = run_once(home_target, thumb_j0_gains(), home, 1000.0);
   bool bounded = all_cst(edge);
   for (std::size_t i = 0; i < kActuatorCount; ++i) bounded = bounded && std::abs(edge.target_effort[i]) <= 1000;
   check(bounded && edge.target_effort[0] > 0, "compute: the home pose gives a bounded effort toward the target");
+
+  // f. 목표 필터(기본 10 Hz)는 측정 자세에서 시작해, 첫 주기에는 거의 0 이고 1 s 뒤에는 1° 오차의 effort 다.
+  {
+    Config filtered = thumb_j0_gains();
+    filtered.filter_enabled = true;
+    controllers::JointImpedanceController controller(kPeriodNs);
+    JointImpedanceCommand command{};
+    command.target = target;
+    std::array<double, kActuatorCount> limit{};
+    limit.fill(30000.0);
+    canfd::CommandFrames frames{};
+    controller.compute(command, filtered, state, limit, frames);
+    const int first = frames.target_effort[0];
+    for (int k = 1; k < 500; ++k) controller.compute(command, filtered, state, limit, frames);
+    check(std::abs(first) <= 1 && frames.target_effort[0] >= 323 && frames.target_effort[0] <= 325,
+          "compute: the target filter starts at the measured pose and settles on the target");
+  }
+
+  // g. 목표 속도 제한 1 rad/s 는 한 주기에 목표를 0.002 rad 만 옮긴다 → 324.30 × 0.1146 = 37.2.
+  {
+    Config limited = thumb_j0_gains();
+    limited.max_target_velocity = 1.0;
+    const auto slow = run_once(target, limited, state, 30000.0);
+    check(slow.target_effort[0] >= 36 && slow.target_effort[0] <= 38, "compute: the target moves at most max_target_velocity");
+  }
+
+  // h. 새 stiffness 는 0.2 s 시정수로 다가간다: 1 → 0.5 로 바꾼 다음 주기는 0.995 → 322.7.
+  {
+    Config ramp = thumb_j0_gains();
+    controllers::JointImpedanceController controller(kPeriodNs);
+    JointImpedanceCommand command{};
+    command.target = target;
+    std::array<double, kActuatorCount> limit{};
+    limit.fill(30000.0);
+    canfd::CommandFrames frames{};
+    controller.compute(command, ramp, state, limit, frames);
+    ramp.stiffness[0] = 0.5;
+    controller.compute(command, ramp, state, limit, frames);
+    check(frames.target_effort[0] >= 321 && frames.target_effort[0] <= 324, "compute: a new stiffness is approached, not jumped to");
+  }
+
+  // 엄지 j0 2° 자세(d0 4197). i·j 는 d0 만 바꾼다.
+  std::array<int, kActuatorCount> near_stop{};
+  kinematics::ik_joint_to_actuator(pose_deg({2, 20, 0, 20}, {0, 20, 20}), near_stop);
+
+  // i. −1° 목표는 d0 1000(0.486°)으로 올라간다.
+  {
+    const HandState at_2deg = state_from_counts(near_stop);
+    Active below = active_of(at_2deg);
+    below[0] = -1.0 * kDeg;
+    std::array<int, kActuatorCount> margin_count = near_stop;
+    margin_count[0] = 1000;
+    Active margin = below;
+    margin[0] = active_of(state_from_counts(margin_count))[0];
+    const int raised = run_once(below, thumb_j0_gains(), at_2deg, 30000.0).target_effort[0];
+    const int direct = run_once(margin, thumb_j0_gains(), at_2deg, 30000.0).target_effort[0];
+    check(std::abs(raised - direct) <= 1, "compute: a target below count 1000 is raised to it");
+  }
+
+  // j. count 1000 아래에서 − 쪽 상한만 count 0 까지 0 으로 준다. d0 500, 30000 rpm → −500.
+  {
+    auto at = [&](int d0, double rpm) {
+      std::array<int, kActuatorCount> count = near_stop;
+      count[0] = d0;
+      HandState s = state_from_counts(count);
+      s.actuators.velocity_rpm[0] = rpm;
+      return s;
+    };
+    const HandState zone = at(500, 30000);
+    check(run_once(active_of(zone), thumb_j0_gains(), zone, 1000.0).target_effort[0] == -500,
+          "compute: the effort toward the stop tapers below count 1000");
+    const HandState resting = at(500, 0);
+    Active out = active_of(resting);
+    out[0] += 10.0 * kDeg;
+    check(run_once(out, thumb_j0_gains(), resting, 1000.0).target_effort[0] == 1000,
+          "compute: the effort away from the stop keeps max_effort");
+    const HandState beyond = at(-200, 30000);
+    check(run_once(active_of(beyond), thumb_j0_gains(), beyond, 1000.0).target_effort[0] == 0,
+          "compute: past the stop nothing pushes toward it");
+  }
 }
 #else
 // ── Test 3: type c 는 Jacobian 이 없어 모든 actuator 에 CST 0 ──
@@ -285,101 +399,6 @@ void test_compute_type_c()
 }
 #endif
 
-// ── Test 4: 마찰 보상 (impedance effort 를 직접 넣는다) ──
-void test_friction_compensation()
-{
-  using Model = Config::FrictionModel;
-  auto near = [](double a, double b) { return std::abs(a - b) < 0.05; };
-  std::array<double, kActuatorCount> none{};
-
-  // Coulomb: 이동 중(60 rpm = 1024 count/s) c+ 50 과 점성 0.01 → 60.24. 정지 대역에서는 effort 의 방향을
-  // ramp max(300, 2 × 80) = 300 에 걸쳐 따른다. +150 → +25, −150 → −40. scale 0 이면 0.
-  {
-    Config gains{};
-    gains.friction_scale = 1.0;
-    gains.coulomb_friction.positive.fill(50.0);
-    gains.coulomb_friction.negative.fill(80.0);
-    gains.coulomb_friction.viscous.fill(0.01);
-    HandState sliding{};
-    sliding.actuators.velocity_rpm[0] = 60;
-    controllers::JointImpedanceController c(kPeriodNs);
-    const auto moving = c.friction_compensation(gains, sliding, none);
-    check(near(moving[0], 60.24) && moving[1] == 0.0, "coulomb: moving + adds c+ and viscous, at rest with zero effort nothing");
-
-    std::array<double, kActuatorCount> effort{};
-    effort[0] = 150.0;
-    effort[1] = -150.0;
-    const auto resting = c.friction_compensation(gains, HandState{}, effort);
-    check(near(resting[0], 25.0) && near(resting[1], -40.0), "coulomb: stick band follows the effort over the ramp");
-
-    gains.friction_scale = 0.0;
-    const auto off = c.friction_compensation(gains, HandState{}, effort);
-    check(off[0] == 0.0 && off[1] == 0.0, "coulomb: friction_scale 0 adds nothing");
-  }
-  // 위치 표: actuator 0 의 표는 count 0~8000 에 8 칸, + 방향 10..80, − 방향 40.
-  // count 2500 은 칸 2 중심 → 30, 3000 은 두 중심 사이 → 35, −500 은 첫 칸 → 10, − 이동이면 −40, 정지·effort 0 → 0.
-  {
-    Config gains{};
-    gains.friction_scale = 1.0;
-    gains.friction_model = Model::PositionTable;
-    auto& table = gains.position_table_friction;
-    for (std::size_t k = 0; k < Config::PositionTableFriction::kBins; ++k) {
-      table.positive[0][k] = 10.0 * static_cast<double>(k + 1);
-      table.negative[0][k] = 40.0;
-    }
-    table.start[0] = 0.0;
-    table.end[0] = 8000.0;
-    auto at = [&](std::int32_t count, std::int32_t rpm) {
-      HandState s{};
-      s.actuators.position_count[0] = count;
-      s.actuators.velocity_rpm[0] = rpm;
-      controllers::JointImpedanceController c(kPeriodNs);
-      return c.friction_compensation(gains, s, none)[0];
-    };
-    check(near(at(2500, 60), 30.0), "table: bin centre while moving +");
-    check(near(at(3000, 60), 35.0), "table: halfway between two bin centres");
-    check(near(at(-500, 60), 10.0), "table: the edge value held outside the range");
-    check(near(at(2500, -60), -40.0), "table: moving - gives c- at that count");
-    check(at(2500, 0) == 0.0, "table: no bias at rest with zero effort");
-  }
-  // Stribeck: c 50, s 100, stribeck velocity 1024 count/s, shape 2. 60 rpm → 50 + 50·e^−1 = 68.39, 240 rpm → 50.
-  {
-    Config gains{};
-    gains.friction_scale = 1.0;
-    gains.friction_model = Model::Stribeck;
-    auto& f = gains.stribeck_friction;
-    f.positive.fill(50.0);  f.negative.fill(50.0);
-    f.static_positive.fill(100.0);  f.static_negative.fill(100.0);
-    f.stribeck_velocity.fill(1024.0);
-    HandState s{};
-    s.actuators.velocity_rpm[0] = 60;
-    s.actuators.velocity_rpm[1] = 240;
-    controllers::JointImpedanceController c(kPeriodNs);
-    const auto comp = c.friction_compensation(gains, s, none);
-    check(near(comp[0], 68.39), "stribeck: c + (s - c) e^-1 at the stribeck velocity");
-    check(near(comp[1], 50.0), "stribeck: c well above the stribeck velocity");
-  }
-  // LuGre: bristle stiffness 10, damping 0, g 50. 1024 count/s 로 계속 움직이면 z → g/σ0 = 5, effort 50.
-  // 첫 주기는 z = 2.048 / (1 + 10·1024·0.002/50) = 1.4529 → 14.53. reset 하면 다시 첫 주기 값.
-  {
-    Config gains{};
-    gains.friction_scale = 1.0;
-    gains.friction_model = Model::LuGre;
-    auto& f = gains.lugre_friction;
-    f.curve.positive.fill(50.0);  f.curve.negative.fill(50.0);
-    f.curve.static_positive.fill(50.0);  f.curve.static_negative.fill(50.0);
-    f.bristle_stiffness.fill(10.0);
-    HandState s{};
-    s.actuators.velocity_rpm[0] = 60;
-    controllers::JointImpedanceController c(kPeriodNs);
-    check(near(c.friction_compensation(gains, s, none)[0], 14.53), "lugre: the first cycle deflects the bristle by the implicit step");
-    double later = 0.0;
-    for (int k = 0; k < 200; ++k) later = c.friction_compensation(gains, s, none)[0];
-    check(std::abs(later - 50.0) <= 1.0, "lugre: steady sliding reaches g");
-    c.reset();
-    check(near(c.friction_compensation(gains, s, none)[0], 14.53), "lugre: reset relaxes the bristle");
-  }
-}
 }  // namespace
 
 int main()
@@ -391,7 +410,6 @@ int main()
 #else
   test_compute_type_c();
 #endif
-  test_friction_compensation();
 
   std::printf("joint_impedance_controller test: %s\n", g_failures == 0 ? "OK" : "FAIL");
   return g_failures == 0 ? 0 : 1;

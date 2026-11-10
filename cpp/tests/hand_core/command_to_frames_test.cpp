@@ -3,14 +3,11 @@
 //     → 복원 rad 가 원본과 일치? index 매핑·IK/FK 정합을 한 번에 검증.
 //   - fault-mask: faulted/미-enabled actuator 는 CSP=현재위치 hold, CST=0.
 //   - effort clamp: ±max_effort, max_effort=0 → 0.
-//   - friction file: Coulomb 모델 채움, 다른 format 거부.
 // device-in-the-loop 아님(HW 거동은 별도 HW probe). HandCore 는 생성만(소켓 open 안 함).
 
 #include <array>
 #include <cmath>
 #include <cstdio>
-#include <fstream>
-#include <string>
 
 #include <aidin_hand2/types/config.hpp>
 
@@ -199,41 +196,6 @@ void test_effort_clamp(HandCore& core)
   check(frames.target_effort[2] == 0, "max_effort=0 zeroes torque");
 }
 
-// ── Test 4: friction file ──
-void test_friction_file()
-{
-  const std::string path = "command_to_frames_test_friction.json";
-  {
-    std::ofstream file(path);
-    file << R"({"format": "aidin-hand2-friction/1", "actuators": [)"
-         << R"({"index": 1, "coulombPositive": 264.7, "coulombNegative": 166.8, "viscous": 0.0029}]})";
-  }
-  ControllerConfig::JointImpedanceController config{};
-  config.friction_model = ControllerConfig::JointImpedanceController::FrictionModel::PositionTable;
-  config.friction_scale = 0.7;
-  load_friction_file(path, config);
-  check(config.friction_model == ControllerConfig::JointImpedanceController::FrictionModel::Coulomb,
-        "friction file selects the Coulomb model");
-  check(config.coulomb_friction.positive[1] == 264.7 && config.coulomb_friction.negative[1] == 166.8 &&
-            config.coulomb_friction.viscous[1] == 0.0029,
-        "friction file fills the listed actuator");
-  check(config.coulomb_friction.positive[0] == 0.0, "friction file leaves the others zero");
-  check(config.friction_scale == 0.7, "friction file keeps friction_scale");
-
-  {
-    std::ofstream file(path);
-    file << R"({"format": "something else", "actuators": []})";
-  }
-  bool rejected = false;
-  try {
-    load_friction_file(path, config);
-  } catch (const Exception& error) {
-    rejected = error.code() == ErrorCode::InvalidArgument;
-  }
-  check(rejected, "friction file with another format is rejected");
-  std::remove(path.c_str());
-}
-
 }  // namespace
 
 int main()
@@ -243,7 +205,6 @@ int main()
   test_joint_position_roundtrip(core);
   test_fault_mask(core);
   test_effort_clamp(core);
-  test_friction_file();
 
   std::printf("command_to_frames test: %s\n", g_failures == 0 ? "OK" : "FAIL");
   return g_failures == 0 ? 0 : 1;

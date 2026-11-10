@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "hand_core/kinematics/hand_kinematics_core.hpp"
 
@@ -12,7 +13,6 @@ namespace
 {
 
 using Config = ControllerConfig::JointImpedanceController;
-constexpr std::size_t kTableBins = Config::PositionTableFriction::kBins;
 
 // 256 CPT x 4 on the motor shaft
 constexpr double kCountPerRevolution = 1024.0;
@@ -21,91 +21,52 @@ constexpr double kMotorRadPerCount   = 2.0 * 3.14159265358979323846 / kCountPerR
 // N·m at effort 1000: maxon ECX SPEED 8 M at the drive's 0.4 A
 constexpr double kRatedMotorTorqueNm = 3.62e-3 * 0.4;
 
-// count/s, below it the impedance effort sets the friction direction
-constexpr double kStickVelocity = 300.0;
+// N·m/rad per active joint at stiffness 1, 0.6 x the lowest that oscillated
+// The long finger j3 takes its hard stiffness from kHardMotorStiffnessJ3 instead
+constexpr std::array<double, kActiveJointCount> kHardStiffness{
+    27.4, 60.0, 11.6, 14.5, 5.33, 20.1, 0.0, 5.33, 20.1, 0.0, 5.33, 20.1, 0.0, 5.33, 20.1, 0.0};
 
-// Effort, the least the direction ramps over at rest
-constexpr double kMinStickRamp = 300.0;
+// N·m/rad on the motor shaft at long finger j3 stiffness 1, 0.6 x the lowest that oscillated
+constexpr double kHardMotorStiffnessJ3 = 3.62e-5;
 
-// Linear between bin centres, the edge value held outside them, the first bin when start == end
-double table_at(const std::array<double, kTableBins>& table, double start, double end, double count)
+// Motor rad per long finger j3 rad, the most the j3 hard stiffness follows
+constexpr double kMaxMotorPerJ3 = 652.0;
+
+// Damping ratio per active joint, 0.6 x the lowest that oscillated at hard stiffness, at most 0.7
+constexpr std::array<double, kActiveJointCount> kDampingRatio{
+    0.62, 0.49, 0.49, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7};
+
+// s, the time constant a new stiffness is approached with
+constexpr double kStiffnessTimeConstant = 0.2;
+
+// count, the least a target keeps each actuator off its hard stop at 0
+constexpr int kMinTargetCount = 1000;
+
+// count, over which the effort toward the hard stop tapers to 0
+constexpr double kStopZoneCount = 1000.0;
+
+// Matched-pole low-pass coefficient: alpha = 1 - exp(-dt * 2 * pi * fc), cutoff <= 0 gives 1
+double lowpass_alpha(double cutoff_freq, double dt_seconds)
 {
-  constexpr double kBins = static_cast<double>(kTableBins);
-  if (end == start) return table[0];
-
-  // 0 at the first bin centre
-  const double position = (count - start) / (end - start) * kBins - 0.5;
-  if (position <= 0.0) return table[0];
-  if (position >= kBins - 1.0) return table[kTableBins - 1];
-  const auto lower = static_cast<std::size_t>(position);
-  const double fraction = position - static_cast<double>(lower);
-  return table[lower] + fraction * (table[lower + 1] - table[lower]);
+  if (!(cutoff_freq > 0.0)) return 1.0;
+  return 1.0 - std::exp(-dt_seconds * 2.0 * 3.14159265358979323846 * cutoff_freq);
 }
 
-// c at speed, s at rest
-double stribeck_at(double c, double s, double stribeck_velocity, double shape, double speed)
+// Active joints 6, 9, 12 and 15, each driven by the actuator of the same index
+bool is_long_finger_j3(std::size_t joint)
 {
-  if (!(stribeck_velocity > 0.0)) return c;
-  return c + (s - c) * std::exp(-std::pow(speed / stribeck_velocity, shape));
+  return joint >= 4 && (joint - 4) % 3 == 2;
 }
 
-// Resisting effort toward +count and -count, and the viscous gain, of a static model
-struct StaticFriction {
-  double positive;
-  double negative;
-  double viscous;
-};
-
-StaticFriction static_friction_of(const Config& config, std::size_t i, double count, double speed)
+// N·m/rad at stiffness 1; the long finger j3 holds its motor-side stiffness, so it follows the pose
+double hard_stiffness(std::size_t joint, const JointJacobian& count_per_joint)
 {
-  switch (config.friction_model) {
-    case Config::FrictionModel::PositionTable: {
-      const Config::PositionTableFriction& f = config.position_table_friction;
-      return {table_at(f.positive[i], f.start[i], f.end[i], count),
-              table_at(f.negative[i], f.start[i], f.end[i], count), f.viscous[i]};
-    }
-    case Config::FrictionModel::Stribeck: {
-      const Config::StribeckFriction& f = config.stribeck_friction;
-      return {stribeck_at(f.positive[i], f.static_positive[i], f.stribeck_velocity[i], f.shape, speed),
-              stribeck_at(f.negative[i], f.static_negative[i], f.stribeck_velocity[i], f.shape, speed),
-              f.viscous[i]};
-    }
-    default: {
-      const Config::CoulombFriction& f = config.coulomb_friction;
-      return {f.positive[i], f.negative[i], f.viscous[i]};
-    }
-  }
+  if (!is_long_finger_j3(joint)) return kHardStiffness[joint];
+  const double motor_per_joint = std::min(
+      std::abs(count_per_joint[joint * kActiveJointCount + joint]) * kMotorRadPerCount, kMaxMotorPerJ3);
+  return kHardMotorStiffnessJ3 * motor_per_joint * motor_per_joint;
 }
 
-// Twice the largest resisting effort of the static model, so the ramp adds little stiffness
-double stick_ramp_of(const Config& config)
-{
-  double largest = 0.0;
-  const auto take = [&largest](const auto& values) {
-    for (const double v : values) largest = std::max(largest, v);
-  };
-  switch (config.friction_model) {
-    case Config::FrictionModel::PositionTable:
-      for (std::size_t i = 0; i < kActuatorCount; ++i) {
-        take(config.position_table_friction.positive[i]);
-        take(config.position_table_friction.negative[i]);
-      }
-      break;
-    case Config::FrictionModel::Stribeck:
-      take(config.stribeck_friction.static_positive);
-      take(config.stribeck_friction.static_negative);
-      take(config.stribeck_friction.positive);
-      take(config.stribeck_friction.negative);
-      break;
-    default:
-      take(config.coulomb_friction.positive);
-      take(config.coulomb_friction.negative);
-      break;
-  }
-  return std::max(kMinStickRamp, 2.0 * largest);
-}
-
-#if !defined(AIDIN_HAND2_HAND_TYPE_C)
 // The 21-joint FK output without each digit's passive q4
 std::array<double, kActiveJointCount> active_joints_of(const std::array<double, kJointCount>& joints)
 {
@@ -117,6 +78,39 @@ std::array<double, kActiveJointCount> active_joints_of(const std::array<double, 
   return active;
 }
 
+// Thumb 0 and long fingers 1..4, for an active joint or the actuator of the same index
+std::size_t finger_of(std::size_t index)
+{
+  return index < 4 ? 0 : 1 + (index - 4) / 3;
+}
+
+// A finger with an IK count below kMinTargetCount takes the FK pose of its counts raised to it
+std::array<double, kActiveJointCount> off_hard_stop(const std::array<double, kActiveJointCount>& target)
+{
+  std::array<int, kActuatorCount> count{};
+  kinematics::ik_joint_to_actuator(target, count);
+  std::array<bool, kFingerCount> raised{};
+  bool any_raised = false;
+  for (std::size_t i = 0; i < kActuatorCount; ++i) {
+    if (count[i] >= kMinTargetCount) continue;
+    count[i] = kMinTargetCount;
+    raised[finger_of(i)] = true;
+    any_raised = true;
+  }
+  if (!any_raised) return target;
+
+  std::array<double, kJointCount> joints{};
+  std::array<double, kTaskCount> task{};
+  kinematics::fk_actuator_to_joint(count, joints, task);
+  const std::array<double, kActiveJointCount> lifted = active_joints_of(joints);
+  std::array<double, kActiveJointCount> result = target;
+  for (std::size_t j = 0; j < kActiveJointCount; ++j) {
+    if (raised[finger_of(j)] && std::isfinite(lifted[j])) result[j] = lifted[j];
+  }
+  return result;
+}
+
+#if !defined(AIDIN_HAND2_HAND_TYPE_C)
 // rad/s from the drives' velocity_rpm
 std::array<double, kActiveJointCount> joint_velocity(const HandState& state, const JointJacobian& joint_per_count)
 {
@@ -135,8 +129,8 @@ std::array<double, kActiveJointCount> joint_velocity(const HandState& state, con
 
 std::array<double, kActiveJointCount> joint_impedance_torque(
     const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
-    const std::array<double, kActiveJointCount>& velocity, const Config& config,
-    const JointJacobian& count_per_joint)
+    const std::array<double, kActiveJointCount>& velocity, const std::array<double, kActiveJointCount>& stiffness,
+    const Config& config, const JointJacobian& count_per_joint)
 {
   std::array<double, kActiveJointCount> torque{};
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
@@ -145,9 +139,9 @@ std::array<double, kActiveJointCount> joint_impedance_torque(
       const double motor_per_joint = count_per_joint[i * kActiveJointCount + j] * kMotorRadPerCount;
       inertia += motor_per_joint * motor_per_joint * config.motor_inertia_kgm2[i];
     }
-    const double stiffness = config.stiffness_Nm_per_rad[j];
-    const double damping   = 2.0 * config.damping_ratio[j] * std::sqrt(stiffness * inertia);
-    torque[j] = stiffness * (target[j] - position[j]) - damping * velocity[j];
+    const double k           = hard_stiffness(j, count_per_joint) * stiffness[j];
+    const double coefficient = 2.0 * kDampingRatio[j] * std::sqrt(k * inertia);
+    torque[j] = k * (target[j] - position[j]) - coefficient * velocity[j];
   }
   return torque;
 }
@@ -161,6 +155,8 @@ std::array<double, kActuatorCount> joint_torque_to_effort(
     // Motor torque is the joint torques through d(joint)/d(motor rad)
     double motor_torque = 0.0;
     for (std::size_t j = 0; j < kActiveJointCount; ++j) {
+      // The long finger j3 drives its own actuator only, and j2 holds the linkage's reaction by its stiffness
+      if (is_long_finger_j3(j) && i != j) continue;
       motor_torque += joint_per_count[j * kActuatorCount + i] / kMotorRadPerCount * torque[j];
     }
     effort[i] = motor_torque / (config.efficiency[i] * kRatedMotorTorqueNm) * 1000.0;
@@ -169,13 +165,51 @@ std::array<double, kActuatorCount> joint_torque_to_effort(
 }
 
 JointImpedanceController::JointImpedanceController(long period_nanoseconds)
-: dt_seconds_(static_cast<double>(period_nanoseconds) / 1e9)
+: dt_seconds_(static_cast<double>(period_nanoseconds) / 1e9),
+  stiffness_alpha_(1.0 - std::exp(-dt_seconds_ / kStiffnessTimeConstant))
 {
+  reset();
 }
 
 void JointImpedanceController::reset()
 {
-  bristle_.fill(0.0);
+  target_.fill(std::numeric_limits<double>::quiet_NaN());
+  stiffness_.fill(std::numeric_limits<double>::quiet_NaN());
+}
+
+std::array<double, kActiveJointCount> JointImpedanceController::filtered_target(
+    const std::array<double, kActiveJointCount>& command_target, const Config& config,
+    const std::array<double, kActiveJointCount>& measured)
+{
+  if (config.cutoff_freq != cutoff_freq_) {
+    cutoff_freq_ = config.cutoff_freq;
+    alpha_       = lowpass_alpha(cutoff_freq_, dt_seconds_);
+  }
+  const double alpha    = config.filter_enabled ? alpha_ : 1.0;
+  const double max_step = config.max_target_velocity > 0.0 ? config.max_target_velocity * dt_seconds_
+                                                           : std::numeric_limits<double>::infinity();
+
+  for (std::size_t i = 0; i < kActiveJointCount; ++i) {
+    // Seed from the measured pose on (re-)entry; from the target if FK gave NaN
+    if (std::isnan(target_[i])) {
+      const double seed = std::isfinite(measured[i]) ? measured[i] : command_target[i];
+      target_[i] = seed;
+      section_[i].fill(seed);
+    }
+
+    // 3rd-order low-pass as first-order sections in cascade; alpha 1 passes the target through
+    if (alpha >= 1.0) {
+      section_[i].fill(command_target[i]);
+    } else {
+      section_[i][0] += alpha * (command_target[i] - section_[i][0]);
+      section_[i][1] += alpha * (section_[i][0]   - section_[i][1]);
+      section_[i][2] += alpha * (section_[i][1]   - section_[i][2]);
+    }
+
+    target_[i] += std::clamp(section_[i][2] - target_[i], -max_step, max_step);
+  }
+  target_ = off_hard_stop(target_);
+  return target_;
 }
 
 void JointImpedanceController::compute(const JointImpedanceCommand& command,
@@ -193,74 +227,33 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
   kinematics::jacobian_actuator_to_joint(position, joint_per_count);
   kinematics::jacobian_joint_to_actuator(position, count_per_joint);
 
-  // 2) Joint law, then its effort through the transposed Jacobian
+  // 2) Target through the low-pass and the velocity limit, stiffness on its way to the setting
+  const std::array<double, kActiveJointCount> target = filtered_target(command.target, config, position);
+  for (std::size_t j = 0; j < kActiveJointCount; ++j) {
+    if (std::isnan(stiffness_[j])) stiffness_[j] = config.stiffness[j];
+    stiffness_[j] += stiffness_alpha_ * (config.stiffness[j] - stiffness_[j]);
+  }
+
+  // 3) Joint law, then its effort through the transposed Jacobian
   const std::array<double, kActiveJointCount> velocity = joint_velocity(state, joint_per_count);
   const std::array<double, kActiveJointCount> torque =
-      joint_impedance_torque(command.target, position, velocity, config, count_per_joint);
-  const std::array<double, kActuatorCount> impedance_effort = joint_torque_to_effort(torque, joint_per_count, config);
-
-  // 3) Friction compensation per actuator
-  const std::array<double, kActuatorCount> compensation = friction_compensation(config, state, impedance_effort);
-  for (std::size_t i = 0; i < kActuatorCount; ++i) effort[i] = impedance_effort[i] + compensation[i];
+      joint_impedance_torque(target, position, velocity, stiffness_, config, count_per_joint);
+  effort = joint_torque_to_effort(torque, joint_per_count, config);
 #else
   (void)command;
   (void)config;
-  (void)state;
 #endif
 
   // 4) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
+  //    The bound toward the hard stop tapers to 0 over kStopZoneCount
   //    An effort that is not finite sends 0
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     const double value = std::isfinite(effort[i]) ? effort[i] : 0.0;
+    const double toward_stop =
+        max_effort[i] * std::clamp(state.actuators.position_count[i] / kStopZoneCount, 0.0, 1.0);
     frames.mode_of_operation[i] = canfd::mode_of_operation::kCST;
-    frames.target_effort[i]     = static_cast<std::int16_t>(std::clamp(value, -max_effort[i], max_effort[i]));
+    frames.target_effort[i]     = static_cast<std::int16_t>(std::clamp(value, -toward_stop, max_effort[i]));
   }
-}
-
-std::array<double, kActuatorCount> JointImpedanceController::friction_compensation(
-    const ControllerConfig::JointImpedanceController& config, const HandState& state,
-    const std::array<double, kActuatorCount>& impedance_effort)
-{
-  std::array<double, kActuatorCount> compensation{};
-  const bool compensate = config.friction_scale > 0.0;
-  const bool lugre = config.friction_model == Config::FrictionModel::LuGre;
-  const double stick_ramp = compensate && !lugre ? stick_ramp_of(config) : kMinStickRamp;
-  if (!compensate || !lugre) bristle_.fill(0.0);
-
-  for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    const double v = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
-    if (compensate && lugre) {
-      // Implicit step of the bristle, stable for any bristle stiffness
-      const Config::LuGreFriction& f = config.lugre_friction;
-      const Config::StribeckFriction& curve = f.curve;
-      const double speed = std::abs(v);
-      const double g = v >= 0.0
-                           ? stribeck_at(curve.positive[i], curve.static_positive[i], curve.stribeck_velocity[i],
-                                         curve.shape, speed)
-                           : stribeck_at(curve.negative[i], curve.static_negative[i], curve.stribeck_velocity[i],
-                                         curve.shape, speed);
-      const double sigma0 = f.bristle_stiffness[i];
-      const double previous = bristle_[i];
-      const double next = (g > 0.0 && sigma0 > 0.0)
-                              ? (previous + v * dt_seconds_) / (1.0 + sigma0 * speed * dt_seconds_ / g)
-                              : 0.0;
-      bristle_[i] = next;
-      const double rate = (next - previous) / dt_seconds_;
-      compensation[i] = config.friction_scale * (sigma0 * next + f.bristle_damping[i] * rate + curve.viscous[i] * v);
-    } else if (compensate) {
-      // The impedance effort sets the direction at rest, ramping over ±stick_ramp
-      const StaticFriction f =
-          static_friction_of(config, i, state.actuators.position_count[i], std::abs(v));
-      const bool moving = std::abs(v) > kStickVelocity;
-      const double direction =
-          moving ? (v > 0.0 ? 1.0 : -1.0) : std::clamp(impedance_effort[i] / stick_ramp, -1.0, 1.0);
-      const double bias = 0.5 * (f.positive - f.negative);
-      const double friction = 0.5 * (f.positive + f.negative);
-      const double bias_weight = moving ? 1.0 : std::abs(direction);
-      compensation[i] = config.friction_scale * (bias * bias_weight + friction * direction + f.viscous * v);
-    }
-  }
-  return compensation;
 }
 
 }  // namespace aidin_hand2::controllers

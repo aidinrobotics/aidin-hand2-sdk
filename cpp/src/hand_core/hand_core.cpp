@@ -41,12 +41,10 @@ bool workspace_clamp_enabled();
 template <std::size_t Size>
 bool all_finite(const std::array<double, Size>& values);
 
-// Joint stiffness >= 0, damping ratio in [0, 1], motor inertia > 0, link inertia >= 0,
+// Joint stiffness in [0, 1], target filter values >= 0, motor inertia > 0, link inertia >= 0,
 // efficiency in (0, 1], all finite
 Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config);
 
-// Every friction value finite, resisting efforts and gains >= 0, the model one of the defined
-Status check_friction(const ControllerConfig::JointImpedanceController& config);
 
 bool is_command_valid(const JointPositionCommand& command);
 bool is_command_valid(const JointImpedanceCommand& command);
@@ -487,7 +485,6 @@ Status HandCore::set_controller_config(const ControllerConfig& config)
   }
   const ControllerConfig::JointImpedanceController& impedance = config.joint_impedance_controller;
   if (Status joint = check_joint_impedance(impedance); !joint.ok()) return joint;
-  if (Status friction = check_friction(impedance); !friction.ok()) return friction;
   std::lock_guard<std::mutex> lock(staging_mutex_);
   staging_controller_config_ = config;
   controller_config_buffer_.write(config);
@@ -781,11 +778,14 @@ Status check_joint_impedance(const ControllerConfig::JointImpedanceController& c
     return Status{ErrorCode::InvalidArgument,
                   std::string("Cannot set controller config: joint impedance ") + what};
   };
-  if (!all_non_negative(config.stiffness_Nm_per_rad)) {
-    return fail("stiffness_Nm_per_rad must be finite and >= 0");
+  for (const double stiffness : config.stiffness) {
+    if (!std::isfinite(stiffness) || stiffness < 0.0 || stiffness > 1.0) {
+      return fail("stiffness must be finite and in [0, 1]");
+    }
   }
-  for (const double ratio : config.damping_ratio) {
-    if (!std::isfinite(ratio) || ratio < 0.0 || ratio > 1.0) return fail("damping_ratio must be finite and in [0, 1]");
+  if (!std::isfinite(config.cutoff_freq) || config.cutoff_freq < 0.0 ||
+      !std::isfinite(config.max_target_velocity) || config.max_target_velocity < 0.0) {
+    return fail("cutoff_freq and max_target_velocity must be finite and >= 0");
   }
   for (const double inertia : config.motor_inertia_kgm2) {
     if (!std::isfinite(inertia) || inertia <= 0.0) return fail("motor_inertia_kgm2 must be finite and > 0");
@@ -799,51 +799,6 @@ Status check_joint_impedance(const ControllerConfig::JointImpedanceController& c
   return {};
 }
 
-Status check_friction(const ControllerConfig::JointImpedanceController& config)
-{
-  using Model = ControllerConfig::JointImpedanceController::FrictionModel;
-  const auto fail = [](const char* what) {
-    return Status{ErrorCode::InvalidArgument,
-                  std::string("Cannot set controller config: joint impedance ") + what};
-  };
-  if (config.friction_model != Model::Coulomb && config.friction_model != Model::PositionTable &&
-      config.friction_model != Model::Stribeck && config.friction_model != Model::LuGre) {
-    return fail("friction_model is unknown");
-  }
-  if (!std::isfinite(config.friction_scale) || config.friction_scale < 0.0) {
-    return fail("friction_scale must be finite and >= 0");
-  }
-
-  const auto& coulomb = config.coulomb_friction;
-  if (!all_non_negative(coulomb.positive) || !all_non_negative(coulomb.negative) ||
-      !all_non_negative(coulomb.viscous)) {
-    return fail("coulomb_friction values must be finite and >= 0");
-  }
-
-  const auto& table = config.position_table_friction;
-  if (!all_finite(table.start) || !all_finite(table.end) || !all_non_negative(table.viscous)) {
-    return fail("position_table_friction start and end must be finite, viscous finite and >= 0");
-  }
-  for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    if (!all_non_negative(table.positive[i]) || !all_non_negative(table.negative[i])) {
-      return fail("position_table_friction values must be finite and >= 0");
-    }
-  }
-
-  for (const auto* curve : {&config.stribeck_friction, &config.lugre_friction.curve}) {
-    if (!all_non_negative(curve->positive) || !all_non_negative(curve->negative) ||
-        !all_non_negative(curve->static_positive) || !all_non_negative(curve->static_negative) ||
-        !all_non_negative(curve->stribeck_velocity) || !all_non_negative(curve->viscous) ||
-        !std::isfinite(curve->shape) || curve->shape <= 0.0) {
-      return fail("stribeck_friction and lugre_friction.curve values must be finite and >= 0, shape > 0");
-    }
-  }
-  if (!all_non_negative(config.lugre_friction.bristle_stiffness) ||
-      !all_non_negative(config.lugre_friction.bristle_damping)) {
-    return fail("lugre_friction bristle_stiffness and bristle_damping must be finite and >= 0");
-  }
-  return {};
-}
 
 bool is_command_valid(const JointPositionCommand& command)
 {

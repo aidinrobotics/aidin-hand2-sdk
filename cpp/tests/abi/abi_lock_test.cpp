@@ -46,7 +46,7 @@ AIDIN_ABI_SIZE_LOCK(HandState,               1320);
 AIDIN_ABI_SIZE_LOCK(HandStateJointVelEff,     512);
 AIDIN_ABI_SIZE_LOCK(Diagnostics,               96);
 AIDIN_ABI_SIZE_LOCK(HandConfig,                88);
-AIDIN_ABI_SIZE_LOCK(ControllerConfig,        5304);
+AIDIN_ABI_SIZE_LOCK(ControllerConfig,         560);
 AIDIN_ABI_SIZE_LOCK(Idle,                       1);
 AIDIN_ABI_SIZE_LOCK(JointPositionCommand,     128);
 AIDIN_ABI_SIZE_LOCK(JointImpedanceCommand,    128);

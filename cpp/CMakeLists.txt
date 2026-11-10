@@ -85,7 +85,6 @@ add_library(aidin_hand2 SHARED
   src/hand_core/lifecycle/action_check.cpp
   src/hand_core/controllers/joint_position_controller.cpp
   src/hand_core/controllers/joint_impedance_controller.cpp
-  src/hand_core/controllers/friction_file.cpp
   src/hand_core/comms/hand_comms.cpp
   src/hand_core/comms/canfd/interface_setup.cpp
   src/hand_core/comms/canfd/protocol.cpp
@@ -287,8 +286,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
     src/hand_core/lifecycle/action_check.cpp
     src/hand_core/controllers/joint_position_controller.cpp
     src/hand_core/controllers/joint_impedance_controller.cpp
-    src/hand_core/controllers/friction_file.cpp
-    src/hand_core/comms/hand_comms.cpp
+      src/hand_core/comms/hand_comms.cpp
     src/hand_core/comms/canfd/interface_setup.cpp
     src/hand_core/comms/canfd/protocol.cpp
     src/hand_core/comms/state_machine/homing_sequence.cpp

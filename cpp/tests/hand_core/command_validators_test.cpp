@@ -166,15 +166,13 @@ void test_controller_config_filter_rejected(HandCore& core)
 }
 
 // ── Test 4: set_controller_config — joint 공간 impedance 값의 기본값과 범위 ──
-// 기본 stiffness 는 count 기본값을 기준 자세에서 환산한 임시값, ζ 0.7, 관성 0.033 g·cm², 효율 1, 링크 관성 0.
+// 기본 stiffness 1(hard), 목표 필터 켬·10 Hz·속도 제한 없음, 관성 0.033 g·cm², 효율 1, 링크 관성 0.
 void test_joint_impedance_config(HandCore& core)
 {
   const ControllerConfig::JointImpedanceController defaults{};
-  const std::array<double, kActiveJointCount> stiffness{
-      4.9, 26.5, 3.2, 2.5, 0.4, 2.5, 1.35, 0.4, 2.5, 1.35, 0.4, 2.5, 1.35, 0.4, 2.5, 1.35};
-  bool defaults_ok = defaults.stiffness_Nm_per_rad == stiffness;
+  bool defaults_ok = defaults.filter_enabled && defaults.cutoff_freq == 10.0 && defaults.max_target_velocity == 0.0;
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
-    defaults_ok = defaults_ok && defaults.damping_ratio[j] == 0.7 && defaults.link_inertia_kgm2[j] == 0.0;
+    defaults_ok = defaults_ok && defaults.stiffness[j] == 1.0 && defaults.link_inertia_kgm2[j] == 0.0;
   }
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     defaults_ok = defaults_ok && defaults.motor_inertia_kgm2[i] == 3.3e-9 && defaults.efficiency[i] == 1.0;
@@ -188,18 +186,24 @@ void test_joint_impedance_config(HandCore& core)
     return config;
   };
   using Gains = ControllerConfig::JointImpedanceController;
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness_Nm_per_rad[3] = -1.0; }))),
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness[3] = -0.1; }))),
         "negative joint stiffness rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness_Nm_per_rad[1] = kInf; }))),
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness[3] = 1.05; }))),
+        "joint stiffness above 1 rejected");
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.stiffness[1] = kInf; }))),
         "infinite joint stiffness rejected");
-  check(core.set_controller_config(with([](Gains& g) { g.stiffness_Nm_per_rad.fill(0.0); })).ok(),
+  check(core.set_controller_config(with([](Gains& g) { g.stiffness.fill(0.0); })).ok(),
         "zero joint stiffness accepted");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.damping_ratio[0] = 1.5; }))),
-        "damping ratio above 1 rejected");
-  check(rejected(core.set_controller_config(with([](Gains& g) { g.damping_ratio[0] = kNaN; }))),
-        "damping ratio NaN rejected");
-  check(core.set_controller_config(with([](Gains& g) { g.damping_ratio[0] = 1.0; })).ok(),
-        "damping ratio 1 accepted");
+  check(core.set_controller_config(with([](Gains& g) { g.stiffness.fill(1.0); })).ok(),
+        "joint stiffness 1 accepted");
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.cutoff_freq = -1.0; }))),
+        "negative target cutoff rejected");
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.cutoff_freq = kNaN; }))),
+        "target cutoff NaN rejected");
+  check(rejected(core.set_controller_config(with([](Gains& g) { g.max_target_velocity = -0.5; }))),
+        "negative max target velocity rejected");
+  check(core.set_controller_config(with([](Gains& g) { g.max_target_velocity = 3.0; })).ok(),
+        "max target velocity accepted");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.efficiency[2] = 0.0; }))),
         "zero efficiency rejected");
   check(rejected(core.set_controller_config(with([](Gains& g) { g.efficiency[2] = 1.2; }))),
