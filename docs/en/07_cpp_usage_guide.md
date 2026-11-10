@@ -325,8 +325,10 @@ try {
   call [`run()`](08_cpp_api_reference/hand.md#handrun) first.
 - If `auto_home=true`, `run()` homes on its own. When the `homing_state` value is not `Succeeded`,
   even a `run()` call from `Running` starts homing, so the fingers move to their hard stops.
-- On success, the SDK applies a command that holds the origin posture. Send the command that you
-  need next. [5.3 Command lifetime](#53-command-lifetime) covers this in detail.
+- On success, the SDK applies a command that holds the robot hand 1000 counts off the hard stop.
+  Because encoder count `0` is the hard stop, the joint angles in that posture are small values
+  under 1°, not 0. Send the command that you need next. [5.3 Command lifetime](#53-command-lifetime)
+  covers this in detail.
 - On failure, `home()` throws `HardwareFault`, and the message names the actuator index values that
   failed.
 - [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) returns the `homing_state` value to `NotRun`, so you must home again.
@@ -391,27 +393,14 @@ gains that the conversion uses live in [`ControllerConfig`](08_cpp_api_reference
 both controllers together. You can call it at any time, and it takes effect from the next cycle. If
 you never call it, every field keeps its default.
 
-If a value is non-finite or negative, `set_controller_config()` throws `InvalidArgument` and keeps
-the existing settings.
+If a value is non-finite or outside its allowed range, `set_controller_config()` throws
+`InvalidArgument` and keeps the existing settings. The allowed ranges are in the table of each
+controller's section.
 
 #### 4.2.1 Joint position controller
 
-The joint position controller turns a joint angle command into an actuator position. Every cycle,
-the command that arrives passes through the following 3 stages.
-
-1. The controller ignores an input that moves within the deadband of the command that passed through
-   last.
-2. A third-order low-pass filter runs. It reduces the changes that are faster than the `cutoff_freq`
-   value.
-3. [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) converts the command into an actuator position.
-
-The deadband suppresses the noise in the input. The low-pass filter spreads a discontinuous input
-across several cycles, which matters when the input arrives at a lower rate than the SDK control
-rate. If you set the `deadband` or the `cutoff_freq` value to `0`, the controller skips only that
-stage.
-
-The following example sets the 3 items of the `joint_position_controller` field to the same values
-as the defaults.
+The joint position controller turns a joint angle command into an actuator position. A deadband and
+a low-pass filter on the input remove noise and discontinuous changes.
 
 ```cpp
 ah2::ControllerConfig controller;
@@ -423,59 +412,42 @@ hand.set_controller_config(controller);
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `filter_enabled` | `bool` | `true` | Whether the filter runs. `false` skips both stages |
-| `cutoff_freq` | `double` | `10.0` | The cutoff frequency [Hz]. `0` skips this stage |
-| `deadband` | `double` | `0.000873` | The size of the change to ignore [rad]. `0` skips this stage |
+| `filter_enabled` | `bool` | `true` | Whether the filter runs. `false` skips both the deadband and the low-pass filter |
+| `cutoff_freq` | `double` | `10.0` | The cutoff frequency [Hz]. `0` skips it |
+| `deadband` | `double` | `0.000873` | The size of the change to ignore [rad]. `0` skips it |
 
-Decide the `cutoff_freq` value from the rate at which the input actually changes. The rate at which
-you call `set_command()` is not the basis. Start from a low value and raise it. A lower value adds
-delay, and a higher value weakens the filter. No value produces overshoot.
-
-The `deadband` field exists because the gear ratio is large. Even a small fluctuation at the joint
-becomes a large reversal at the motor shaft, and it crosses the backlash band again and again.
-Adjust the value while you check the size of the fluctuation in the input.
+Match the `cutoff_freq` value to the rate at which the input actually changes. A lower value adds
+delay, and a higher value weakens the filter.
 
 #### 4.2.2 Joint impedance controller
 
-The joint impedance controller turns a joint angle command into an actuator effort. It converts the
-command into a target actuator position with `ik_joint_to_actuator()`, and then it computes the
-effort in encoder space with the following equation.
+The joint impedance controller turns a joint angle command into an actuator effort. Because the
+effort is proportional to the displacement from the target, use this controller when you let a
+finger yield to an external force or control the grasping force. `stiffness` is 0 to 1 per joint,
+and the SDK sets the damping.
 
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-Because the contact force is proportional to the displacement, use this controller when you control
-the grasping force. Both gains have the length `kActuatorCount`, and their values live in
-**actuator space**, not in joint space.
-
-The following example sets the 2 gains of the `joint_impedance_controller` field to the same values
-as the defaults.
+The following example lowers only the j2 of the index finger to half and leaves the other joints at
+the default `1.0`.
 
 ```cpp
 ah2::ControllerConfig controller;
-controller.joint_impedance_controller.stiffness = {
-    0.02, 0.02, 0.02, 0.02,   // thumb   a0 a1 a2 a3
-    0.01, 0.01, 0.02,         // index   a1 a2 a3
-    0.01, 0.01, 0.02,         // middle
-    0.01, 0.01, 0.02,         // ring
-    0.01, 0.01, 0.02};        // baby
-controller.joint_impedance_controller.damping = {
-    1e-5, 1e-5, 1e-5, 1e-5,   // thumb
-    1e-5, 1e-5, 1e-5,         // index
-    1e-5, 1e-5, 1e-5,         // middle
-    1e-5, 1e-5, 1e-5,         // ring
-    1e-5, 1e-5, 1e-5};        // baby
+controller.joint_impedance_controller.stiffness[5] = 0.5;   // index j2
 hand.set_controller_config(controller);
 ```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | thumb `0.02`, and `0.01`·`0.01`·`0.02` on the other fingers | The gain that multiplies the position error |
-| `damping` | `std::array<double, kActuatorCount>` | `1e-5` × 16 | The gain that multiplies the velocity |
+| `stiffness` | `std::array<double, kActiveJointCount>` | all `1.0` | Stiffness per joint, 0 to 1 |
+| `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
+| `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the low-pass filter [Hz], 0 or more |
+
+> [!IMPORTANT]
+> Hand type C has no joint impedance controller. If you pass a `JointImpedanceCommand`,
+> `set_command()` throws `InvalidArgument`. You choose the type when you build the SDK, see
+> [SDK build & install](06_sdk_build_and_install.md).
 
 > [!NOTE]
-> The joint impedance controller is still under development, so do not use it. It works, but its
+> The SDK does not yet reduce the error at which friction stops a joint short of its target. The
 > behavior may change in a later version.
 
 > [!TIP]
@@ -488,8 +460,9 @@ hand.set_controller_config(controller);
 >   input with the filter off and at two cutoff frequencies and prints the setpoint side by side,
 >   then shows a change smaller than the `deadband` value being ignored.
 > - [`07_impedance_controller.cpp`](../../cpp/examples/07_impedance_controller.cpp) — raises the
->   `stiffness` value while holding the same target and prints the effort setpoint rising. Holding a
->   finger back creates the displacement that changes the value.
+>   `stiffness` value of the index finger's j2 through 0.2, 0.5 and 1 while holding the same target
+>   and prints the effort setpoint rising. Holding a finger back creates the displacement that
+>   changes the value.
 
 ## 5. Command
 

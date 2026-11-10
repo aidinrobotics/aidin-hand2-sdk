@@ -166,7 +166,8 @@ workspace 안으로 자동 투영됩니다. 범위 모델은 [Workspace limits](
 
 **Parameters**     ｜ `command` — command 5종 중 하나<br>
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
-`WrongCallOrder`(`Running` 상태가 아니거나 `homing_state != Succeeded`. [`Idle`](types_command.md#idle)은 후자에서 예외)<br>
+`WrongCallOrder`(`Running` 상태가 아니거나 `homing_state != Succeeded`. [`Idle`](types_command.md#idle)은 후자에서 예외) ·
+`InvalidArgument`(hand type C에 [`JointImpedanceCommand`](types_command.md#jointimpedancecommand) 전달)<br>
 **Preconditions**  ｜ `Running` — actuator enable이 확인된 상태여야 하므로 [`run()`](#handrun)이 성공한 뒤입니다<br>
 **Notes**          ｜ 값이 잘못돼도 예외를 던지지 않습니다. 직전 command가 유지되고
 `Diagnostics::nan_command_count`가 늘며 warning log가 남습니다. 조건은 [Validation](types_command.md#validation) 참조
@@ -199,8 +200,8 @@ filter와 impedance gain을 결정합니다. 언제든 호출할 수 있고 다�
 
 **Parameters**     ｜ `config` — [`ControllerConfig`](types_config.md#controllerconfig)<br>
 **Throws**         ｜ `WrongCallOrder`(파기된 `HandCore` 또는 무효가 된 handle) ·
-`InvalidArgument` — `cutoff_freq`·`deadband`·`stiffness`·`damping` 필드 중 non-finite이거나
-음수인 값이 있을 때<br>
+`InvalidArgument` — 필드가 non-finite이거나 허용 범위 밖일 때. 범위는
+[`ControllerConfig`](types_config.md#controllerconfig) 참조<br>
 **Notes**          ｜ 실패하면 기존 설정을 유지합니다. getter가 없으므로 적용값이 필요하면 application에서 직접
 보관하십시오
 

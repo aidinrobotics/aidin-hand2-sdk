@@ -76,20 +76,10 @@ non-finite이거나 음수면 [`set_controller_config()`](hand.md#handset_contro
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | 아래 표 | 위치 오차에 곱하는 gain |
-| `damping` | `std::array<double, kActuatorCount>` | 모든 actuator `1e-5` | 속도에 곱하는 gain |
+| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `1.0` | active joint별 stiffness, 0~1. 1 = joint의 hard stiffness |
+| `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
+| `cutoff_freq` | `double` | `10.0` | 목표 low-pass filter의 차단 주파수 [Hz] |
 
-encoder 공간에서 다음과 같이 계산합니다.
-
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-| Actuator index | stiffness | damping |
-|---|---:|---:|
-| 0 – 3 (thumb) | `0.02` | `1e-5` |
-| 4, 5 / 7, 8 / 10, 11 / 13, 14 (long finger a1·a2) | `0.01` | `1e-5` |
-| 6 / 9 / 12 / 15 (long finger a3) | `0.02` | `1e-5` |
-
-어느 actuator라도 non-finite이거나 음수면 [`set_controller_config()`](hand.md#handset_controller_config)가 `InvalidArgument` 예외를
-던집니다. 값을 고르는 기준은 [C++ guide](../07_cpp_usage_guide.md#422-joint-impedance-controller)에 있습니다.
+`stiffness`의 순서는 [`JointImpedanceCommand::target`](types_command.md#jointimpedancecommand)과 같습니다.
+`stiffness`가 non-finite이거나 0~1 밖이거나 `cutoff_freq`가 non-finite이거나 음수면
+[`set_controller_config()`](hand.md#handset_controller_config)가 `InvalidArgument` 예외를 던집니다.

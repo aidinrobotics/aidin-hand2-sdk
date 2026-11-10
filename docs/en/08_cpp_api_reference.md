@@ -82,6 +82,7 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 |---|---|
 | [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | 16 actuator encoders → 21 joints |
 | [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | 16 active joints → 16 actuator encoders |
+| [`compute_joint_vel_eff()`](08_cpp_api_reference/hand_kinematics.md#compute_joint_vel_eff) | one `HandState` → velocity and effort of 16 active joints |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
 
@@ -180,6 +181,7 @@ Every enum, struct, class and alias, grouped by the file that declares it. A nes
 | [`HandState`](08_cpp_api_reference/types_state.md#handstate) | struct | What [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state) returns |
 | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | The actuator observations |
 | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | The FK result |
+| [`HandStateJointVelEff`](08_cpp_api_reference/types_state.md#handstatejointveleff) | struct | The velocity and effort of the active joints |
 | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | The tactile readings |
 | [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | struct | The command input and output of this cycle |
 | [`ActuatorPositionSetpoint` / `ActuatorEffortSetpoint`](08_cpp_api_reference/types_state.md#actuatorpositionsetpoint--actuatoreffortsetpoint) | struct | The controller output setpoint |

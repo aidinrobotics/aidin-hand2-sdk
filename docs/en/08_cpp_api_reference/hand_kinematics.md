@@ -8,6 +8,7 @@ Conversion functions that work without a [`Hand`](hand.md#hand). Angles are in r
 |---|---|
 | [`fk_actuator_to_joint()`](#fk_actuator_to_joint) | 16 actuator encoders → 21 joints |
 | [`ik_joint_to_actuator()`](#ik_joint_to_actuator) | 16 active joints → 16 actuator encoders |
+| [`compute_joint_vel_eff()`](#compute_joint_vel_eff) | one `HandState` → velocity and effort of 16 active joints |
 
 ### `fk_actuator_to_joint()`
 
@@ -33,5 +34,18 @@ Computes encoder values from active joint angles.
 
 **Parameters**     ｜ `active_joint` — 16 active joint angles [rad]<br>
 **Returns**        ｜ 16 actuator encoder counts
+
+### `compute_joint_vel_eff()`
+
+```cpp
+HandStateJointVelEff compute_joint_vel_eff(const HandState& state);
+```
+
+Converts the actuator velocity, current and effort setpoint in a `HandState` into values of the 16
+active joints through the kinematics at that posture. The effort is the motor torque constant,
+3.62 mN·m/A, times the current, and it does not include the gear losses.
+
+**Parameters**     ｜ `state` — what [`Hand::get_state()`](hand.md#handget_state) returned<br>
+**Returns**        ｜ [`HandStateJointVelEff`](types_state.md#handstatejointveleff). All NaN on hand type C
 
 ---

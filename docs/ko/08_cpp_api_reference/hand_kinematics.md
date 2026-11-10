@@ -8,6 +8,7 @@
 |---|---|
 | [`fk_actuator_to_joint()`](#fk_actuator_to_joint) | actuator encoder 16개 → joint 21개 |
 | [`ik_joint_to_actuator()`](#ik_joint_to_actuator) | active joint 16개 → actuator encoder 16개 |
+| [`compute_joint_vel_eff()`](#compute_joint_vel_eff) | `HandState` 하나 → active joint 16개의 속도와 effort |
 
 ---
 
@@ -37,3 +38,18 @@ active joint 각도에서 encoder 값을 계산합니다.
 
 **Parameters**     ｜ `active_joint` — active joint 각도 16개 [rad]<br>
 **Returns**        ｜ actuator encoder count 16개
+
+---
+
+### `compute_joint_vel_eff()`
+
+```cpp
+HandStateJointVelEff compute_joint_vel_eff(const HandState& state);
+```
+
+`HandState`의 actuator 속도·전류·effort setpoint를 그 자세의 kinematics로 active joint 16개의 값으로
+바꿉니다. effort는 모터 torque 상수 3.62 mN·m/A에 전류를 곱한 값이고 감속기 손실은 포함하지
+않습니다.
+
+**Parameters**     ｜ `state` — [`Hand::get_state()`](hand.md#handget_state)의 결과<br>
+**Returns**        ｜ [`HandStateJointVelEff`](types_state.md#handstatejointveleff). hand type C에서는 모두 NaN

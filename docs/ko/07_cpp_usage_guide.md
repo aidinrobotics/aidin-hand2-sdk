@@ -307,8 +307,9 @@ try {
   `Running` 상태가 됩니다. 그래서 [`run()`](08_cpp_api_reference/hand.md#handrun)을 먼저 호출할 필요가 없습니다.
 - `auto_home=true`이면 `run()`이 homing을 자동으로 진행합니다. `homing_state` 값이 `Succeeded`가
   아니면 `Running` 상태에서 호출한 `run()`도 homing을 시작하므로, finger가 hard stop까지 이동합니다.
-- 성공하면 원점 자세를 유지하는 command가 적용됩니다. 이어서 필요한 command를 전송하십시오.
-  자세한 내용은 [5.3 Command lifetime](#53-command-lifetime)에 있습니다.
+- 성공하면 hard stop에서 1000 count 떨어진 자세를 유지하는 command가 적용됩니다. encoder count `0`이
+  hard stop이므로 이 자세의 joint 각도는 0이 아니라 1° 미만의 작은 값입니다. 이어서 필요한 command를
+  전송하십시오. 자세한 내용은 [5.3 Command lifetime](#53-command-lifetime)에 있습니다.
 - 실패하면 `HardwareFault` 예외를 던지고 message에 실패한 actuator index가 포함됩니다.
 - [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect)는 `homing_state` 값을 `NotRun`으로 되돌리므로 homing을 다시 진행해야 합니다.
 
@@ -369,23 +370,13 @@ controller는 command를 drive에 전송할 값으로 변환합니다. 변환에
 인자로 받으므로 두 controller의 설정이 함께 적용됩니다. 호출 시점에는 제약이 없고 다음 cycle부터
 반영됩니다. 한 번도 호출하지 않으면 각 필드의 기본값이 적용됩니다.
 
-값이 non-finite이거나 음수면 `set_controller_config()`가 `InvalidArgument` 예외를 던지고 기존
-설정을 유지합니다.
+값이 non-finite이거나 허용 범위 밖이면 `set_controller_config()`가 `InvalidArgument` 예외를 던지고
+기존 설정을 유지합니다. 허용 범위는 각 controller 절의 표에 있습니다.
 
 #### 4.2.1 Joint position controller
 
-joint position controller는 joint 각도 명령을 actuator position으로 변환합니다. 입력된 명령은 매
-cycle 다음 세 단계를 거칩니다.
-
-1. 직전에 통과한 명령에서 deadband 이내로 움직인 입력은 무시합니다.
-2. 3차 low-pass filter가 적용됩니다. `cutoff_freq` 값보다 빠른 변화가 줄어듭니다.
-3. [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator)로 actuator position으로 변환됩니다.
-
-deadband는 입력에 섞인 noise를 억제하고, low-pass filter는 SDK 제어 주기보다 낮은 rate로 들어와
-불연속한 입력을 여러 cycle에 걸쳐 반영합니다. `deadband`나 `cutoff_freq` 값을 `0`으로 설정하면
-해당 단계만 생략됩니다.
-
-다음은 `joint_position_controller` 필드의 세 항목을 기본값과 같은 값으로 지정하는 예입니다.
+joint position controller는 joint 각도 명령을 actuator position으로 변환합니다. 입력에는 deadband와
+low-pass filter가 적용되어 잡음과 불연속한 변화를 거릅니다.
 
 ```cpp
 ah2::ControllerConfig controller;
@@ -397,58 +388,41 @@ hand.set_controller_config(controller);
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `filter_enabled` | `bool` | `true` | filter 사용 여부. `false`면 두 단계를 모두 생략 |
+| `filter_enabled` | `bool` | `true` | filter 사용 여부. `false`면 deadband와 low-pass filter를 모두 생략 |
 | `cutoff_freq` | `double` | `10.0` | 차단 주파수 [Hz]. `0`이면 생략 |
 | `deadband` | `double` | `0.000873` | 무시할 변화의 크기 [rad]. `0`이면 생략 |
 
-`cutoff_freq` 값은 입력이 실제로 갱신되는 주기를 기준으로 결정합니다. `set_command()`를 호출하는
-주기는 기준이 아닙니다. 낮은 값에서 시작해 올려 가며 조정하십시오. 낮추면 지연이 커지고 높이면
-filter 효과가 감소합니다. 어느 값에서도 overshoot은 발생하지 않습니다.
-
-`deadband` 필드가 필요한 이유는 감속비가 크기 때문입니다. joint에서 미세한 변동이라도 모터축에서는
-큰 반전이 되어 backlash 구간을 반복해서 통과합니다. 입력에 섞인 변동의 크기를 확인하며
-조정하십시오.
+`cutoff_freq` 값은 입력이 실제로 갱신되는 주기에 맞춥니다. 낮추면 지연이 커지고 높이면 filter 효과가
+줄어듭니다.
 
 #### 4.2.2 Joint impedance controller
 
-joint impedance controller는 joint 각도 명령을 actuator effort로 변환합니다. 명령을
-`ik_joint_to_actuator()`로 목표 actuator position으로 변환한 뒤, encoder 공간에서 다음 식으로
-effort를 산출합니다.
+joint impedance controller는 joint 각도 명령을 actuator effort로 변환합니다. effort가 목표와의
+변위에 비례하므로 finger가 외력에 밀리게 두거나 파지력을 제어할 때 사용합니다. `stiffness`는
+joint별 0~1이고 damping은 SDK가 정합니다.
 
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-접촉 힘이 변위에 비례하므로 파지력을 제어할 때 사용합니다. 두 gain은 길이가 `kActuatorCount`이고,
-joint가 아니라 **actuator 공간**의 값입니다.
-
-다음은 `joint_impedance_controller` 필드의 두 gain을 기본값과 같은 값으로 지정하는 예입니다.
+다음은 index finger의 j2만 절반으로 낮추고 나머지 joint는 기본값 `1.0`으로 두는 예입니다.
 
 ```cpp
 ah2::ControllerConfig controller;
-controller.joint_impedance_controller.stiffness = {
-    0.02, 0.02, 0.02, 0.02,   // thumb   a0 a1 a2 a3
-    0.01, 0.01, 0.02,         // index   a1 a2 a3
-    0.01, 0.01, 0.02,         // middle
-    0.01, 0.01, 0.02,         // ring
-    0.01, 0.01, 0.02};        // baby
-controller.joint_impedance_controller.damping = {
-    1e-5, 1e-5, 1e-5, 1e-5,   // thumb
-    1e-5, 1e-5, 1e-5,         // index
-    1e-5, 1e-5, 1e-5,         // middle
-    1e-5, 1e-5, 1e-5,         // ring
-    1e-5, 1e-5, 1e-5};        // baby
+controller.joint_impedance_controller.stiffness[5] = 0.5;   // index j2
 hand.set_controller_config(controller);
 ```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | thumb `0.02`, 나머지 finger는 `0.01`·`0.01`·`0.02` | 위치 오차에 곱하는 gain |
-| `damping` | `std::array<double, kActuatorCount>` | `1e-5` × 16 | 속도에 곱하는 gain |
+| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `1.0` | joint별 stiffness, 0~1 |
+| `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
+| `cutoff_freq` | `double` | `10.0` | low-pass filter의 차단 주파수 [Hz], 0 이상 |
+
+> [!IMPORTANT]
+> hand type C에는 이 controller가 없습니다. `JointImpedanceCommand`를 전달하면 `set_command()`가
+> `InvalidArgument` 예외를 던집니다. type은 [SDK build & install](06_sdk_build_and_install.md)에서
+> 빌드할 때 선택합니다.
 
 > [!NOTE]
-> joint impedance controller는 아직 개발 중이므로 사용하지 마십시오. 동작하지만 이후 버전에서
-> 거동이 바뀔 수 있습니다.
+> 마찰 때문에 목표 앞에서 멈추는 오차를 줄이는 기능은 아직 없습니다. 거동은 이후 버전에서 바뀔 수
+> 있습니다.
 
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다. controller마다 파일이 하나씩입니다.
@@ -460,8 +434,8 @@ hand.set_controller_config(controller);
 >   filter를 끈 상태와 차단 주파수가 다른 두 상태에서 각각 전송해 setpoint를 나란히 출력하고,
 >   `deadband` 값보다 작은 변화가 무시되는 것을 확인합니다.
 > - [`07_impedance_controller.cpp`](../../cpp/examples/07_impedance_controller.cpp) — 같은 target을
->   유지한 채 `stiffness` 필드만 올리며 effort setpoint가 증가하는 것을 출력합니다. finger를 붙잡아
->   변위를 만들면 값이 달라집니다.
+>   유지한 채 index j2의 `stiffness` 값만 0.2·0.5·1로 올리며 effort setpoint가 증가하는 것을
+>   출력합니다. finger를 붙잡아 변위를 만들면 값이 달라집니다.
 
 ## 5. Command
 

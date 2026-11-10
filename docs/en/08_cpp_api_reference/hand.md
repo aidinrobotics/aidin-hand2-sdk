@@ -156,7 +156,8 @@ joint command goes through the workspace projection automatically. The range mod
 
 **Parameters**     ｜ `command` — one of the five command types<br>
 **Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
-`WrongCallOrder` (not `Running`, or `homing_state != Succeeded`, from which [`Idle`](types_command.md#idle) is exempt)<br>
+`WrongCallOrder` (not `Running`, or `homing_state != Succeeded`, from which [`Idle`](types_command.md#idle) is exempt) ·
+`InvalidArgument` (a [`JointImpedanceCommand`](types_command.md#jointimpedancecommand) on hand type C)<br>
 **Preconditions**  ｜ `Running` — the actuator enable must be confirmed, so this comes after
 [`run()`](#handrun) succeeds<br>
 **Notes**          ｜ A bad value does not throw. The previous command keeps going out,
@@ -189,8 +190,8 @@ Sets the filter and the impedance gains. Callable at any time, applied from the 
 
 **Parameters**     ｜ `config` — [`ControllerConfig`](types_config.md#controllerconfig)<br>
 **Throws**         ｜ `WrongCallOrder` (destroyed `HandCore` or invalidated handle) ·
-`InvalidArgument` — one of `cutoff_freq`, `deadband`, `stiffness`, `damping` is
-non-finite or negative<br>
+`InvalidArgument` — a field is non-finite or outside its allowed range, see
+[`ControllerConfig`](types_config.md#controllerconfig)<br>
 **Notes**          ｜ On failure the SDK keeps the previous settings. There is no getter, so
 the application keeps
 the values it applied

@@ -66,22 +66,12 @@ non-finite or negative, [`set_controller_config()`](hand.md#handset_controller_c
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | see table | Gain on position error |
-| `damping` | `std::array<double, kActuatorCount>` | `1e-5` on every axis | Gain on velocity |
+| `stiffness` | `std::array<double, kActiveJointCount>` | all `1.0` | Stiffness per active joint, 0 to 1. 1 = the joint's hard stiffness |
+| `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
+| `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the target low-pass filter [Hz] |
 
-Computed in encoder space:
-
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-| Actuator index | stiffness | damping |
-|---|---:|---:|
-| 0 – 3 (thumb) | `0.02` | `1e-5` |
-| 4, 5 / 7, 8 / 10, 11 / 13, 14 (long finger a1, a2) | `0.01` | `1e-5` |
-| 6 / 9 / 12 / 15 (long finger a3) | `0.02` | `1e-5` |
-
-If any axis is non-finite or negative, [`set_controller_config()`](hand.md#handset_controller_config) throws `InvalidArgument`. How to
-choose the values is in the [C++ guide](../07_cpp_usage_guide.md#422-joint-impedance-controller).
+`stiffness` follows the order of [`JointImpedanceCommand::target`](types_command.md#jointimpedancecommand).
+[`set_controller_config()`](hand.md#handset_controller_config) throws `InvalidArgument` when `stiffness` is non-finite or
+outside 0 to 1, or when `cutoff_freq` is non-finite or negative.
 
 ---

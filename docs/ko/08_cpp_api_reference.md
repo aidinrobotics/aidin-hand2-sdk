@@ -80,6 +80,7 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 |---|---|
 | [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | actuator encoder 16개 → joint 21개 |
 | [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | active joint 16개 → actuator encoder 16개 |
+| [`compute_joint_vel_eff()`](08_cpp_api_reference/hand_kinematics.md#compute_joint_vel_eff) | `HandState` 하나 → active joint 16개의 속도와 effort |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
 
@@ -177,6 +178,7 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 | [`HandState`](08_cpp_api_reference/types_state.md#handstate) | struct | [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state)가 돌려주는 값 |
 | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | actuator 관측 |
 | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | FK 결과 |
+| [`HandStateJointVelEff`](08_cpp_api_reference/types_state.md#handstatejointveleff) | struct | active joint의 속도와 effort |
 | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | 촉각 |
 | [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | struct | 이번 cycle의 command 입력·출력 |
 | [`ActuatorPositionSetpoint` / `ActuatorEffortSetpoint`](08_cpp_api_reference/types_state.md#actuatorpositionsetpoint--actuatoreffortsetpoint) | struct | controller 출력 setpoint |

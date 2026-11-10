@@ -136,6 +136,20 @@ enum class CommandSource {
 
 ---
 
+## `HandStateJointVelEff`
+
+[`compute_joint_vel_eff()`](hand_kinematics.md#compute_joint_vel_eff)의 결과입니다. 모두 active joint
+16개의 값이고 hand type C에서는 모두 NaN입니다.
+
+| Field | Type | Description |
+|---|---|---|
+| `velocity_rad_s` | `std::array<double, kActiveJointCount>` | `velocity_rpm`에서 계산한 joint 속도 [rad/s] |
+| `effort_Nm` | `std::array<double, kActiveJointCount>` | `current_mA`에서 계산한 joint effort [N·m] |
+| `commanded_effort_Nm` | `std::array<double, kActiveJointCount>` | 이번 cycle의 effort setpoint에서 계산한 joint effort [N·m]. setpoint가 position이면 NaN |
+| `rated_effort_Nm` | `std::array<double, kActiveJointCount>` | 가장 많이 부담하는 actuator가 정격 전류에 이르는 joint effort [N·m] |
+
+---
+
 ## `TactileState`
 
 | Field | Type | Description |

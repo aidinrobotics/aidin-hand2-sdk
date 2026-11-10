@@ -119,6 +119,18 @@ enum class CommandSource {
 |---|---|---|
 | `position_rad` | `std::array<double, kJointCount>` | rad |
 
+## `HandStateJointVelEff`
+
+What [`compute_joint_vel_eff()`](hand_kinematics.md#compute_joint_vel_eff) returns. Every field holds
+the 16 active joints, and on hand type C every value is NaN.
+
+| Field | Type | Description |
+|---|---|---|
+| `velocity_rad_s` | `std::array<double, kActiveJointCount>` | Joint velocity from `velocity_rpm` [rad/s] |
+| `effort_Nm` | `std::array<double, kActiveJointCount>` | Joint effort from `current_mA` [N·m] |
+| `commanded_effort_Nm` | `std::array<double, kActiveJointCount>` | Joint effort from the effort setpoint of this cycle [N·m]. NaN when the setpoint is a position |
+| `rated_effort_Nm` | `std::array<double, kActiveJointCount>` | Joint effort at which the most loaded actuator reaches its rated current [N·m] |
+
 ## `TactileState`
 
 | Field | Type | Description |

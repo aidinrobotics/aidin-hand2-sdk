@@ -8,6 +8,44 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+The joint impedance controller works in joint space: each active joint takes a stiffness from 0 to 1
+of a measured hard stiffness, and the damping follows it. Encoder count 0 is now the hard stop, so
+actuator positions read 1000 higher than in 0.8 at the same pose. `ControllerConfig` changes size:
+request 0.9 and rebuild.
+
+### Added
+
+- **`compute_joint_vel_eff()` turns one `HandState` into the velocity and the effort of the 16
+  active joints.** `HandStateJointVelEff` carries `velocity_rad_s` from `velocity_rpm`, `effort_Nm`
+  from `current_mA` through the motor torque constant and the kinematics (gear losses not included),
+  `commanded_effort_Nm` from the effort setpoint of that cycle (NaN when the controller sent
+  positions) and `rated_effort_Nm`, the joint torque at which the most loaded actuator reaches its
+  rated current. On hand type C every value is NaN. The function is in `hand/hand_kinematics.hpp`.
+
+### Changed
+
+- **Breaking: the joint impedance controller takes a stiffness level per active joint, and
+  `ControllerConfig::JointImpedanceController` changed shape.** The per-actuator `stiffness` and
+  `damping` gains in encoder space are gone. `stiffness` is now 16 values from 0 to 1, one per
+  active joint in the order of `JointImpedanceCommand::target`, where 1 is the joint's measured
+  hard stiffness and the SDK sets the damping to match; `set_controller_config()` rejects a value
+  above 1. The target passes the joint position controller's low-pass (`filter_enabled` and
+  `cutoff_freq`, on at 10 Hz by default). The controller works in joint space so that one value
+  means the same stiffness in every pose. Hand types A and B carry the Jacobians this needs; on
+  hand type C `set_command()` rejects a `JointImpedanceCommand` with `InvalidArgument`.
+- **Breaking: encoder count 0 is the hard stop.** The SDK no longer places its origin 1000 counts
+  off the hard stop at the wire. After homing the robot hand holds 1000 counts off the stop, and the
+  joint angles there are a fraction of a degree rather than 0. An `ActuatorPositionCommand` written
+  for 0.8 now lands 1000 counts closer to the stop, so add 1000 to stored targets.
+
+### Fixed
+
+- **The control loop locks only its own memory.** `mlockall(MCL_CURRENT | MCL_FUTURE)` locked every
+  later allocation of the process the SDK ran in, and under a memlock limit an application aborted
+  with `bad_alloc` once a hand had connected. The control thread now locks its own stack, its state
+  and the SDK's code, and logs a warning when it cannot. An application that wants the whole
+  process locked calls `mlockall()` itself.
+
 ## [0.8.0] - 2026-10-07
 
 Tactile readings are `int32`, and the SDK takes a tactile bias, so the difference from the
