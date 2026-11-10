@@ -1,17 +1,18 @@
 // Copyright (c) AIDIN ROBOTICS Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// AIDIN Hand Gen2 SDK, the joint impedance controller and the two gains that shape it
+// AIDIN Hand Gen2 SDK, the joint impedance controller and the stiffness level that shapes it
 //
 // The command looks like a position command, but the controller turns it into effort instead of
-// position: the target becomes an actuator position through the inverse kinematics, and the
-// effort follows from how far the actuator is from it.
+// position: each joint gets a torque toward its target, and the actuators receive that torque
+// through the finger's kinematics.
 //
-//   effort = stiffness × position_error − damping × velocity
+//   torque = stiffness × hard stiffness × (target − position) − damping × velocity
 //
-// Both gains are per actuator, not per joint. This example holds one target while the
-// stiffness is raised, so the printed effort setpoint is answering for the gain alone. Hold
-// the index finger away from its target and the effort grows; let go and it drops back.
+// stiffness is per joint, a level 0..1 of the joint's hard stiffness, and the damping follows it.
+// This example holds one target while the level is raised, so the printed effort setpoint is
+// answering for the level alone. Hold the index finger away from its target and the effort
+// grows; let go and it drops back.
 //
 // The controller is still in development. It works, but its behaviour may change in a later
 // version, so do not build on it yet.
@@ -49,10 +50,9 @@ int main(int argc, char** argv)
 
   constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
 
-  // The index finger. kJoint indexes the command's active-joint array and kActuator indexes
-  // both the gain arrays and the setpoint array, and the two spaces are separate: an actuator
-  // index and a joint index of the same number are not the same axis. The gains are what make
-  // this distinction matter here — they are per actuator, so kActuator is what selects one.
+  // The index finger's flexion. kJoint indexes the command's active-joint array and the stiffness
+  // levels; kActuator indexes the setpoint array. The two spaces are separate: this joint is
+  // driven by two actuators, and kActuator is one of them.
   constexpr std::size_t kJoint    = 5;
   constexpr std::size_t kActuator = 5;
 
@@ -78,21 +78,20 @@ int main(int argc, char** argv)
     command.target.fill(0.0);
     command.target[kJoint] = 35.0 * kDegToRad;
 
-    // 3) Raise the stiffness on this one actuator across three passes. Every other actuator
+    // 3) Raise the stiffness level on this one joint across three passes. Every other joint
     //    keeps the default, so nothing else changes underneath the comparison.
-    for (const double stiffness : {0.005, 0.02, 0.05}) {
+    for (const double stiffness : {0.2, 0.5, 1.0}) {
       if (g_shutdown.load()) break;
 
       ControllerConfig controller;  // constructed fresh, so the other 15 stay at the default
-      controller.joint_impedance_controller.stiffness[kActuator] = stiffness;
-      controller.joint_impedance_controller.damping[kActuator]   = 1e-5;
+      controller.joint_impedance_controller.stiffness[kJoint] = stiffness;
       hand.set_controller_config(controller);
 
       // Resending the command is not required — the config change lands on the next cycle by
       // itself — but it makes each pass start the same way.
       hand.set_command(command);
 
-      std::printf("[example] stiffness %.3f — hold the index finger back and watch the effort\n", stiffness);
+      std::printf("[example] stiffness level %.1f — hold the index finger back and watch the effort\n", stiffness);
       for (int i = 0; i < 30 && !g_shutdown.load(); ++i) {
         const HandState state = hand.get_state();
 

@@ -112,17 +112,11 @@ int main(int argc, char** argv)
     hand.set_command(open);
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
-    // 3) Gains before the command. They are per actuator rather than per joint, and the
-    //    defaults are the ones the guide lists — set here explicitly so this pass does not
-    //    depend on whatever ran before it.
+    // 3) Gains before the command. The stiffness is a level 0..1 of each joint's hard stiffness
+    //    and the damping follows it — set here explicitly so this pass does not depend on
+    //    whatever ran before it.
     ControllerConfig controller;
-    controller.joint_impedance_controller.stiffness = {
-        0.02, 0.02, 0.02, 0.02,   // thumb   a0 a1 a2 a3
-        0.01, 0.01, 0.02,         // index   a1 a2 a3
-        0.01, 0.01, 0.02,         // middle
-        0.01, 0.01, 0.02,         // ring
-        0.01, 0.01, 0.02};        // baby
-    controller.joint_impedance_controller.damping.fill(1e-5);
+    controller.joint_impedance_controller.stiffness.fill(0.5);
     hand.set_controller_config(controller);
 
     // 4) The same 16 numbers, assigned to the other struct. Nothing else changed.
