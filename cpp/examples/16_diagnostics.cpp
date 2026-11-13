@@ -12,11 +12,11 @@
 // The last section prints the diagnostic record the guide asks for — the whole set of values
 // worth keeping when something needs explaining afterwards.
 //
-// Pull the CAN cable while it runs and the lifecycle turns to Faulted about 100 ms later, at
-// which point the cycle counter and the timestamp both stop advancing. That pair stopping
-// together is the signal; neither one alone tells you frames are still arriving.
+// Pull the CAN cable while it runs and the lifecycle turns to Faulted about 100 ms later, with
+// fault_code 404, at which point the cycle counter and the timestamp both stop advancing. That
+// pair stopping together is the signal; neither one alone tells you frames are still arriving.
 //
-// Run as: 16_diagnostics [right|left] [interface=can0]
+// Run as: 16_diagnostics [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand, and moves nothing. Ctrl-C prints the record and finishes.
 
 #include <array>
@@ -46,11 +46,15 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = 500;    // Hz, so the loop period to compare against is 2 ms
-    config.auto_home    = false;  // this example never leaves Connected
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;  // this example never leaves Connected
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -80,9 +84,11 @@ int main(int argc, char** argv)
       previous_misses = diagnostics.deadline_misses;
 
       // 3) The loop's four fields, plus the timestamp that should be advancing with them.
-      std::printf("\r\033[K[example] %-12s %-10s | cycles %10llu  miss %8llu (%.2f%% now)"
+      //    fault_code is 0 until the lifecycle turns to Faulted.
+      std::printf("\r\033[K[example] %-12s fault %3u %-10s | cycles %10llu  miss %8llu (%.2f%% now)"
                   "  period %5.3f ms  compute %5.3f ms  ts %s",
-                  to_string(diagnostics.lifecycle), to_string(diagnostics.homing_state),
+                  to_string(diagnostics.lifecycle), static_cast<unsigned>(diagnostics.fault_code),
+                  to_string(diagnostics.homing_state),
                   static_cast<unsigned long long>(diagnostics.control_cycles),
                   static_cast<unsigned long long>(diagnostics.deadline_misses),
                   miss_rate * 100.0, diagnostics.last_period_ms, diagnostics.last_compute_ms,
@@ -119,6 +125,7 @@ int main(int argc, char** argv)
     std::printf("  monotonic_ns     %lld\n", static_cast<long long>(monotonic_ns));
     std::printf("  state.timestamp  %lld\n", static_cast<long long>(state.timestamp));
     std::printf("  lifecycle        %s\n", to_string(diagnostics.lifecycle));
+    std::printf("  fault_code       %u\n", static_cast<unsigned>(diagnostics.fault_code));
     std::printf("  homing_state     %s\n", to_string(diagnostics.homing_state));
     std::printf("  nan_commands     %llu\n",
                 static_cast<unsigned long long>(diagnostics.nan_command_count));
@@ -139,8 +146,7 @@ int main(int argc, char** argv)
                   to_string(diagnostics.actuator_health.fault[a]));
     }
 
-    // 7) Joint positions, all 21 of them. The velocity and effort arrays are placeholders, so
-    //    they are left out of the record rather than written down as measurements.
+    // 7) Joint positions, all 21 of them.
     std::printf("  joints rad      ");
     for (std::size_t j = 0; j < kJointCount; ++j) {
       std::printf(" %+.4f", state.joints.position_rad[j]);
@@ -177,7 +183,7 @@ int main(int argc, char** argv)
     std::printf("  disabled_actuators none\n");
     std::printf("\n[example] done\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

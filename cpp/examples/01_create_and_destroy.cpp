@@ -10,7 +10,7 @@
 // Nothing moves: no run(), no home(), no set_command(). It does not even connect, because
 // ownership is decided before any CAN traffic.
 //
-// Run as: 01_create_and_destroy [right|left] [interface=can0]
+// Run as: 01_create_and_destroy [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Runs without a hand attached, since create() validates the config and allocates only.
 
 #include <atomic>
@@ -34,17 +34,19 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
-  // 1) A config is checked twice: the constructor rejects an empty interface name or a side
-  //    outside the enum, and create() rejects a control_rate of 0 or less.
-  HandConfig config{argc > 2 ? argv[2] : "can0", side};
-  config.control_rate = 500;    // Hz
-  config.auto_home    = false;  // nothing here asks for control, so homing never comes up
+  // 1) The constructor rejects an empty interface name, or a side or hand model outside its enum.
+  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+  config.auto_home = false;  // nothing here asks for control, so homing never comes up
 
-  std::printf("[example] config: interface=%s  side=%s  control_rate=%d Hz\n\n",
+  std::printf("[example] config: interface=%s  side=%s\n\n",
               config.interface_name.c_str(),
-              side == HandSide::Left ? "Left" : "Right",
-              config.control_rate);
+              side == HandSide::Left ? "Left" : "Right");
 
   try {
     // 2) The manager holds the HandCore. It is move-only, so there is exactly one owner.
@@ -73,7 +75,7 @@ int main(int argc, char** argv)
       (void)copy.get_diagnostics();
       std::printf("[example] the copy still answered, which the SDK is not supposed to allow\n");
     } catch (const Exception& error) {
-      std::printf("[example] the copy is invalid too — %s: %s\n", to_string(error.code()), error.what());
+      std::printf("[example] the copy is invalid too — %s: %s\n", to_string(error.kind()), error.what());
     }
 
     // 6) destroy_all() is the same for everything the manager owns, and the destructor does
@@ -81,7 +83,7 @@ int main(int argc, char** argv)
     manager.destroy_all();
     std::printf("\n[example] destroy_all() on an empty manager is a no-op\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

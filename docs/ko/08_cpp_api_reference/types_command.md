@@ -21,7 +21,7 @@
 enum class CommandMode { Idle, JointPosition, JointImpedance, ActuatorPosition, ActuatorEffort };
 ```
 
-[`set_command()`](hand.md#handset_command) 인자 type과 1:1이며 [`get_command_mode()`](hand.md#handget_command_mode)가 돌려줍니다.
+[`set_command()`](hand.md#handset_command) 인자 type과 1:1이며 [`get_command_mode()`](hand.md#handget_command_mode)가 반환합니다.
 
 ---
 
@@ -83,7 +83,7 @@ void clamp();
 
 | Field | Type | Unit | Description |
 |---|---|---|---|
-| `target` | `std::array<double, kActuatorCount>` | encoder count | 모터 위치 목표 16개 |
+| `target` | `std::array<double, kActuatorCount>` | encoder count | actuator 위치 목표 16개 |
 
 ---
 
@@ -93,7 +93,7 @@ void clamp();
 |---|---|---|---|
 | `target` | `std::array<double, kActuatorCount>` | 정격 전류의 0.1% | effort 목표 16개 |
 
-부호가 방향이고, 크기는 `max_effort` 값까지만 나갑니다. 정격 전류는 모든 모터가 400 mA이므로
+부호가 방향이고, 크기는 `max_effort` 값까지만 나갑니다. 정격 전류는 모든 actuator가 400 mA이므로
 `1000`(100%)이 400 mA에 해당합니다.
 
 ---

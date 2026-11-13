@@ -12,7 +12,7 @@
 // Running, and the last part of this example walks the two paths back into Running to print
 // which command each one starts from.
 //
-// Run as: 08_idle [right|left] [interface=can0]
+// Run as: 08_idle [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop. Push a finger around
 // during the Idle passes to feel the resistance the printed numbers are describing.
 
@@ -41,11 +41,15 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -58,7 +62,7 @@ int main(int argc, char** argv)
       hand.set_command(Idle{});
       std::printf("[example] Idle was accepted in Connected, which the SDK is not supposed to allow\n");
     } catch (const Exception& error) {
-      std::printf("[example] in Connected — %s: %s\n\n", to_string(error.code()), error.what());
+      std::printf("[example] in Connected — %s: %s\n\n", to_string(error.kind()), error.what());
     }
 
     // 2) In Running it goes through even before homing. Every other command needs
@@ -141,7 +145,7 @@ int main(int argc, char** argv)
     hand.stop();
     std::printf("[example] done — Idle keeps the drives on, stop() does not\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

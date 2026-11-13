@@ -169,7 +169,7 @@ int main(int argc, char** argv)
         if (line.rfind("state ", 0) == 0) {
           state = line.substr(6);
         } else {
-          note = line;   // ok, or err <ErrorCode>: <message>
+          note = line;   // ok, or err <ErrorKind>: <message>
         }
         redraw(state, grip, note);
       }

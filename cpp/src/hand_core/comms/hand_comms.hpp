@@ -16,7 +16,7 @@ namespace aidin_hand2
 {
 
 // Owns the Transport that moves frames and the Protocol that gives them meaning
-// It runs the connect and the control session, while HandCore owns the typed commands and the loop
+// It activates the communication, while HandCore owns the typed commands and the loop
 class HandComms {
  public:
   // -------------------------------- Lifetime --------------------------------
@@ -30,41 +30,37 @@ class HandComms {
   HandComms(HandComms&&) = delete;
   HandComms& operator=(HandComms&&) = delete;
 
-  // ------------------------------- Connection -------------------------------
+  // ----------------------------- Communication ------------------------------
 
-  // Opens the socket, installs the filters and sets the TX headers, rolling back a partial open
+  // Makes frames flow, without enabling any drive: opens the socket, installs the filters, checks
+  // that no other master commands the hand and sets the TX headers, rolling back a partial open
   // An interface_name of "auto" scans the CAN interfaces for the one this side is wired to
-  [[nodiscard]] Status connect();
+  [[nodiscard]] Status activate();
 
   // Safe to call repeatedly
-  void disconnect() noexcept;
+  void deactivate() noexcept;
 
-  // The interface actually connected, which after an "auto" scan is the resolved canX
+  // The interface actually activated, which after an "auto" scan is the resolved canX
   [[nodiscard]] const std::string& interface_name() const noexcept { return config_.interface_name; }
 
-  // Fixed after connect, so a mismatch with if_nametoindex means the interface was re-created
-  [[nodiscard]] int bound_interface_index() const noexcept { return transport_.bound_interface_index(); }
-
-  // -------------------------------- Session ---------------------------------
-
-  // Opens and closes the control session that read, write and home are gated on
-  [[nodiscard]] Status run();
-  [[nodiscard]] Status stop();
+  // Actuators in config_.disabled_actuators, each counted once
+  [[nodiscard]] std::size_t disabled_actuator_count() const noexcept;
 
   // -------------------------------- RT path ---------------------------------
 
-  // Called every cycle, so these return a bare ErrorCode: building a message allocates
-  // Turning a code into a sentence is the non-RT side's job
+  // Called every cycle, so these return false instead of a Status: building a message allocates
+  // Turning a failure into a sentence is the non-RT side's job
 
-  // Starts the homing sequence, which write() then drives
-  [[nodiscard]] ErrorCode home();
+  // Starts the homing sequence, which write() then drives, false while not active
+  [[nodiscard]] bool start_homing();
 
-  // Drains RX, decodes it and fills the observation
-  [[nodiscard]] ErrorCode read(HandState& hand_state, ActuatorHealth& actuator_health);
+  // Drains RX, decodes it and fills the observation, false while not active
+  [[nodiscard]] bool read(HandState& hand_state, ActuatorHealth& actuator_health);
 
   // The control word comes from the internal state machine
   // quick_stop forces 0x02, which stops the drives themselves and cancels a running homing
-  [[nodiscard]] ErrorCode write(const canfd::CommandFrames& command_frames, bool quick_stop = false);
+  // False while not active or when a frame was not sent, with last_transmit_errno() telling why
+  [[nodiscard]] bool write(const canfd::CommandFrames& command_frames, bool quick_stop = false);
 
   // Whether every enabled actuator reached quick stop, which is what stop() waits on
   [[nodiscard]] bool quick_stop_attained() const noexcept;
@@ -79,21 +75,16 @@ class HandComms {
   // Whether this session ever saw a valid frame, so silence is never reported before the first one
   [[nodiscard]] bool any_frame_received() const noexcept { return any_frame_received_; }
 
-  // Last RX anomaly, Decoded meaning none, carried as an event detail
+  // ConflictingCommand once another master's command arrived in this session, otherwise Decoded
   [[nodiscard]] canfd::DecodeResult last_receive_anomaly() const noexcept { return last_receive_anomaly_; }
-
-  // CAN_ERR_* class bits of the last error frame, telling a no-ACK apart from a bus-off
-  // Only meaningful while last_receive_anomaly is Error
-  [[nodiscard]] std::int32_t last_error_frame_class() const noexcept { return last_error_frame_class_; }
 
   // errno of the last failed TX, 0 when the reason is unknown
   [[nodiscard]] int last_transmit_errno() const noexcept { return last_transmit_errno_; }
 
   // --------------------------------- Homing ---------------------------------
 
-  // home() starts the sequence, write() drives it, and is_homing() drops to false when it ends
+  // start_homing() starts the sequence, write() drives it, and is_homing() drops to false when it ends
   [[nodiscard]] bool is_homing() const noexcept;
-  [[nodiscard]] bool last_homing_succeeded() const noexcept;
 
   // Why it ended, and how far it had got
   [[nodiscard]] HomingOutcome last_homing_outcome() const noexcept;
@@ -110,8 +101,8 @@ class HandComms {
  private:
   // -------------------------------- Internal --------------------------------
 
-  // Guards run, read and write
-  [[nodiscard]] bool is_connected() const noexcept { return transport_.is_open(); }
+  // Guards start_homing, read and write
+  [[nodiscard]] bool is_active() const noexcept { return transport_.is_open(); }
 
   // Walks the CAN interfaces for one carrying this side's state frames and pins
   // config_.interface_name to it, failing with InterfaceUnavailable when none does
@@ -142,14 +133,11 @@ class HandComms {
 
   HomingSequence homing_;
 
-  bool control_active_{false};
-
   // Reset to 0 by a frame, otherwise incremented up to saturation
   std::uint32_t cycles_since_last_frame_{0};
 
   bool any_frame_received_{false};
   canfd::DecodeResult last_receive_anomaly_{canfd::DecodeResult::Decoded};
-  std::int32_t last_error_frame_class_{0};
   int last_transmit_errno_{0};
 };
 

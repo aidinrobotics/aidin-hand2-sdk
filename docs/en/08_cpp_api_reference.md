@@ -23,12 +23,12 @@ The documents for each header file are below.
 &nbsp;&nbsp;[**`hand/hand_manager.hpp`**](08_cpp_api_reference/hand_manager.md) — `HandManager`<br>
 &nbsp;&nbsp;[**`hand/hand.hpp`**](08_cpp_api_reference/hand.md) — `Hand`<br>
 &nbsp;&nbsp;[**`hand/hand_kinematics.hpp`**](08_cpp_api_reference/hand_kinematics.md) — FK / IK<br>
-&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — constants, `HandSide`, `Finger`, array conventions<br>
+&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — constants, `HandSide`, `HandModel`, `Finger`, array conventions<br>
 &nbsp;&nbsp;[**`types/config.hpp`**](08_cpp_api_reference/types_config.md) — `HandConfig`, `ControllerConfig`<br>
 &nbsp;&nbsp;[**`types/command.hpp`**](08_cpp_api_reference/types_command.md) — `CommandMode` and the 5 commands<br>
 &nbsp;&nbsp;[**`types/state.hpp`**](08_cpp_api_reference/types_state.md) — `HandLifecycle`, `HomingState`, `HandState`, `ActuatorFault`<br>
 &nbsp;&nbsp;[**`types/diagnostics.hpp`**](08_cpp_api_reference/types_diagnostics.md) — `Diagnostics`<br>
-&nbsp;&nbsp;[**`types/error.hpp`**](08_cpp_api_reference/types_error.md) — `ErrorCode`, `Exception`<br>
+&nbsp;&nbsp;[**`types/error.hpp`**](08_cpp_api_reference/types_error.md) — `ErrorKind`, `Exception`, error code constants (`types/error_codes.hpp`)<br>
 &nbsp;&nbsp;[**`logging/logging.hpp`**](08_cpp_api_reference/logging.md) — `LogLevel` and the logging functions<br>
 &nbsp;&nbsp;[**`version.hpp`**](08_cpp_api_reference/version.md) — version constants and `find_package`
 
@@ -83,6 +83,13 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 | [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | 16 actuator encoders → 21 joints |
 | [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | 16 active joints → 16 actuator encoders |
 
+**[`types/description.hpp`](08_cpp_api_reference/types_description.md)**
+
+| Function | Role |
+|---|---|
+| [`parse_hand_model()`](08_cpp_api_reference/types_description.md#parse_hand_model) | string → `HandModel` |
+| [`to_string()`](08_cpp_api_reference/types_description.md#to_string) | `HandModel` → string |
+
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
 
 | Function | Role |
@@ -109,9 +116,11 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 
 | Function | Role |
 |---|---|
-| [`to_string(ErrorCode)`](08_cpp_api_reference/types_error.md#enum-errorcode) | The error code name |
-| [`Exception::Exception()`](08_cpp_api_reference/types_error.md#exceptionexception) | Build an exception from a code and a message |
-| [`Exception::code()`](08_cpp_api_reference/types_error.md#exceptioncode) | Returns the `ErrorCode` |
+| [`to_string(ErrorKind)`](08_cpp_api_reference/types_error.md#enum-errorkind) | The classification name |
+| [`kind_of()`](08_cpp_api_reference/types_error.md#kind_of) | The `ErrorKind` an error code belongs to |
+| [`Exception::Exception()`](08_cpp_api_reference/types_error.md#exceptionexception) | Build an exception from a robot hand and an error code, or a classification, and a message |
+| [`Exception::kind()`](08_cpp_api_reference/types_error.md#exceptionkind) | Returns the `ErrorKind` |
+| [`Exception::code()`](08_cpp_api_reference/types_error.md#exceptioncode) | Returns the error code |
 
 **[`logging/logging.hpp`](08_cpp_api_reference/logging.md)**
 
@@ -146,6 +155,7 @@ Every enum, struct, class and alias, grouped by the file that declares it. A nes
 |---|---|---|
 | [constants](08_cpp_api_reference/types_description.md#constants) | `constexpr` | The actuator, joint and tactile counts |
 | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | enum | Left or right |
+| [`HandModel`](08_cpp_api_reference/types_description.md#enum-handmodel) | enum | The robot hand's model |
 | [`Finger`](08_cpp_api_reference/types_description.md#enum-finger) | enum | The tactile finger index |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
@@ -178,10 +188,10 @@ Every enum, struct, class and alias, grouped by the file that declares it. A nes
 | [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) | enum | The actuator error code |
 | [`CommandSource`](08_cpp_api_reference/types_state.md#enum-commandsource) | enum | The source that this cycle used |
 | [`HandState`](08_cpp_api_reference/types_state.md#handstate) | struct | What [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state) returns |
-| [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | The actuator observations |
-| [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | The FK result |
-| [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | The tactile readings |
-| [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | struct | The command input and output of this cycle |
+| [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | Position, velocity and current of the 16 actuators |
+| [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | Angle, velocity and estimated torque of the 21 joints |
+| [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | Tactile sensor values |
+| [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | struct | Command input and output of this cycle |
 | [`ActuatorPositionSetpoint` / `ActuatorEffortSetpoint`](08_cpp_api_reference/types_state.md#actuatorpositionsetpoint--actuatoreffortsetpoint) | struct | The controller output setpoint |
 | [`ActuatorHealth`](08_cpp_api_reference/types_state.md#actuatorhealth) | struct | The per-actuator enable and fault |
 | [`ControllerOutput`](08_cpp_api_reference/types_state.md#type-aliases) | alias | The setpoint variant |
@@ -196,8 +206,9 @@ Every enum, struct, class and alias, grouped by the file that declares it. A nes
 
 | Type | Kind | Role |
 |---|---|---|
-| [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) | enum | The failure classification |
+| [`ErrorKind`](08_cpp_api_reference/types_error.md#enum-errorkind) | enum | The failure classification |
 | [`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error) | class | The exception that a public call throws |
+| [`error_code`](08_cpp_api_reference/types_error.md#namespace-error_code) | namespace | Error code constants |
 
 **[`logging/logging.hpp`](08_cpp_api_reference/logging.md)**
 

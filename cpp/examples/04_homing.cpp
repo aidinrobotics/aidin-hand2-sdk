@@ -11,7 +11,7 @@
 // rather than during. What they show is the reference being built: nothing meaningful before,
 // the hard stop at -1000 straight after, and 0 once the fingers back off it.
 //
-// Run as: 04_homing [right|left] [interface=can0]
+// Run as: 04_homing [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, so clear the space around
 // the hand and keep your hands off it until the run finishes.
 
@@ -83,11 +83,15 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;  // home() is called below, so run() must not do it as well
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;  // home() is called below, so run() must not do it as well
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -107,7 +111,7 @@ int main(int argc, char** argv)
       hand.set_command(zero_pose);
       std::printf("[example] the command was accepted, which the SDK is not supposed to allow yet\n");
     } catch (const Exception& error) {
-      std::printf("[example] before homing — %s: %s\n\n", to_string(error.code()), error.what());
+      std::printf("[example] before homing — %s: %s\n\n", to_string(error.kind()), error.what());
     }
 
     // 3) Idle is the exception. It needs no reference because it sends an effort of 0.
@@ -163,7 +167,7 @@ int main(int argc, char** argv)
   } catch (const Exception& error) {
     // A HardwareFault here is most likely homing itself failing, and the message names the
     // actuator that did not reach its stop.
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

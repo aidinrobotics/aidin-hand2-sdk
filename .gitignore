@@ -2,6 +2,7 @@ build/
 build-*/
 install/
 log/
+Testing/
 .cache/
 .vscode/
 *.pyc

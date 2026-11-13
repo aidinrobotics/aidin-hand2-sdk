@@ -1,8 +1,8 @@
 # SDK build & install
 
 Build, test, and install the SDK, then confirm it works with the example. Complete
-[Real-time kernel setup](04_real_time_kernel_setup.md) and
-[CAN-FD setup](05_can_fd_setup.md) first.
+[CAN-FD setup](05_can_fd_setup.md) first. [Real-time kernel setup](04_real_time_kernel_setup.md) is
+recommended, and the build and the installation do not need it.
 
 ## Contents
 
@@ -33,40 +33,13 @@ Run all following commands from the SDK repo root.
 cd aidin-hand2-sdk
 ```
 
-> [!IMPORTANT]
-> **The AIDIN Hand Gen2 comes in hand types A, B and C, and you select the type at build time.**
-> The kinematics computes differently for each type. AIDIN tells you the type when it delivers
-> the robot hand.
-
-Run only the one below that matches your hand.
-
-**a) type A**
+> [!NOTE]
+> The hand model (`Gen2` or `Gen2B`) is not a build choice. One build carries the kinematics of
+> both models, and the program picks one through the `hand_model` field of
+> [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig).
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#   -- aidin_hand2: hand type = a
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_a.a
-```
-
-**b) type B**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=b
-#   -- aidin_hand2: hand type = b
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_b.a
-```
-
-**c) type C**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=c
-#   -- aidin_hand2: hand type = c
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_c.a
-```
-
-Confirm the selection from those two lines, then build.
-
-```bash
 cmake --build cpp/build -j"$(nproc)"
 ```
 
@@ -108,7 +81,7 @@ Your application's CMakeLists.txt is two lines. Always request the version: a di
 not compatible, and CMake skips the version check when none is requested.
 
 ```cmake
-find_package(aidin_hand2 0.8 REQUIRED)
+find_package(aidin_hand2 0.9 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -125,7 +98,7 @@ Tell your application's CMakeLists.txt where the prefix is.
 
 ```cmake
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
-find_package(aidin_hand2 0.8 REQUIRED)
+find_package(aidin_hand2 0.9 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 

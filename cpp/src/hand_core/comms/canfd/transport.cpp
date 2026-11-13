@@ -1,7 +1,5 @@
 #include "hand_core/comms/canfd/transport.hpp"
 
-#include "hand_core/comms/canfd/interface_setup.hpp"
-
 #include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -13,7 +11,6 @@
 #include <cstring>
 #include <string>
 #include <system_error>
-#include <utility>
 
 namespace aidin_hand2::canfd
 {
@@ -27,15 +24,14 @@ Transport::~Transport()
 
 Status Transport::open(const std::string& interface)
 {
-  // 1) Leave an existing socket alone, since reopening goes through close()
+  // 1) Leave an existing socket alone, since every reopen in the SDK goes through close() first
   if (fd_ >= 0) {
-    return {ErrorCode::WrongCallOrder, "CAN transport already open: " + interface + " — close it before reopening"};
+    return {error_code::kInternalState, "CAN transport already open on '" + interface + "'"};
   }
 
-  // 2) Bring the interface up with the protocol constants, doing nothing if it is already up
-  Status interface_ready = ensure_interface_up(interface);
-  if (!interface_ready.ok()) {
-    return interface_ready;
+  // 2) Check the name before anything CAN specific, so a wrong name is reported as such
+  if (if_nametoindex(interface.c_str()) == 0) {
+    return open_failure(interface, errno);
   }
 
   // 3) Create the CAN raw socket
@@ -53,7 +49,8 @@ Status Transport::open(const std::string& interface)
     return open_failure(interface, saved_errno);
   }
 
-  // 5) Resolve the interface name to an index
+  // 5) Resolve the interface name to an index, kept apart because ifr_flags shares its storage
+  // An interface removed since step 2 fails here with ENODEV, reported as not found
   ifreq ifr{};
   std::strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ - 1);
   if (::ioctl(fd, SIOCGIFINDEX, &ifr) < 0) {
@@ -61,11 +58,23 @@ Status Transport::open(const std::string& interface)
     ::close(fd);
     return open_failure(interface, saved_errno);
   }
+  const int interface_index = ifr.ifr_ifindex;
 
-  // 6) Bind, closing only the local fd on failure so this object stays closed
+  // 6) A down interface binds without error and then stays silent, so it is refused here
+  if (::ioctl(fd, SIOCGIFFLAGS, &ifr) < 0) {
+    const int saved_errno = errno;
+    ::close(fd);
+    return open_failure(interface, saved_errno);
+  }
+  if ((ifr.ifr_flags & IFF_UP) == 0) {
+    ::close(fd);
+    return {error_code::kInterfaceDown, "CAN interface '" + interface + "' is down"};
+  }
+
+  // 7) Bind, closing only the local fd on failure so this object stays closed
   sockaddr_can addr{};
   addr.can_family = AF_CAN;
-  addr.can_ifindex = ifr.ifr_ifindex;
+  addr.can_ifindex = interface_index;
   if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
     const int saved_errno = errno;
     ::close(fd);
@@ -73,7 +82,6 @@ Status Transport::open(const std::string& interface)
   }
 
   fd_ = fd;
-  bound_interface_index_ = ifr.ifr_ifindex;
   return {};
 }
 
@@ -129,49 +137,32 @@ bool Transport::set_id_filters(const std::vector<can_filter>& filters)
   return ::setsockopt(fd_, SOL_CAN_RAW, CAN_RAW_FILTER, data, len) == 0;
 }
 
-bool Transport::set_error_mask(can_err_mask_t mask)
-{
-  if (fd_ < 0) {
-    return false;
-  }
-  return ::setsockopt(fd_, SOL_CAN_RAW, CAN_RAW_ERR_FILTER, &mask, sizeof(mask)) == 0;
-}
-
 // --------------------------------- Helpers ----------------------------------
 
-// Every case is InterfaceUnavailable, only the message differs
+// Every case is an E3xx, InterfaceUnavailable
 Status Transport::open_failure(const std::string& interface, int err)
 {
-  std::string message;
   switch (err) {
     case ENODEV:
-      message = "CAN interface '" + interface +
-                "' not found (check the name with `ip link`, and that it exists)";
-      break;
-    // ENETDOWN cannot reach here, because ensure_interface_up() ran first
+      return {error_code::kInterfaceNotFound, "CAN interface '" + interface + "' not found"};
+    // ENETDOWN cannot reach here, because open() refuses a down interface before binding
     // A link that drops later shows up through send() and last_send_errno()
     case EPERM:
     case EACCES:
-      message = "permission denied opening CAN socket on '" + interface +
-                "' (need root or CAP_NET_RAW)";
-      break;
+      return {error_code::kSocketPermissionDenied,
+              "permission denied opening CAN socket on '" + interface + "'"};
     case EAFNOSUPPORT:
     case EPROTONOSUPPORT:
-      message = "CAN not supported by the kernel (try `modprobe can can_raw`)";
-      break;
+      return {error_code::kCanNotSupported, "CAN not supported by the kernel"};
     case ENOPROTOOPT:
       // setsockopt(CAN_RAW_FD_FRAMES) refused the option itself
-      message = "kernel or interface '" + interface +
-                "' is not configured for CAN-FD (CAN_RAW_FD_FRAMES);"
-                " check with `ip -details link show " + interface + "`";
-      break;
+      return {error_code::kCanFdNotConfigured,
+              "kernel or interface '" + interface + "' is not configured for CAN-FD (CAN_RAW_FD_FRAMES)"};
     default:
       // Falls back to the standard description, which is thread safe
-      message = "failed to open CAN interface '" + interface +
-                "': " + std::generic_category().message(err);
-      break;
+      return {error_code::kInterfaceOpenFailed,
+              "CAN interface '" + interface + "' could not be opened (" + std::generic_category().message(err) + ")"};
   }
-  return {ErrorCode::InterfaceUnavailable, std::move(message)};
 }
 
 }  // namespace aidin_hand2::canfd

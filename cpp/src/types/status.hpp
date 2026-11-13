@@ -1,70 +1,85 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
-#include <aidin_hand2/types/config.hpp>  // HandSide
 #include <aidin_hand2/types/error.hpp>
-
-#include "logging/log.hpp"
+#include <aidin_hand2/types/error_codes.hpp>
 
 namespace aidin_hand2
 {
 
 // Failure result returned by internal calls
 struct Status {
-  ErrorCode code{ErrorCode::None};
+  // A number from error_codes.hpp, 0 on success
+  std::uint16_t code{0};
   std::string message{};
 
   [[nodiscard]] bool ok() const noexcept
   {
-    return code == ErrorCode::None;
+    return code == 0;
+  }
+
+  [[nodiscard]] ErrorKind kind() const noexcept
+  {
+    return kind_of(code);
   }
 };
 
-// Logs the failure before throwing
-inline void throw_if_error(const Status& status)
+// The caller reports a thrown failure, so nothing here logs it
+// A failure about one hand reads "[left] [E<code>] <message>"
+[[noreturn]] inline void throw_error(HandSide side, std::uint16_t code, const std::string& message)
 {
-  if (!status.ok()) {
-    log_exception(status.code, status.message);
-    throw Exception(status.code, status.message);
-  }
+  throw Exception(side, code, message);
+}
+
+// For a failure that is about no single hand, as in destroy_all()
+[[noreturn]] inline void throw_error(std::uint16_t code, const std::string& message)
+{
+  throw Exception(code, message);
 }
 
 inline void throw_if_error(HandSide side, const Status& status)
 {
   if (!status.ok()) {
-    log_exception(side, status.code, status.message);
-    throw Exception(status.code, status.message);
+    throw_error(side, status.code, status.message);
   }
 }
 
-[[noreturn]] inline void throw_error(ErrorCode code, std::string message)
+// Builds "cannot <action>: unexpected failure (<detail>)"
+inline std::string unexpected_failure(const char* action, const char* detail)
 {
-  log_exception(code, message);
-  throw Exception(code, std::move(message));
+  return std::string("cannot ") + action + ": unexpected failure (" + detail + ")";
 }
 
-[[noreturn]] inline void throw_error(HandSide side, ErrorCode code, std::string message)
-{
-  log_exception(side, code, message);
-  throw Exception(code, std::move(message));
-}
-
-// Rethrows an Exception as is and wraps anything else as UnexpectedError
-// operation is the public API name, as in "connect()"
+// Rethrows an Exception as is and wraps anything else as E901
+// action is the "<action>" of a "cannot <action>: " message, as in "connect hand"
 template <class Callable>
-auto guard_boundary(const char* operation, Callable&& callable) -> decltype(callable())
+auto guard_boundary(HandSide side, const char* action, Callable&& callable) -> decltype(callable())
 {
   try {
     return callable();
   } catch (const Exception&) {
     throw;
   } catch (const std::exception& unexpected) {
-    throw_error(ErrorCode::UnexpectedError,
-                std::string("Unexpected failure in ") + operation + ": " + unexpected.what());
+    throw_error(side, error_code::kUnexpectedException, unexpected_failure(action, unexpected.what()));
   } catch (...) {
-    throw_error(ErrorCode::UnexpectedError,
-                std::string("Unexpected failure in ") + operation + ": unknown exception");
+    throw_error(side, error_code::kUnexpectedException, unexpected_failure(action, "unknown exception"));
+  }
+}
+
+// The same for a call that spans both hands, as destroy_all() does
+template <class Callable>
+auto guard_boundary(const char* action, Callable&& callable) -> decltype(callable())
+{
+  try {
+    return callable();
+  } catch (const Exception&) {
+    throw;
+  } catch (const std::exception& unexpected) {
+    throw_error(error_code::kUnexpectedException, unexpected_failure(action, unexpected.what()));
+  } catch (...) {
+    throw_error(error_code::kUnexpectedException, unexpected_failure(action, "unknown exception"));
   }
 }
 

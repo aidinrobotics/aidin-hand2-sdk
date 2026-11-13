@@ -10,7 +10,7 @@
 // create() twice with configs that differ in interface_name and hand_side is the whole of it.
 // destroy_all() releases both, and the destructor would do the same.
 //
-// Run as: 02_two_hands [left_interface=can0] [right_interface=can1]
+// Run as: 02_two_hands [left_interface=can0] [right_interface=can1] [hand_model=gen2|gen2b]
 // Needs two hands, one per interface. Nothing moves: no run(), no home(), no set_command().
 
 #include <atomic>
@@ -37,17 +37,22 @@ int main(int argc, char** argv)
 
   const std::string left_interface  = argc > 1 ? argv[1] : "can0";
   const std::string right_interface = argc > 2 ? argv[2] : "can1";
+  const std::optional<HandModel> parsed = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!parsed) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
+  const HandModel hand_model = *parsed;
 
   try {
     // 1) Two configs. The side tells the SDK which CAN IDs to expect — left answers on 0x2xx
     //    and right on 0x1xx — so a swapped pair shows up as no data rather than as odd motion.
-    HandConfig left_config{left_interface, HandSide::Left};
-    left_config.control_rate = 500;    // Hz
-    left_config.auto_home    = false;  // nothing here asks for control
+    //    The hand model picks the kinematics; both hands here are of the same model.
+    HandConfig left_config{left_interface, HandSide::Left, hand_model};
+    left_config.auto_home = false;  // nothing here asks for control
 
-    HandConfig right_config{right_interface, HandSide::Right};
-    right_config.control_rate = 500;
-    right_config.auto_home    = false;
+    HandConfig right_config{right_interface, HandSide::Right, hand_model};
+    right_config.auto_home = false;
 
     // 2) One manager, two HandCore instances. Nothing is shared between them.
     HandManager manager;
@@ -93,7 +98,7 @@ int main(int argc, char** argv)
     std::printf("[example] destroy_all() released both hands\n");
   } catch (const Exception& error) {
     // The message names the interface that failed, which is what tells the two apart here.
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

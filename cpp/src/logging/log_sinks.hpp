@@ -16,15 +16,14 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <aidin_hand2/logging/logging.hpp>
-#include <aidin_hand2/types/description.hpp>
 
 // spdlog wiring for logging.cpp, kept out of the API file
 
 namespace aidin_hand2::log_sinks
 {
 
-// %E.%F is epoch seconds.nanoseconds, %* and %~ are the custom flags below
-inline constexpr const char* kConsolePattern = "[%E.%F] [aidin_hand2] %^%*%$ %~";
+// %E.%F is epoch seconds.nanoseconds, %* is the custom flag below
+inline constexpr const char* kConsolePattern = "[%E.%F] [aidin_hand2] %^%*%$ %v";
 inline constexpr const char* kFilePattern    = "[%E.%F] [aidin_hand2] [%l] %v";
 
 // A fault storm writes about 200 KiB/s, so 300 MiB keeps roughly 25 minutes of one. 50 MiB per
@@ -59,11 +58,6 @@ inline LogLevel from_spdlog_level(spdlog::level::level_enum level)
   }
 }
 
-inline const char* hand_prefix(HandSide side)
-{
-  return side == HandSide::Left ? "[left] " : "[right] ";
-}
-
 // Renders "[level]" padded on the right so messages start at the same column
 class BracketedLevelFlag : public spdlog::custom_flag_formatter
 {
@@ -84,28 +78,6 @@ class BracketedLevelFlag : public spdlog::custom_flag_formatter
   std::unique_ptr<custom_flag_formatter> clone() const override
   {
     return spdlog::details::make_unique<BracketedLevelFlag>();
-  }
-};
-
-// Indents the lines after an explicit newline so they align with the message column
-class HangingIndentMessageFlag : public spdlog::custom_flag_formatter
-{
- public:
-  void format(const spdlog::details::log_msg& message, const std::tm&,
-              spdlog::memory_buf_t& destination) override
-  {
-    // 22 timestamp + 1 + 13 logger name + 1 + 10 level field + 1
-    constexpr std::size_t kPrefixWidth = 48;
-    for (const char character : message.payload) {
-      destination.push_back(character);
-      if (character == '\n') {
-        for (std::size_t i = 0; i < kPrefixWidth; ++i) destination.push_back(' ');
-      }
-    }
-  }
-  std::unique_ptr<custom_flag_formatter> clone() const override
-  {
-    return spdlog::details::make_unique<HangingIndentMessageFlag>();
   }
 };
 
@@ -141,9 +113,7 @@ struct LoggerState {
     console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     console_sink->set_level(spdlog::level::info);
     auto console_formatter = std::make_unique<spdlog::pattern_formatter>();
-    console_formatter->add_flag<BracketedLevelFlag>('*')
-        .add_flag<HangingIndentMessageFlag>('~')
-        .set_pattern(kConsolePattern);
+    console_formatter->add_flag<BracketedLevelFlag>('*').set_pattern(kConsolePattern);
     console_sink->set_formatter(std::move(console_formatter));
     logger = std::make_shared<spdlog::logger>("aidin_hand2", console_sink);
 

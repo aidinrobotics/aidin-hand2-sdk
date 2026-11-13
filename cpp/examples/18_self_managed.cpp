@@ -8,7 +8,7 @@
 // same handler, the first cycle performs the initial connect from Disconnected, and a lifecycle
 // change that arrives without an exception (auto-reconnect finishing, for one) is picked up too
 //
-// Run as: 18_self_managed [right|left] [interface=can0]
+// Run as: 18_self_managed [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. auto_home is on, so the first run() drives every finger into its hard stop:
 // clear the space around the hand before running. Ctrl-C leaves the loop and the HandManager
 // destructor confirms the quick stop on the way out
@@ -17,6 +17,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdio>
 #include <string>
 #include <thread>
 #include <vector>
@@ -104,10 +105,14 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate        = 500;    // Hz
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
     config.auto_home           = true;   // run() homes before it enables control
     config.auto_reconnect      = true;   // the control loop rebuilds a dropped link by itself
     config.auto_reconnect_home = true;
@@ -117,6 +122,9 @@ int main(int argc, char** argv)
     HandManager manager;
     Hand hand = manager.create(config);
     hand.set_max_effort(600.0);          // percent of rated current, independent of the lifecycle
+
+    // The last failure printed, so one that repeats every cycle prints once
+    std::string last_error;
 
     while (!g_shutdown.load()) {
       try {
@@ -128,14 +136,18 @@ int main(int argc, char** argv)
           case HandLifecycle::Running:      break;
         }
         hand.set_command(next_command());
-      } catch (const Exception&) {
-        // The SDK logged the cause before throwing. Skipping this cycle is enough:
-        // the switch on the next one performs whatever step is still missing
+        last_error.clear();
+      } catch (const Exception& error) {
+        // Skipping this cycle is enough: the switch on the next one performs whatever step is
+        // still missing
+        if (last_error != error.what()) std::printf("[example] %s\n", error.what());
+        last_error = error.what();
       }
       wait_next_period();
     }
-  } catch (const Exception&) {
+  } catch (const Exception& error) {
     // Never started. The config was rejected, or the hand could not be created
+    std::printf("[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
   return 0;

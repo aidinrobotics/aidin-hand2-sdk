@@ -30,4 +30,8 @@ enum class Mode {
 void set_mode(Mode mode) noexcept;
 Mode get_mode() noexcept;
 
+// Whether a control word frame carrying quick stop (0x0002) was sent since the
+// last set_mode().
+bool quick_stop_sent() noexcept;
+
 }  // namespace aidin_hand2::mock

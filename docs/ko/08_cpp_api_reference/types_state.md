@@ -8,11 +8,11 @@
 | [`HomingState`](#enum-homingstate) | enum | 원점 상태 |
 | [`ActuatorFault`](#enum-actuatorfault) | enum | actuator error code |
 | [`CommandSource`](#enum-commandsource) | enum | 이번 cycle에 쓴 출처 |
-| [`HandState`](#handstate) | struct | [`get_state()`](hand.md#handget_state)가 돌려주는 값 |
-| [`ActuatorState`](#actuatorstate) | struct | actuator 관측 |
-| [`JointState`](#jointstate) | struct | FK 결과 |
-| [`TactileState`](#tactilestate) | struct | 촉각 |
-| [`CommandedState`](#commandedstate) | struct | 이번 cycle의 command 입력·출력 |
+| [`HandState`](#handstate) | struct | [`get_state()`](hand.md#handget_state)가 반환하는 값 |
+| [`ActuatorState`](#actuatorstate) | struct | actuator 16개의 위치·속도·전류 |
+| [`JointState`](#jointstate) | struct | joint 21개의 각도·속도·추정 토크 |
+| [`TactileState`](#tactilestate) | struct | 촉각 센서 값 |
+| [`CommandedState`](#commandedstate) | struct | 이번 cycle의 command 입력과 출력 |
 | [`ActuatorHealth`](#actuatorhealth) | struct | actuator별 enable·fault |
 | [`ControllerOutput`](#type-aliases) | alias | setpoint variant |
 
@@ -58,26 +58,26 @@ constexpr const char* to_string(HomingState state) noexcept;
 
 ```cpp
 enum class ActuatorFault : std::uint16_t {
-  None                     = 0x0000,  // 정상
-  OverCurrentError         = 0x2310,  // 전기
-  OverVoltageError         = 0x3210,  // 전기
-  UnderVoltageError        = 0x3220,  // 전기
-  OverTemperatureError     = 0x4210,  // 열
-  CurrentDetectionError    = 0x5210,  // 전기
-  SpeedError               = 0x7310,  // 제어
-  CommunicationError       = 0x7500,  // 통신
-  FollowingError           = 0x8611,  // 제어, 추종 실패
-  HallSensorError          = 0xFF01,  // 홀센서
-  OverLoadError            = 0xFF02,  // 기구 부하
-  PositiveLimitSwitchError = 0xFF03,  // 리밋
-  NegativeLimitSwitchError = 0xFF04,  // 리밋
-  EmergencySwitchError     = 0xFF05,  // 안전
-  Sto1Error                = 0xFF06,  // 안전 (STO = Safe Torque Off)
-  Sto2Error                = 0xFF07,  // 안전 (STO = Safe Torque Off)
-  SerialEncoderChannelAError             = 0xFF24,  // 엔코더
-  SerialEncoderChannelADisconnectedError = 0xFF25,  // 엔코더
-  SerialEncoderChannelBError             = 0xFF26,  // 엔코더
-  SerialEncoderChannelBDisconnectedError = 0xFF27,  // 엔코더
+  None                     = 0x0000,
+  OverCurrentError         = 0x2310,
+  OverVoltageError         = 0x3210,
+  UnderVoltageError        = 0x3220,
+  OverTemperatureError     = 0x4210,
+  CurrentDetectionError    = 0x5210,
+  SpeedError               = 0x7310,
+  CommunicationError       = 0x7500,
+  FollowingError           = 0x8611,
+  HallSensorError          = 0xFF01,
+  OverLoadError            = 0xFF02,
+  PositiveLimitSwitchError = 0xFF03,
+  NegativeLimitSwitchError = 0xFF04,
+  EmergencySwitchError     = 0xFF05,
+  Sto1Error                = 0xFF06,
+  Sto2Error                = 0xFF07,
+  SerialEncoderChannelAError             = 0xFF24,
+  SerialEncoderChannelADisconnectedError = 0xFF25,
+  SerialEncoderChannelBError             = 0xFF26,
+  SerialEncoderChannelBDisconnectedError = 0xFF27,
 };
 
 constexpr const char* to_string(ActuatorFault fault) noexcept;
@@ -85,8 +85,8 @@ constexpr const char* to_string(ActuatorFault fault) noexcept;
 
 actuator가 보고하는 `0x603F` error code입니다. fault가 떠도 SDK는 스스로 멈추지 않습니다. 대신
 제어·통신 루프가 그 actuator에 fault reset을 반복 시도하고, 해당 actuator는 command 적용 대상에서
-제외됩니다. `disabled_actuators` 필드에 지정한 index는 보고되지 않습니다. code별 점검 항목은
-[Error messages](../15_error_messages.md#11-actuator-fault)에 있습니다.
+제외됩니다. `disabled_actuators` 필드에 지정한 index는 보고되지 않습니다. fault가 보고됐을 때 남는 log와 조치는
+[Error messages의 E504](../15_error_messages.md#6-e5xx-hardwarefault)에 있습니다.
 
 ---
 
@@ -107,14 +107,14 @@ enum class CommandSource {
 
 | Field | Type | Description |
 |---|---|---|
-| `timestamp` | `std::int64_t` | 그 cycle의 `CLOCK_REALTIME` epoch ns. `0`은 아직 값이 없다는 뜻 |
-| `actuators` | [`ActuatorState`](#actuatorstate) | actuator 관측 |
-| `joints` | [`JointState`](#jointstate) | FK 결과 |
-| `tactile` | [`TactileState`](#tactilestate) | 촉각 |
-| `commanded` | [`CommandedState`](#commandedstate) | 이번 cycle의 command 입력·출력 |
+| `timestamp` | `std::int64_t` | 그 cycle의 시각 |
+| `actuators` | [`ActuatorState`](#actuatorstate) | actuator 16개의 위치·속도·전류 |
+| `joints` | [`JointState`](#jointstate) | joint 21개의 각도·속도·추정 토크 |
+| `tactile` | [`TactileState`](#tactilestate) | 촉각 센서 값 |
+| `commanded` | [`CommandedState`](#commandedstate) | 이번 cycle의 command 입력과 출력 |
 
-`timestamp` 필드는 rosbag이나 ROS `header.stamp`와 맞추는 용도입니다. 주기 측정에는
-`Diagnostics::last_period_ms` 필드를 사용하십시오.
+`timestamp` 필드는 `CLOCK_REALTIME` 기준 epoch ns이며, `0`이면 아직 값이 없다는 뜻입니다. rosbag이나
+ROS `header.stamp`와 맞추는 용도이고, 주기 측정에는 `Diagnostics::last_period_ms` 필드를 사용하십시오.
 
 ---
 
@@ -130,9 +130,15 @@ enum class CommandSource {
 
 ## `JointState`
 
-| Field | Type | Unit |
-|---|---|---|
-| `position_rad` | `std::array<double, kJointCount>` | rad |
+| Field | Type | Unit | Description |
+|---|---|---|---|
+| `position_rad` | `std::array<double, kJointCount>` | rad | joint 21개의 각도 |
+| `velocity_rad_s` | `std::array<double, kJointCount>` | rad/s | joint 21개의 속도. passive joint4 포함 |
+| `effort_Nm` | `std::array<double, kJointCount>` | N·m | active joint의 추정 토크. joint4는 NaN |
+
+`effort_Nm` 필드는 actuator 전류(`current_mA`)에서 모터 토크 상수를 고려하여 추정된 joint 토크입니다.
+구동부의 손실과 마찰을 반영하지 않으므로 실제 joint 토크와 다를 수 있습니다. passive joint인 joint4에는
+effort가 없어 NaN입니다.
 
 ---
 
@@ -145,7 +151,7 @@ enum class CommandSource {
 
 값은 센서의 raw value입니다. [`Hand::set_tactile_bias()`](hand.md#handset_tactile_bias)로 bias를
 설정하면 값은 bias와의 차이이며 음수일 수 있습니다.
-[`Hand::get_tactile_bias()`](hand.md#handget_tactile_bias)도 이 type으로 bias를 돌려줍니다.
+[`Hand::get_tactile_bias()`](hand.md#handget_tactile_bias)도 이 type으로 bias를 반환합니다.
 
 ---
 

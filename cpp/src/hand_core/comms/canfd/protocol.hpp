@@ -21,11 +21,6 @@ namespace aidin_hand2::canfd
 
 // -------------------------------- Constants ---------------------------------
 
-// Homing takes the hard stop as drive 0, and commanding 0 there would keep pressing into it,
-// so the SDK treats this far off the hard stop as its own 0
-// The conversion happens only at the wire boundary, in encode and decode
-inline constexpr std::int32_t kHomeOffsetCount = 1000;
-
 // CiA402 mode_of_operation values
 namespace mode_of_operation
 {

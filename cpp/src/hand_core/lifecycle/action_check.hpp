@@ -27,6 +27,9 @@ enum class HandAction {
   ResetTactileBias,
 };
 
+// E207, one message whichever call met the destroyed hand, as the caller knows which call it made
+[[nodiscard]] Status hand_destroyed();
+
 // Check the action is possible now
 // The table is read against requested, so a requested stop refuses a command before the drives
 // confirm it. observed only carries the fault, which dominates every request
@@ -36,9 +39,9 @@ enum class HandAction {
 
 // ---------------------------- Message rendering -----------------------------
 
-// Builds ", last RX error: <reason>" from a canfd::DecodeResult and the CAN_ERR_* class bits
-[[nodiscard]] std::string receive_anomaly_suffix(std::int32_t decode_result,
-                                                 std::int32_t can_error_class);
+// Builds ", last RX error: conflicting command" from a canfd::DecodeResult, empty for the rest
+// The other anomalies do not tell why the frames stopped
+[[nodiscard]] std::string receive_anomaly_suffix(std::int32_t decode_result);
 
 // Builds " (errno <number>: <system message>)" from the errno of the failed CAN send
 [[nodiscard]] std::string transmit_errno_suffix(std::int32_t transmit_errno);
@@ -46,7 +49,10 @@ enum class HandAction {
 // Builds "0x" and four uppercase hex digits
 [[nodiscard]] std::string to_hex16(std::uint16_t value);
 
-// Builds one phrase per stop reason, with the two suffixes above appended where they apply
+// The number its realtime log line carries: 404, 405 or 702, 0 for a reason that never stops the hand
+[[nodiscard]] std::uint16_t stop_cause_code(const StopCause& cause);
+
+// Builds "E<code> <event>", the code and the words of its realtime log line, empty for code 0
 [[nodiscard]] std::string stop_cause_phrase(const StopCause& cause);
 
 }  // namespace aidin_hand2

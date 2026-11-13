@@ -20,7 +20,7 @@
 
 #include "hand_core/comms/canfd/protocol.hpp"  // CommandFrames, mode_of_operation::kCSP
 #include "hand_core/controllers/joint_position_controller.hpp"
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
+#include "hand_core/kinematics/gen2/kinematics.hpp"
 
 using namespace aidin_hand2;
 
@@ -35,6 +35,8 @@ void check(bool ok, const char* what)
 
 // 실기와 동일한 제어 주기 — 필터 계수가 dt 에 의존하므로 500Hz 를 그대로 쓴다.
 constexpr long kPeriodNs = 2'000'000;  // 2 ms
+
+const kinematics::Solver& kGen2 = kinematics::gen2::kSolver;
 
 // 기본 config 로 계약을 본다 — deadband 도 여기서 읽어 기본값과 테스트가 어긋나지 않게 한다.
 const ControllerConfig::JointPositionController kConfig{};
@@ -61,7 +63,7 @@ std::array<double, kActiveJointCount> active_from_uniform_encoder(double encoder
   encoder.fill(static_cast<int>(encoder_scalar));
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM>  task{};
-  kinematics::fk_actuator_to_joint(encoder, joint, task);
+  kGen2.fk_actuator_to_joint(encoder, joint, task);
   std::array<double, kActiveJointCount> active{};
   for (std::size_t k = 0; k < kActiveJointCount; ++k) active[k] = joint[map[k]];
   return active;
@@ -74,7 +76,7 @@ HandState state_from_uniform_encoder(double encoder_scalar)
   encoder.fill(static_cast<int>(encoder_scalar));
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM>  task{};
-  kinematics::fk_actuator_to_joint(encoder, joint, task);
+  kGen2.fk_actuator_to_joint(encoder, joint, task);
   HandState state{};
   state.joints.position_rad = joint;
   return state;
@@ -98,7 +100,7 @@ bool all_csp(const canfd::CommandFrames& f)
 canfd::CommandFrames frames_of(const std::array<double, kActiveJointCount>& joint_rad)
 {
   std::array<int, kActuatorCount> cnt{};
-  kinematics::ik_joint_to_actuator(joint_rad, cnt);
+  kGen2.ik_joint_to_actuator(joint_rad, cnt);
   canfd::CommandFrames frames{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     frames.mode_of_operation[i] = canfd::mode_of_operation::kCSP;
@@ -143,7 +145,7 @@ void test_lowpass_converges()
   const canfd::CommandFrames jump = frames_of(B);
   check(!same_positions(frames_of(A), jump), "fixture: A 와 B 가 구별되는 count 를 낸다");
 
-  controllers::JointPositionController controller(kPeriodNs);
+  controllers::JointPositionController controller(kPeriodNs, kGen2);
 
   // cycle 1 — 관측 자세 A 에서 seed 하고 한 step 만 이동. 즉시 점프가 아니다.
   const canfd::CommandFrames f1 = drive(controller, B, at_a, 1);
@@ -163,7 +165,7 @@ void test_deadband()
   const auto B = active_from_uniform_encoder(4000.0);
   const HandState at_a = state_from_uniform_encoder(0.0);
 
-  controllers::JointPositionController controller(kPeriodNs);
+  controllers::JointPositionController controller(kPeriodNs, kGen2);
   const canfd::CommandFrames base = drive(controller, B, at_a, 400);  // B 로 정착 (= B)
 
   // (a) 임계 안(0.4·deadband)에서 흔들어도 출력이 변하지 않는다.
@@ -189,7 +191,7 @@ void test_reset_seeds_from_measured()
   const HandState at_a = state_from_uniform_encoder(0.0);
   const HandState at_c = state_from_uniform_encoder(2000.0);
 
-  controllers::JointPositionController controller(kPeriodNs);
+  controllers::JointPositionController controller(kPeriodNs, kGen2);
   drive(controller, A, at_a, 400);  // A 로 정착시켜 stale 상태를 만든다
 
   controller.reset();
@@ -197,7 +199,7 @@ void test_reset_seeds_from_measured()
   check(!same_positions(f, frames_of(B)), "reset 직후 첫 cycle 도 목표로 점프하지 않는다");
 
   // 대조군: reset 없이 같은 순서를 밟으면 관측 자세(C)와 무관하게 stale 값(A)에서 출발한다.
-  controllers::JointPositionController control(kPeriodNs);
+  controllers::JointPositionController control(kPeriodNs, kGen2);
   drive(control, A, at_a, 400);
   const canfd::CommandFrames g = drive(control, B, at_c, 1);
   check(!same_positions(f, g), "reset 이 첫 cycle 출발점을 바꾼다(관측 자세 vs stale)");
@@ -212,7 +214,7 @@ void test_filter_disabled()
   ControllerConfig::JointPositionController off{};
   off.filter_enabled = false;
 
-  controllers::JointPositionController controller(kPeriodNs);
+  controllers::JointPositionController controller(kPeriodNs, kGen2);
   const canfd::CommandFrames f1 = drive(controller, B, at_a, 1, off);
   check(same_positions(f1, frames_of(B)), "첫 cycle 에 목표가 그대로 통과한다");
   check(all_csp(f1), "CSP 모드로 낸다");

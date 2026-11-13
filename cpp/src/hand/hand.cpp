@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "hand_core/hand_core.hpp"
+#include "hand_core/lifecycle/action_check.hpp"
 #include "types/status.hpp"
 
 namespace aidin_hand2
@@ -13,18 +14,18 @@ namespace
 {
 
 // Throws when the handle outlived its core
-std::shared_ptr<HandCore> lock_core(const std::weak_ptr<HandCore>& core);
+std::shared_ptr<HandCore> lock_core(const std::weak_ptr<HandCore>& core, HandSide side);
 
 // Runs the action on the locked core and raises a failed Status as an exception
 template <class Action>
-void invoke(const std::weak_ptr<HandCore>& core, Action&& action);
+void invoke(const std::weak_ptr<HandCore>& core, HandSide side, Action&& action);
 
 }  // namespace
 
 // ------------------------------- Construction -------------------------------
 
-Hand::Hand(std::weak_ptr<HandCore> core)
-: core_(std::move(core))
+Hand::Hand(std::weak_ptr<HandCore> core, HandSide side)
+: core_(std::move(core)), side_(side)
 {
 }
 
@@ -32,71 +33,71 @@ Hand::Hand(std::weak_ptr<HandCore> core)
 
 void Hand::connect()
 {
-  guard_boundary("connect()", [&] { invoke(core_, [](HandCore& c) { return c.connect(); }); });
+  guard_boundary(side_, "connect hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.connect(); }); });
 }
 
 void Hand::disconnect()
 {
-  guard_boundary("disconnect()", [&] { invoke(core_, [](HandCore& c) { return c.disconnect(); }); });
+  guard_boundary(side_, "disconnect hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.disconnect(); }); });
 }
 
 void Hand::reconnect()
 {
-  guard_boundary("reconnect()", [&] { invoke(core_, [](HandCore& c) { return c.reconnect(); }); });
+  guard_boundary(side_, "reconnect hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.reconnect(); }); });
 }
 
 // -------------------------------- Operation ---------------------------------
 
 void Hand::run()
 {
-  guard_boundary("run()", [&] { invoke(core_, [](HandCore& c) { return c.run(); }); });
+  guard_boundary(side_, "run hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.run(); }); });
 }
 
 void Hand::stop()
 {
-  guard_boundary("stop()", [&] { invoke(core_, [](HandCore& c) { return c.stop(); }); });
+  guard_boundary(side_, "stop hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.stop(); }); });
 }
 
 void Hand::home()
 {
-  guard_boundary("home()", [&] { invoke(core_, [](HandCore& c) { return c.home(); }); });
+  guard_boundary(side_, "home hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.home(); }); });
 }
 
 void Hand::start_homing()
 {
-  guard_boundary("start_homing()", [&] { invoke(core_, [](HandCore& c) { return c.start_homing(); }); });
+  guard_boundary(side_, "home hand", [&] { invoke(core_, side_, [](HandCore& c) { return c.start_homing(); }); });
 }
 
 bool Hand::is_homing() const
 {
-  return guard_boundary("is_homing()", [&] { return lock_core(core_)->is_homing(); });
+  return guard_boundary(side_, "read homing state", [&] { return lock_core(core_, side_)->is_homing(); });
 }
 
 // --------------------------------- Command ----------------------------------
 
 void Hand::set_command(const Idle& command)
 {
-  guard_boundary("set_command()", [&] { invoke(core_, [&](HandCore& c) { return c.set_command(command); }); });
+  guard_boundary(side_, "set command", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_command(command); }); });
 }
 
 void Hand::set_command(const JointPositionCommand& command)
 {
-  guard_boundary("set_command()", [&] { invoke(core_, [&](HandCore& c) { return c.set_command(command); }); });
+  guard_boundary(side_, "set command", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_command(command); }); });
 }
 
 void Hand::set_command(const JointImpedanceCommand& command)
 {
-  guard_boundary("set_command()", [&] { invoke(core_, [&](HandCore& c) { return c.set_command(command); }); });
+  guard_boundary(side_, "set command", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_command(command); }); });
 }
 
 void Hand::set_command(const ActuatorPositionCommand& command)
 {
-  guard_boundary("set_command()", [&] { invoke(core_, [&](HandCore& c) { return c.set_command(command); }); });
+  guard_boundary(side_, "set command", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_command(command); }); });
 }
 
 void Hand::set_command(const ActuatorEffortCommand& command)
 {
-  guard_boundary("set_command()", [&] { invoke(core_, [&](HandCore& c) { return c.set_command(command); }); });
+  guard_boundary(side_, "set command", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_command(command); }); });
 }
 
 // ---------------------------------- Config ----------------------------------
@@ -110,47 +111,47 @@ void Hand::set_max_effort(double limit)
 
 void Hand::set_max_effort(const std::array<double, kActuatorCount>& limit)
 {
-  guard_boundary("set_max_effort()", [&] { invoke(core_, [&](HandCore& c) { return c.set_max_effort(limit); }); });
+  guard_boundary(side_, "set max effort", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_max_effort(limit); }); });
 }
 
 void Hand::set_controller_config(const ControllerConfig& config)
 {
-  guard_boundary("set_controller_config()",
-                 [&] { invoke(core_, [&](HandCore& c) { return c.set_controller_config(config); }); });
+  guard_boundary(side_, "set controller config",
+                 [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_controller_config(config); }); });
 }
 
 // --------------------------------- Tactile ----------------------------------
 
 void Hand::set_tactile_bias()
 {
-  guard_boundary("set_tactile_bias()", [&] { invoke(core_, [](HandCore& c) { return c.set_tactile_bias(); }); });
+  guard_boundary(side_, "set tactile bias", [&] { invoke(core_, side_, [](HandCore& c) { return c.set_tactile_bias(); }); });
 }
 
 void Hand::reset_tactile_bias()
 {
-  guard_boundary("reset_tactile_bias()", [&] { invoke(core_, [](HandCore& c) { return c.reset_tactile_bias(); }); });
+  guard_boundary(side_, "reset tactile bias", [&] { invoke(core_, side_, [](HandCore& c) { return c.reset_tactile_bias(); }); });
 }
 
 TactileState Hand::get_tactile_bias() const
 {
-  return guard_boundary("get_tactile_bias()", [&] { return lock_core(core_)->tactile_bias(); });
+  return guard_boundary(side_, "read tactile bias", [&] { return lock_core(core_, side_)->tactile_bias(); });
 }
 
 // ------------------------------- Observation --------------------------------
 
 HandState Hand::get_state() const
 {
-  return guard_boundary("get_state()", [&] { return lock_core(core_)->state(); });
+  return guard_boundary(side_, "read state", [&] { return lock_core(core_, side_)->state(); });
 }
 
 Diagnostics Hand::get_diagnostics() const
 {
-  return guard_boundary("get_diagnostics()", [&] { return lock_core(core_)->diagnostics(); });
+  return guard_boundary(side_, "read diagnostics", [&] { return lock_core(core_, side_)->diagnostics(); });
 }
 
 CommandMode Hand::get_command_mode() const
 {
-  return guard_boundary("get_command_mode()", [&] { return lock_core(core_)->command_mode(); });
+  return guard_boundary(side_, "read command mode", [&] { return lock_core(core_, side_)->command_mode(); });
 }
 
 // --------------------------------- Helpers ----------------------------------
@@ -158,21 +159,19 @@ CommandMode Hand::get_command_mode() const
 namespace
 {
 
-std::shared_ptr<HandCore> lock_core(const std::weak_ptr<HandCore>& core)
+std::shared_ptr<HandCore> lock_core(const std::weak_ptr<HandCore>& core, HandSide side)
 {
   auto locked = core.lock();
   if (!locked) {
-    throw_error(ErrorCode::WrongCallOrder,
-                "Hand is no longer valid (destroyed or manager gone)");
+    throw_if_error(side, hand_destroyed());
   }
   return locked;
 }
 
 template <class Action>
-void invoke(const std::weak_ptr<HandCore>& core, Action&& action)
+void invoke(const std::weak_ptr<HandCore>& core, HandSide side, Action&& action)
 {
-  auto c = lock_core(core);
-  throw_if_error(c->hand_side(), action(*c));
+  throw_if_error(side, action(*lock_core(core, side)));
 }
 
 }  // namespace

@@ -16,18 +16,30 @@
 //   C. 무수신(silence): connect() 가 자체 첫-수신 timeout 으로 유한 반환(Exception).
 //   D. 미확인 정지의 재시도: 확인이 안 온 stop() 을 다시 불러도 "이미 Stopped" 로 조용히
 //      성공하지 않는다 — lifecycle 이 사실을 담으므로 두 번째 호출도 재확인한다.
+//   E. 제어 루프가 도는 동안 앱의 할당: SDK 는 자기 메모리만 잠그므로 memlock 한도보다 큰
+//      할당도 성공한다.
+//   F. 수신이 끊겨 Faulted 가 된 뒤에는 quick stop 을 보내지 않는다.
+//   G. 실시간 설정의 결과는 Connection Info 의 scheduler·memory 줄에만 남는다. SCHED_FIFO 나 메모리
+//      잠금이 안 돼도 warning 을 따로 남기지 않는다 (권한이 있는 환경에서는 그냥 통과).
 //
 // 규약: 익명 namespace, check(bool,const char*)+g_failures, main 이 PASS 출력/ g_failures 반환.
+
+#include <sys/resource.h>
 
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
+#include <new>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include <aidin_hand2/hand/hand.hpp>
 #include <aidin_hand2/hand/hand_manager.hpp>
+#include <aidin_hand2/logging/logging.hpp>
 #include <aidin_hand2/types/config.hpp>
 #include <aidin_hand2/types/error.hpp>
 
@@ -104,8 +116,7 @@ constexpr std::chrono::milliseconds kWatchdog{5000};
 
 HandConfig make_config()
 {
-  HandConfig config{"mock0", HandSide::Left};
-  config.control_rate = 500;
+  HandConfig config{"mock0", HandSide::Left, HandModel::Gen2};
   config.auto_home = false;   // no homing — run() enables directly (per task)
   config.auto_reconnect = false;
   return config;
@@ -200,6 +211,109 @@ void test_unconfirmed_stop_retry_reverifies()
   run_with_watchdog("destroy() [D]", kWatchdog, [&] { manager.destroy(hand); });
 }
 
+// sanitizer 는 mlock() 을 아무것도 잠그지 않는 함수로 바꾸므로, 그 빌드에서는 VmLck 가 늘 0 이다
+#if defined(__SANITIZE_THREAD__) || defined(__SANITIZE_ADDRESS__)
+constexpr bool kMlockLocks = false;
+#else
+constexpr bool kMlockLocks = true;
+#endif
+
+// /proc/self/status 의 VmLck(kB). 읽지 못하면 -1
+long locked_kb()
+{
+  std::ifstream status("/proc/self/status");
+  std::string line;
+  while (std::getline(status, line)) {
+    if (line.rfind("VmLck:", 0) == 0) return std::strtol(line.c_str() + 6, nullptr, 10);
+  }
+  return -1;
+}
+
+// E. 루프가 도는 동안 앱의 할당. 프로세스 전체를 앞으로 할당분까지 잠그면 web_bridge 가
+//    시퀀스 문서를 받다가 bad_alloc 으로 죽었다(memlock 64 MiB). SDK 는 자기 스택·core·코드만
+//    잠그므로 한도보다 큰 할당도 된다.
+void test_host_allocation_while_running()
+{
+  rlimit limit{};
+  if (getrlimit(RLIMIT_MEMLOCK, &limit) != 0 || limit.rlim_cur == RLIM_INFINITY) {
+    std::printf("  (memlock unlimited, E skipped)\n");
+    return;
+  }
+  mock::set_mode(mock::Mode::FramesNoQuickStop);
+  HandManager manager;
+  Hand hand = manager.create(make_config());
+  run_with_watchdog("connect() [E]", kWatchdog, [&] { hand.connect(); });
+
+  // 한도가 SDK 몫(수 MiB)을 넉넉히 넘을 때만 잠겼는지 본다
+  if (limit.rlim_cur >= (32u << 20)) {
+    if (kMlockLocks) {
+      check(locked_kb() > 0, "루프가 쓰는 메모리는 잠겨 있다");
+    } else {
+      std::printf("  (sanitizer build, VmLck check skipped)\n");
+    }
+  }
+  bool allocated = false;
+  try {
+    std::vector<char> block(limit.rlim_cur + (16u << 20), 1);
+    allocated = block.back() == 1;
+  } catch (const std::bad_alloc&) {
+    allocated = false;
+  }
+  std::printf("  (VmLck %ld kB while the loop runs)\n", locked_kb());
+  check(allocated, "루프가 도는 동안 memlock 한도보다 큰 할당이 된다");
+
+  run_with_watchdog("destroy() [E]", kWatchdog, [&] { manager.destroy(hand); });
+}
+
+// F. 통신이 끊긴 bus 에는 받을 노드가 없다. 그때 보낸 frame 은 adapter 대기열에 쌓였다가
+//    핸드가 다시 켜질 때 나가므로, fault 가 난 뒤에는 quick stop 도 보내지 않는다.
+void test_no_quick_stop_after_link_loss()
+{
+  mock::set_mode(mock::Mode::FramesNoQuickStop);
+  HandManager manager;
+  Hand hand = manager.create(make_config());
+  run_with_watchdog("connect() [F]", kWatchdog, [&] { hand.connect(); });
+  run_with_watchdog("run() [F]", kWatchdog, [&] { hand.run(); });
+
+  mock::set_mode(mock::Mode::Silence);
+  bool faulted = false;
+  for (int poll = 0; poll < 100 && !faulted; ++poll) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    faulted = hand.get_diagnostics().lifecycle == HandLifecycle::Faulted;
+  }
+  check(faulted, "전제: 수신이 끊기면 Faulted 가 된다");
+
+  // fault 를 판정한 주기의 송신까지 끝날 시간
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  check(!mock::quick_stop_sent(), "통신이 끊긴 뒤 quick stop 을 보내지 않는다");
+
+  run_with_watchdog("destroy() [F]", kWatchdog, [&] { manager.destroy(hand); });
+}
+
+// G. 실시간 설정은 실패가 아니라 실행 환경이므로 Connection Info 한 곳에만 남는다.
+void test_realtime_setup_in_connection_info_only()
+{
+  std::vector<std::string> warnings;
+  std::string connection_info;
+  set_log_callback([&](LogLevel level, const std::string& message) {
+    if (level == LogLevel::Warn) warnings.push_back(message);
+    if (message.find("Connection Info") != std::string::npos) connection_info = message;
+  });
+
+  mock::set_mode(mock::Mode::FramesNoQuickStop);
+  HandManager manager;
+  Hand hand = manager.create(make_config());
+  run_with_watchdog("connect() [G]", kWatchdog, [&] { hand.connect(); });
+  run_with_watchdog("destroy() [G]", kWatchdog, [&] { manager.destroy(hand); });
+  set_log_callback(nullptr);
+
+  check(connection_info.find("\nscheduler   ") != std::string::npos, "Connection Info 에 scheduler 줄이 있다");
+  for (const std::string& warning : warnings) {
+    check(warning.find("SCHED_FIFO") == std::string::npos, "SCHED_FIFO 결과는 warning 이 아니다");
+    check(warning.find("memory not locked") == std::string::npos, "메모리 잠금 결과는 warning 이 아니다");
+  }
+}
+
 }  // namespace
 
 int main()
@@ -208,6 +322,9 @@ int main()
   test_destroy_while_running_bounded();
   test_silence_connect_bounded();
   test_unconfirmed_stop_retry_reverifies();
+  test_host_allocation_while_running();
+  test_no_quick_stop_after_link_loss();
+  test_realtime_setup_in_connection_info_only();
   if (g_failures == 0) {
     std::printf("liveness_test: PASS\n");
   }

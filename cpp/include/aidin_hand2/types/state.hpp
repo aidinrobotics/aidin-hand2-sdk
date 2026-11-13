@@ -127,9 +127,13 @@ struct ActuatorHealth {
   std::array<ActuatorFault, kActuatorCount> fault{};
 };
 
-// FK output
+// Joint angles, velocities and estimated torques from the actuator readings
+// Effort is from current_mA and the motor torque constant only
+// The passive q4 of each digit follows its q3 in velocity and is NaN in effort
 struct JointState {
   std::array<double, kJointCount> position_rad{};
+  std::array<double, kJointCount> velocity_rad_s{};
+  std::array<double, kJointCount> effort_Nm{};
 };
 
 // Raw sensor values, no unit and no normalization

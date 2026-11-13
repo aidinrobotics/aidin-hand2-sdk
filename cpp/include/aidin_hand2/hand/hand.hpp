@@ -89,9 +89,12 @@ class Hand {
   [[nodiscard]] CommandMode get_command_mode() const;
 
  private:
-  explicit Hand(std::weak_ptr<HandCore> core);
+  Hand(std::weak_ptr<HandCore> core, HandSide side);
 
   std::weak_ptr<HandCore> core_;
+
+  // For the "[left] " of a failure, which may come after the core is gone
+  HandSide side_;
 
   friend class HandManager;
 };

@@ -8,11 +8,11 @@
 // its own. A command that fails comes back as a reason, not a retry, and the state is published
 // on its own schedule because the hand can reach Faulted while no command is in flight
 //
-// Run as: 19_external_server [right|left] [interface=can0] [port=5555]
+// Run as: 19_external_server [right|left] [interface=can0] [port=5555] [hand_model=gen2|gen2b]
 // Needs a real hand. Drive it with 19_external_client, or by hand:
 //   nc localhost 5555
 //   connect / run / home / grip 0.4 / stop / disconnect / reconnect / quit
-// Answers are "ok" or "err <ErrorCode>: <message>", and a lifecycle change arrives as
+// Answers are "ok" or "err <ErrorKind>: <message>", and a lifecycle change arrives as
 // "state <lifecycle> <homing_state>"
 
 #include <netinet/in.h>
@@ -112,7 +112,7 @@ void apply_command(Hand& hand, const std::string& line)
     return;
   }
 
-  throw Exception(ErrorCode::InvalidArgument, "unknown command: " + line);
+  throw Exception(ErrorKind::InvalidArgument, "unknown command: " + line);
 }
 
 void wait_next_period()
@@ -129,6 +129,11 @@ int main(int argc, char** argv)
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
   const int      port = argc > 3 ? std::atoi(argv[3]) : 5555;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 4 ? argv[4] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[4]);
+    return 1;
+  }
 
   const int listener = open_listener(port);
   if (listener < 0) {
@@ -138,8 +143,7 @@ int main(int argc, char** argv)
   int client = -1;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate   = 500;     // Hz
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
     config.auto_home      = false;   // the client decides when to home
     config.auto_reconnect = false;   // and when to recover
 
@@ -179,15 +183,16 @@ int main(int argc, char** argv)
           send_line(client, "ok");
         } catch (const Exception& error) {
           // No retry here. Whether to ask again is the client's call
-          send_line(client, std::string("err ") + to_string(error.code()) + ": " + error.what());
+          send_line(client, std::string("err ") + to_string(error.kind()) + ": " + error.what());
         }
       }
       wait_next_period();
     }
-  } catch (const Exception&) {
+  } catch (const Exception& error) {
+    std::printf("[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     if (client >= 0) ::close(client);
     ::close(listener);
-    return 1;   // the SDK logged the cause before throwing
+    return 1;
   }
 
   if (client >= 0) ::close(client);

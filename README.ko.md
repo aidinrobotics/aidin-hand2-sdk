@@ -6,7 +6,7 @@
 
 촉각 센서가 통합된 로봇 핸드 AIDIN Hand Gen2용 SDK입니다. C++와 Python API를 제공합니다.
 
-[![version](https://img.shields.io/badge/version-0.8.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.9.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
 
 [Build](#build-from-source) | [Documentation](#documentation) | [Changelog](CHANGELOG.md) | [Official Site](https://www.aidinrobotics.co.kr/) | [English](README.md) | 한국어
 
@@ -14,11 +14,27 @@
 
 ## Latest release
 
+- [0.9.0](CHANGELOG.md#090---2026-11-13)
+  - Build
+    - `find_package`에서 0.9를 요청하고 다시 빌드하십시오. soname은 `libaidin_hand2.so.0.9`입니다.
+  - Hand model
+    - hand model은 빌드할 때가 아니라 `HandConfig::hand_model` 필드로 선택합니다(`HandModel::Gen2`·`HandModel::Gen2B` 값).
+    - `AIDIN_HAND2_HAND_TYPE` 빌드 옵션과 hand type C는 제거되었습니다.
+    - kinematics 함수는 첫 인자로 `HandModel` 값을 받습니다.
+  - Control
+    - `HandConfig::control_rate` 필드는 제거되었습니다.
+    - `ControllerConfig::JointImpedanceController` 구조체에서 actuator별 gain인 `stiffness`·`damping` 필드는 제거되었습니다.
+    - `ControllerConfig::JointImpedanceController` 구조체에는 active joint별 0~1 값을 담는 `stiffness` 필드와, 목표에 쓰는 `filter_enabled`·`cutoff_freq` 필드가 있습니다.
+  - State
+    - `HandState::joints` 필드의 각 joint에 `velocity_rad_s`·`effort_Nm` 필드가 추가되었습니다.
+  - Errors and log
+    - `ErrorCode` enum의 이름이 `ErrorKind`로 변경되었고, 이 값을 반환하던 `Exception::code()`는 `Exception::kind()`가 되었습니다.
+    - `Exception::code()`는 이제 오류 번호(예: 401)를 반환하고, 이 번호는 `what()`에 `[E401]`로 나타납니다.
+    - `ErrorKind::HandFaulted` 값이 추가되었습니다. `Faulted` state에서 거부된 호출은 이 kind로 예외를 던지고, 원인은 `Diagnostics::fault_code` 필드에 있습니다.
+    - SDK가 던진 예외를 log에 남기지 않습니다. application에서 `what()`을 남기십시오.
 - [0.8.0](CHANGELOG.md#080---2026-10-07)
-  - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 바뀌었습니다.
+  - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 변경되었습니다.
   - tactile bias 기능(`Hand::set_tactile_bias()` 등)이 추가되었습니다.
-- [0.7.1](CHANGELOG.md#071---2026-10-06)
-  - hand type A·B의 workspace clamp 범위가 바뀌었습니다.
 
 전체 변경은 [CHANGELOG](CHANGELOG.md)에 있습니다.
 
@@ -131,7 +147,7 @@ sudo ldconfig
 ### Operations
 
 - [Workspace limits](docs/ko/14_workspace_limits.md) — 명령이 clamp 되는 범위
-- [Error messages](docs/ko/15_error_messages.md) — 오류 문구별 원인과 조치
+- [Error messages](docs/ko/15_error_messages.md) — 오류 번호별 원인과 조치
 
 ## Related repositories
 

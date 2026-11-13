@@ -3,7 +3,8 @@
 Scheduling the SDK's 500 Hz control and communication loop in real time needs a `PREEMPT_RT`
 kernel, plus permission for a non-root user to run at real-time priority (`SCHED_FIFO`) and lock
 memory. This document builds that kernel from source on Ubuntu (x86_64 / arm64) and grants the
-permission.
+permission. The SDK also runs without either, but the load of other processes can then delay the
+control period, so both are recommended for a computer that controls the robot hand.
 
 ## Contents
 
@@ -192,8 +193,8 @@ sudo reboot
 
 ## 2. Real-time settings
 
-A non-root user needs permission to use `SCHED_FIFO` priority and `mlockall`. Create a `realtime`
-group, add the user, and grant it the limits.
+A non-root user needs permission to use `SCHED_FIFO` priority and to lock memory (`mlock`). Create a
+`realtime` group, add the user, and grant it the limits.
 
 ```bash
 sudo groupadd -r realtime
@@ -204,8 +205,10 @@ sudo tee /etc/security/limits.d/99-realtime.conf >/dev/null <<'EOF'
 EOF
 ```
 
-The SDK raises its control loop to priority 90, so `rtprio` must be at least that; `mlockall`
-also locks future allocations, so `memlock` must be `unlimited`.
+The SDK raises its control loop to priority 90, so `rtprio` must be 90 or more. It also locks the
+stack and state of the control and communication loop and the SDK code in memory, so `memlock` must be
+about 1.1 MB or more for one connected robot hand and about 1.7 MB for two. Memory that the
+application locks on its own counts toward the same limit, so the setting above uses `unlimited`.
 
 Log out and back in, then verify in the new session.
 
@@ -213,6 +216,15 @@ Log out and back in, then verify in the new session.
 id -nG         # current user's groups → realtime present
 ulimit -r      # rtprio  → 99
 ulimit -l      # memlock → unlimited
+```
+
+Check whether the SDK applied the settings in the [Connection Info](09_cpp_logging.md#5-log-record)
+that `connect()` writes. `rtprio` is in effect when the `scheduler` row reads `SCHED_FIFO 90`, and
+`memlock` when the `memory` row reads `locked`.
+
+```text
+scheduler   SCHED_FIFO 90
+memory      locked
 ```
 
 ---

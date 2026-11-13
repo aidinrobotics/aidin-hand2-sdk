@@ -15,6 +15,11 @@ struct Diagnostics {
   // What the hand was observed to reach, not what was asked for: a stop() that threw leaves this
   // Running, because the drives never confirmed the quick stop and may hold the last command
   HandLifecycle lifecycle{HandLifecycle::Disconnected};
+
+  // The event that put the hand in Faulted: 404, 405 or 702 of error_codes.hpp, 0 while not Faulted
+  // Not the drive faults, which are actuator_health.fault
+  std::uint16_t fault_code{0};
+
   HomingState homing_state{HomingState::NotRun};
 
   // set_command calls rejected by validation: a NaN or Inf target, or one past the int32 range

@@ -1,5 +1,5 @@
 // 목적: 로깅 배선 smoke — public 함수 실기능 + 파일 sink(debug까지) + callback sink + 포맷 +
-//   to_string(ErrorCode). 콘솔은 캡처가 번거로워 파일 sink 로 검증한다 (파일은 debug 까지
+//   to_string(ErrorKind). 콘솔은 캡처가 번거로워 파일 sink 로 검증한다 (파일은 debug 까지
 //   항상 기록이 규약).
 
 #include <cstdio>
@@ -30,18 +30,17 @@ void check(bool ok, const char* what)
 
 int main()
 {
-  // to_string(ErrorCode)
-  check(std::string(to_string(ErrorCode::InterfaceUnavailable)) == "InterfaceUnavailable", "to_string InterfaceUnavailable");
-  check(std::string(to_string(ErrorCode::None)) == "None", "to_string None");
+  // to_string(ErrorKind)
+  check(std::string(to_string(ErrorKind::InterfaceUnavailable)) == "InterfaceUnavailable", "to_string InterfaceUnavailable");
+  check(std::string(to_string(ErrorKind::None)) == "None", "to_string None");
 
   // 파일 sink 활성 후 각 채널 기록 → flush → 내용 확인.
   const char* log_path = "logging_test_output.log";
   std::remove(log_path);
   set_log_to_file(log_path);
 
-  log_info("lifecycle sample");
-  log_warn_status(ErrorCode::InterfaceUnavailable, "swallowed status sample");
-  log_exception(ErrorCode::WrongCallOrder, "exception sample");  // error + [exception] 마커
+  log_info(HandSide::Left, "lifecycle sample");
+  log_warn(HandSide::Left, 504, "coded warning sample");
   flush_log();
 
   std::ifstream file(log_path);
@@ -52,10 +51,8 @@ int main()
 
   check(content.find("[aidin_hand2]") != std::string::npos, "tag in output");
   check(content.find("lifecycle sample") != std::string::npos, "info written");
-  check(content.find("Unavailable: swallowed status sample") != std::string::npos,
-        "status log = Name: message");
-  check(content.find("[exception] WrongCallOrder: exception sample") != std::string::npos,
-        "exception marker written");
+  check(content.find("[left] [E504] coded warning sample") != std::string::npos,
+        "coded warning = [side] [E<code>] message");
 
   std::remove(log_path);
 
@@ -65,12 +62,12 @@ int main()
     received.emplace_back(level, message);
   });
 
-  log_debug("callback debug sample");
-  log_warn("callback warn sample");
+  log_debug(HandSide::Left, "callback debug sample");
+  log_warn(HandSide::Left, "callback warn sample");
   check(received.size() == 2, "callback received both");
   check(received.size() == 2 && received[0].first == LogLevel::Debug, "callback debug level");
-  check(received.size() == 2 && received[0].second == "callback debug sample",
-        "callback raw body (no prefix)");
+  check(received.size() == 2 && received[0].second == "[left] callback debug sample",
+        "callback body without the formatter pattern");
   check(received.size() == 2 && received[1].first == LogLevel::Warn, "callback warn level");
 
   // 재호출 = 교체 — 이전 callback 으로는 더 이상 안 간다.
@@ -78,13 +75,13 @@ int main()
   set_log_callback([&replaced](LogLevel level, const std::string& message) {
     replaced.emplace_back(level, message);
   });
-  log_info("after replace");
+  log_info(HandSide::Left, "after replace");
   check(received.size() == 2, "old callback detached after replace");
-  check(replaced.size() == 1 && replaced[0].second == "after replace", "new callback attached");
+  check(replaced.size() == 1 && replaced[0].second == "[left] after replace", "new callback attached");
 
   // nullptr = 해제.
   set_log_callback(nullptr);
-  log_info("after unset");
+  log_info(HandSide::Left, "after unset");
   check(replaced.size() == 1, "callback detached after nullptr");
 
   std::printf("logging test: %s\n", g_failures == 0 ? "OK" : "FAIL");

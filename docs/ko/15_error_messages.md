@@ -1,243 +1,417 @@
 # Error messages and remedies
 
-SDK가 던지는 예외의 message를 그대로 찾아 조치를 확인하는 문서입니다. 호출 순서와 배경은
-[C++ guide](07_cpp_usage_guide.md), 심볼과 필드는 [API reference](08_cpp_api_reference.md)에
-있습니다. 아래에서 log를 남기라고 하는 자리는 [Logging](09_cpp_logging.md)을 보십시오.
+SDK가 예외와 log에 붙이는 오류 번호(`E401` 등)로 원인과 조치를 찾는 문서입니다. 호출 순서와 배경은
+[C++ guide](07_cpp_usage_guide.md), 심볼과 필드는 [API reference](08_cpp_api_reference.md)에 있습니다.
+log를 남기고 전달하는 방법은 [Logging](09_cpp_logging.md)을 보십시오.
 
 ## Contents
 
-&nbsp;&nbsp;[**1. 메시지 읽는 법**](#1-메시지-읽는-법)<br>
-&nbsp;&nbsp;[**2. ErrorCode 요약**](#2-errorcode-요약)<br>
-&nbsp;&nbsp;[**3. `InvalidArgument`**](#3-invalidargument)<br>
-&nbsp;&nbsp;[**4. `WrongCallOrder`**](#4-wrongcallorder)<br>
-&nbsp;&nbsp;[**5. `InterfaceUnavailable`**](#5-interfaceunavailable)<br>
-&nbsp;&nbsp;[**6. `CommunicationLost`**](#6-communicationlost)<br>
-&nbsp;&nbsp;[**7. `HardwareFault`**](#7-hardwarefault)<br>
-&nbsp;&nbsp;[**8. `ControlLoopFault`**](#8-controlloopfault)<br>
-&nbsp;&nbsp;[**9. `UnexpectedError`**](#9-unexpectederror)<br>
-&nbsp;&nbsp;[**10. Faulted 원인 문구**](#10-faulted-원인-문구)<br>
-&nbsp;&nbsp;[**11. Actuator fault**](#11-actuator-fault)
+&nbsp;&nbsp;[**1. Reading a message**](#1-reading-a-message)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[1.1 Message format](#11-message-format)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[1.2 Code ranges](#12-code-ranges)<br>
+&nbsp;&nbsp;[**2. E1xx `InvalidArgument`**](#2-e1xx-invalidargument)<br>
+&nbsp;&nbsp;[**3. E2xx `WrongCallOrder`**](#3-e2xx-wrongcallorder)<br>
+&nbsp;&nbsp;[**4. E3xx `InterfaceUnavailable`**](#4-e3xx-interfaceunavailable)<br>
+&nbsp;&nbsp;[**5. E4xx `CommunicationLost`**](#5-e4xx-communicationlost)<br>
+&nbsp;&nbsp;[**6. E5xx `HardwareFault`**](#6-e5xx-hardwarefault)<br>
+&nbsp;&nbsp;[**7. E6xx `HandFaulted`**](#7-e6xx-handfaulted)<br>
+&nbsp;&nbsp;[**8. E7xx `ControlLoopFault`**](#8-e7xx-controlloopfault)<br>
+&nbsp;&nbsp;[**9. E9xx `UnexpectedError`**](#9-e9xx-unexpectederror)<br>
+&nbsp;&nbsp;[**10. Actuator fault values**](#10-actuator-fault-values)
 
-## 1. 메시지 읽는 법
+## 1. Reading a message
 
-[`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)의 `what()`에는 message만 들어 있고
-error code는 붙지 않습니다. message와 error code를 함께 남기십시오 —
-예제는 [C++ guide의 9.1 Exception](07_cpp_usage_guide.md#91-exception)에 있습니다.
+### 1.1 Message format
 
-대부분의 message는 `Cannot <동작>: <이유>` 형태이고, 이 문서의 표는 `<이유>` 부분으로 찾습니다.
-`<...>`는 실행 시 값이 채워지는 자리입니다.
+[`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)의 `what()`과 log의
+오류 줄은 같은 모양입니다.
 
-`<이유>`가 `hand faulted (<원인>)`이면 `lifecycle` 값이 이미 `Faulted`입니다 — 원인 문구는
-[10. Faulted 원인 문구](#10-faulted-원인-문구)에 있습니다. 이 상태에서는
-[`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) 전까지 lifecycle을 바꾸는 호출이 모두 거부되고,
-[C++ guide](07_cpp_usage_guide.md#22-state-transition-calls)가 설정·조회로 분류한 호출은 그대로 허용됩니다.
+```text
+[<side>] [E<code>] cannot <action>: <reason> (<detail>)    예외의 what()
+[<side>] [E<code>] <event> (<detail>)                      log에만 남는 사건
+```
 
-멈춘 원인은 거부된 호출이 던지는 예외 message에 실립니다. log에도 남는지는 원인에 따라 갈립니다.
+아래 번호별 message는 `[<side>]`를 빼고 번호부터 적습니다. 번호마다 원인·상태·조치를 적고, 함수마다
+다르면 "`stop()`이 실패한 경우"처럼 나눠 적습니다. `destroy()`의 E403·E503은 예외 대신 같은 message를
+log에 남깁니다.
 
-- 제어·통신 루프 예외 → log에도 바로 남습니다
-- 통신 오류 → log에서 빠질 수 있으므로 예외 message를 근거로 삼으십시오
+### 1.2 Code ranges
 
-`Faulted`가 아닌 상태에서 거부된 경우는 code마다 조치가 달라, 아래 각 절 표의 Remedy 열을 그대로
-따르십시오.
-
-## 2. ErrorCode 요약
-
-| [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) | What it means | Look at |
+| [`ErrorKind`](08_cpp_api_reference/types_error.md#enum-errorkind) | What it means | Code |
 |---|---|---|
-| `InvalidArgument` | 넘긴 값이 규칙에 맞지 않음 | 호출한 코드 |
-| `WrongCallOrder` | 지금 상태에서 부를 수 없는 호출 | 호출한 코드(lifecycle) |
-| `InterfaceUnavailable` | CAN interface를 열 수 없음 | interface 이름·권한·점유 |
-| `CommunicationLost` | 통신이 끊김 | 전원·배선·bus 상태 |
-| `HardwareFault` | 장비가 요청을 끝내지 못함 | drive fault·기구 |
-| `ControlLoopFault` | 제어·통신 루프 비정상 종료 | SDK에 보고 |
-| `UnexpectedError` | 분류되지 않은 실패 | SDK에 보고 |
+| `InvalidArgument` | 인자나 설정 값이 유효하지 않음 | E1xx |
+| `WrongCallOrder` | 현재 lifecycle에서 허용되지 않는 호출 | E2xx |
+| `InterfaceUnavailable` | CAN interface를 열지 못함 | E3xx |
+| `CommunicationLost` | CAN 통신 실패(수신 끊김·송신 실패) | E4xx |
+| `HardwareFault` | drive가 요청한 상태에 도달하지 못하거나 fault를 보고함 | E5xx |
+| `HandFaulted` | lifecycle이 `Faulted`라 호출이 거부됨 | E6xx |
+| `ControlLoopFault` | SDK thread를 시작하지 못하거나 thread가 예외로 종료됨 | E7xx |
+| `UnexpectedError` | 예상하지 못한 예외나 내부 상태 오류 | E9xx |
 
-보고 채널은 [SDK build & install](06_sdk_build_and_install.md)에 있는 issue 트래커입니다.
+번호별 조치로 해결되지 않거나 같은 오류가 반복되면 SDK log와 application이 남긴 `what()`을 함께
+전달해 문의해 주십시오. SDK 내부 오류라고 적힌 번호는 바로 문의해 주십시오. 보고 채널은
+[SDK build & install](06_sdk_build_and_install.md)에 있는 issue 트래커입니다.
 
-## 3. `InvalidArgument`
+## 2. E1xx `InvalidArgument`
 
-| Message | Cause | Remedy |
+이 범위의 예외를 던진 호출은 아무것도 바꾸지 않습니다. 값을 고쳐 다시 호출하십시오. E101~E103은
+[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig) 생성자가 던지며 log에는 남지 않습니다.
+값이 잘못된 command는 예외를 던지지 않고 적용되지 않으며, 직전 command가 계속 전송됩니다
+([C++ guide](07_cpp_usage_guide.md#522-rejected-by-value)).
+
+```text
+[E101] cannot create HandConfig: interface_name must not be empty
+```
+
+- 원인: 생성자의 첫 인자가 빈 문자열
+
+```text
+[E102] cannot create HandConfig: hand_side must be HandSide::Left or HandSide::Right
+```
+
+- 원인: `hand_side` 값이 enum 범위 밖
+
+```text
+[E103] cannot create HandConfig: hand_model must be HandModel::Gen2 or HandModel::Gen2B
+```
+
+- 원인: `hand_model` 값이 enum 범위 밖
+- 조치: 문자열에서 바꿀 때는 [`parse_hand_model()`](08_cpp_api_reference/types_description.md#parse_hand_model)을 씁니다
+
+```text
+[E104] cannot set max effort: limit contains NaN/Inf
+```
+
+- 원인: [`set_max_effort()`](08_cpp_api_reference/hand.md#handset_max_effort) 인자에 NaN이나 Inf가 있음. 범위 밖의 값은 거부하지 않고 `[0, 2000]`으로 자릅니다
+
+```text
+[E105] cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0
+```
+
+- 원인: 두 값 중 하나가 non-finite이거나 음수
+
+```text
+[E106] cannot set controller config: joint impedance stiffness must be finite and in [0, 1]
+```
+
+- 원인: `stiffness` 배열에 non-finite이거나 `[0, 1]` 밖의 값이 있음
+
+```text
+[E107] cannot set controller config: joint impedance cutoff_freq must be finite and >= 0
+```
+
+- 원인: `cutoff_freq` 값이 non-finite이거나 음수
+
+## 3. E2xx `WrongCallOrder`
+
+현재 상태에서 할 수 없는 호출입니다. E203을 뺀 나머지는 호출이 아무것도 바꾸지 않습니다. 현재
+lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.lifecycle` 필드로
+확인하고, 상태별로 허용되는 호출은 [C++ guide](07_cpp_usage_guide.md#22-state-transition-calls)의 표를
+보십시오.
+
+```text
+[E201] cannot connect hand: already connected
+```
+
+- 원인: `Running`·`Stopped`에서 [`connect()`](08_cpp_api_reference/hand.md#handconnect)를 호출함. `Connected`에서는 아무것도 하지 않고 성공합니다
+- 조치: 다시 연결하려면 [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect) 뒤에 `connect()`를 호출합니다
+
+```text
+[E202] cannot <action>: not connected
+```
+
+- 원인: `Disconnected`에서 [`run()`](08_cpp_api_reference/hand.md#handrun)·[`stop()`](08_cpp_api_reference/hand.md#handstop)·[`home()`](08_cpp_api_reference/hand.md#handhome)·[`reconnect()`](08_cpp_api_reference/hand.md#handreconnect)·[`set_command()`](08_cpp_api_reference/hand.md#handset_command)·[`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias)·[`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias)를 호출함
+- 조치: `connect()`를 먼저 호출합니다. `reconnect()`는 `Faulted`에서 복구할 때만 씁니다
+
+```text
+[E203] cannot home hand: interrupted during homing
+```
+
+- 원인: `home()`이 homing을 기다리는 동안 다른 thread가 `stop()`이나 `disconnect()`를 호출함. `auto_home` 값이 `true`이면 `run()`도 이 message를 던집니다
+- 조치: 제어를 이어 가려면 `home()`을 다시 호출합니다
+
+```text
+[E204] cannot <action>: not running
+```
+
+- 원인: `Connected`에서 `stop()`을 호출했거나, `Connected`·`Stopped`에서 또는 enable이 확인되기 전에 `set_command()`를 호출함
+- `stop()`이 거부된 경우: 멈출 것이 없으므로 그대로 둡니다
+- `set_command()`가 거부된 경우: `run()`이 성공한 뒤에 다시 보냅니다
+
+```text
+[E205] cannot set command: not homed
+```
+
+- 원인: homing이 성공하기 전에 [`Idle`](08_cpp_api_reference/types_command.md#idle)이 아닌 command를 보냄
+- 조치: `home()`이 성공한 뒤에 다시 보냅니다
+
+```text
+[E206] cannot reconnect hand: not faulted
+```
+
+- 원인: `Connected`·`Running`·`Stopped`에서 `reconnect()`를 호출함
+- 조치: `reconnect()`는 `Faulted`에서만 호출합니다. 다시 연결하려면 `disconnect()` 뒤에 `connect()`를 호출합니다
+
+```text
+[E207] cannot use hand: hand is destroyed
+```
+
+- 원인: 파기한 hand를 호출함. [`destroy()`](08_cpp_api_reference/hand_manager.md#handmanagerdestroy)·`destroy_all()`이 이미 끝났거나 다른 thread에서 진행 중인 경우, 또는 manager가 handle보다 먼저 소멸한 경우입니다
+- 조치: 파기한 handle은 쓰지 않습니다. 필요하면 [`create()`](08_cpp_api_reference/hand_manager.md#handmanagercreate)로 새로 만들고, manager를 handle보다 나중에 소멸시킵니다
+
+## 4. E3xx `InterfaceUnavailable`
+
+`connect()`나 `reconnect()`가 CAN interface를 열지 못했을 때 나옵니다. `connect()`에서 실패하면
+`lifecycle` 값은 `Disconnected`로, `reconnect()`에서 실패하면 `Faulted`로 남습니다. 원인을 해결한 뒤
+실패한 함수를 다시 호출하십시오.
+
+```text
+[E301] cannot connect hand: CAN interface '<name>' not found
+```
+
+- 원인: 그런 이름의 network interface가 없음. 이름이 틀렸거나 CAN adapter가 연결되어 있지 않은 경우입니다
+- 조치: `ip link`로 이름을 확인하고 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)의 `interface_name`과 맞춥니다
+
+```text
+[E302] cannot connect hand: permission denied opening CAN socket on '<name>'
+```
+
+- 원인: OS가 CAN socket을 열지 못하게 막음. CAN socket을 여는 데에는 root 권한이 필요하지 않으므로, process를 실행하는 환경(container, AppArmor·SELinux 같은 보안 정책)이 막는 경우입니다
+- 조치: 실행 환경이 CAN socket을 허용하는지 확인합니다
+
+```text
+[E303] cannot connect hand: CAN not supported by the kernel
+```
+
+- 원인: kernel의 CAN module(`can`, `can_raw`)을 load하지 못함
+- 조치: `sudo modprobe can can_raw`를 실행합니다. 직접 빌드한 kernel이면 [1.5 Configure the kernel](04_real_time_kernel_setup.md#15-configure-the-kernel)의 `CONFIG_CAN`·`CONFIG_CAN_RAW`를 확인합니다
+
+```text
+[E304] cannot connect hand: kernel or interface '<name>' is not configured for CAN-FD (CAN_RAW_FD_FRAMES)
+```
+
+- 원인: kernel이 CAN socket의 CAN-FD 옵션(`CAN_RAW_FD_FRAMES`)을 받아들이지 않음
+- 조치: [1.4 Verify the link](05_can_fd_setup.md#14-verify-the-link)의 명령으로 interface가 CAN-FD(`<FD>`)로 올라와 있는지 확인합니다
+
+```text
+[E305] cannot connect hand: CAN interface '<name>' is down
+```
+
+- 원인: interface가 DOWN 상태
+- 조치: [1.3 Bring up that interface](05_can_fd_setup.md#13-bring-up-that-interface)의 절차로 interface를 올립니다
+
+```text
+[E306] cannot connect hand: CAN interface '<name>' could not be opened (<reason>)
+```
+
+- 원인: 위의 경우가 아닌 이유로 interface를 열지 못함. `<reason>`은 OS가 반환한 오류 설명입니다
+- 조치: [CAN-FD setup](05_can_fd_setup.md#1-bring-up-the-interface)의 절차로 interface를 다시 올려 봅니다
+
+```text
+[E307] cannot connect hand: another master is commanding this hand on <name>
+```
+
+- 원인: 다른 프로그램이 이 로봇 핸드에 command를 보내고 있음. 같은 컴퓨터의 프로그램일 수도 있고, 같은 CAN bus에 연결된 다른 컴퓨터일 수도 있습니다
+- 조치: 다른 프로그램을 끝내고 실패한 함수를 다시 호출합니다
+
+## 5. E4xx `CommunicationLost`
+
+이 범위는 호스트와 로봇 핸드 사이의 통신이 끊겼다는 뜻입니다. 먼저 다음을 확인하십시오.
+
+1. 로봇 핸드 전원이 켜져 있는지
+2. CAN cable이 연결되어 있는지
+3. [1.4 Verify the link](05_can_fd_setup.md#14-verify-the-link)의 명령으로 interface가 CAN-FD(`<FD>`)로 올라와 있는지. 아니면 [1.3 Bring up that interface](05_can_fd_setup.md#13-bring-up-that-interface)대로 다시 올림
+4. `interface_name`과 `hand_side`가 실제로 연결된 로봇 핸드와 맞는지. SDK는 `hand_side`로 정한 쪽의 frame만 받습니다
+
+통신을 복구한 뒤 번호별로 적힌 호출을 다시 하십시오.
+
+> [!WARNING]
+> 통신이 끊긴 동안에는 SDK가 quick stop을 보낼 수 없으므로 drive가 마지막 command를 그대로 유지할 수
+> 있습니다.
+
+```text
+[E401] cannot connect hand: no data received from <name> within 300 ms
+```
+
+- 원인: `connect()`나 `reconnect()`가 300 ms 안에 이 로봇 핸드의 frame을 하나도 받지 못함. `reconnect()`도 같은 message를 던집니다
+- `connect()`가 실패한 경우: `lifecycle` 값은 `Disconnected`로 남습니다. `connect()`를 다시 호출합니다
+- `reconnect()`가 실패한 경우: `lifecycle` 값은 `Faulted`로 남습니다. `reconnect()`를 다시 호출합니다
+
+```text
+[E402] cannot <action>: CAN communication failed
+```
+
+- 원인: [`run()`](08_cpp_api_reference/hand.md#handrun)·[`home()`](08_cpp_api_reference/hand.md#handhome)·[`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias)를 호출한 시점이나 `run()`이 enable을 기다리는 동안 통신이 끊김
+- `run()`이 enable을 기다리다 실패한 경우: SDK가 quick stop을 요청합니다
+- `set_tactile_bias()`가 실패한 경우: bias는 바뀌지 않습니다
+- 조치: `lifecycle` 값이 `Faulted`가 되면 `reconnect()`를, 아니면 실패한 함수를 다시 호출합니다
+
+```text
+[E403] cannot <action>: quick stop not confirmed (CAN communication failed)
+```
+
+- 원인: quick stop을 요청했지만 송신이 실패해 500 ms 안에 확인하지 못함
+- `stop()`이 실패한 경우: `lifecycle` 값은 바뀌지 않습니다. `stop()`을 다시 호출하고, 통신을 바로 복구할 수 없으면 로봇 핸드 전원을 내립니다
+- `disconnect()`가 실패한 경우: 연결이 끊기지 않습니다. `disconnect()`를 다시 호출하거나, 그대로 끊어야 하면 `destroy()`를 호출합니다
+- `destroy()`의 경우: 예외 없이 파기를 마치고, `cannot stop hand`로 시작하는 같은 message를 log에 남깁니다
+
+```text
+[E404] communication lost (no RX)
+```
+
+- 원인: 제어·통신 루프가 100 ms 동안 이 로봇 핸드의 frame을 받지 못해 `lifecycle` 값을 `Faulted`로 바꿈. log는 그 순간 한 번 남습니다
+- 상태: `Faulted`이고 `fault_code` 필드 값은 `404`입니다. SDK는 이 뒤로 로봇 핸드에 아무것도 보내지 않고, 그 뒤 호출은 [E601](#7-e6xx-handfaulted)로 거부됩니다
+- 조치: 통신을 복구한 뒤 `reconnect()`를 호출합니다. `auto_reconnect` 값이 `true`이면 SDK가 스스로 재시도합니다
+
+log 줄의 `no RX` 뒤에 `, last RX error: conflicting command`가 붙으면, 연결한 뒤 다른 프로그램이 같은
+로봇 핸드에 command를 보낸 적이 있다는 뜻입니다. 이번 끊김의 원인이라는 보장은 없습니다. 다른 프로그램을
+끝낸 뒤 `reconnect()`를 호출하십시오.
+
+```text
+[E405] CAN TX failed (errno <number>: <text>)
+```
+
+- 원인: `Running`에서 송신이 실패해 제어·통신 루프가 `lifecycle` 값을 `Faulted`로 바꿈. `(errno …)`는 OS가 반환한 오류이고 없을 수도 있습니다
+- 상태: `Faulted`이고 `fault_code` 필드 값은 `405`입니다. SDK는 이 뒤로 로봇 핸드에 아무것도 보내지 않고, 그 뒤 호출은 [E601](#7-e6xx-handfaulted)로 거부됩니다
+- 조치: 통신을 복구한 뒤 `reconnect()`를 호출합니다
+
+```text
+[E406] auto-reconnect timed out
+```
+
+- 원인: `auto_reconnect` 값이 `true`이고 `auto_reconnect_timeout_ms` 안에 통신이 복구되지 않음
+- 상태: `Faulted`로 남고 자동 재시도를 멈춥니다
+- 조치: 통신을 복구한 뒤 `reconnect()`를 직접 호출합니다
+
+## 6. E5xx `HardwareFault`
+
+통신은 정상이지만 drive가 요청을 끝내지 못했을 때 나옵니다. 먼저
+[`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)의 `actuator_health.fault` 필드에서
+fault가 보고된 actuator가 있는지 확인하고([10. Actuator fault values](#10-actuator-fault-values)), 번호별로
+적힌 호출을 다시 하십시오.
+
+```text
+[E501] cannot run hand: drives did not reach operation enabled within 4000 ms
+```
+
+- 원인: fault가 없는 actuator가 4000 ms 안에 모두 enable되지 않았거나, 모든 actuator가 fault 상태
+- 상태: SDK가 quick stop을 요청하고, quick stop이 확인되면 `Stopped`가 됩니다
+- 조치: [`run()`](08_cpp_api_reference/hand.md#handrun)을 다시 호출합니다
+
+```text
+[E502] homing failed at step (<k>/3) <step>: <reason> (actuators <list>)
+[E502] cannot home hand: homing failed (actuators <list>)
+```
+
+- 원인: homing이 한 단계를 끝내지 못함. 단계와 이유는 log 줄에 있습니다(아래 표). `<list>`는 실패한 actuator index를 쉼표로 이은 값입니다. 실패한 actuator가 없으면 예외에는 `none`으로 적히고, log 줄에서는 괄호까지 생략됩니다
+- 상태: `homing_state` 값이 `Failed`가 됩니다. `auto_home` 값이 `true`이면 `run()`도 이 message를 던집니다
+- 조치: [`home()`](08_cpp_api_reference/hand.md#handhome)을 다시 호출합니다
+
+| Step | `<reason>` | Meaning |
 |---|---|---|
-| `HandConfig: interface_name must not be empty` | 생성자 첫 인자가 빈 문자열 | CAN interface 이름을 넘깁니다 |
-| `HandConfig: hand_side must be HandSide::Left or HandSide::Right` | `hand_side` 값이 범위 밖 | enum 값을 그대로 씁니다 |
-| `Cannot create hand: control_rate must be positive` | `control_rate` 값이 `0` 이하 | 양수로 설정합니다(기본값 `500`) |
-| `Cannot set max effort: limit contains NaN/Inf` | [`set_max_effort()`](08_cpp_api_reference/hand.md#handset_max_effort) 인자에 NaN·Inf | 값을 검사합니다(유효 범위 `[0, 2000]`) |
-| `Cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0` | 두 값 중 하나가 non-finite이거나 음수 | 기존 설정이 유지됩니다. 값을 고쳐 다시 호출합니다 |
-| `Cannot set controller config: joint impedance stiffness and damping must be finite and >= 0` | gain 배열에 non-finite이나 음수 | 위와 같습니다 |
+| `(1/3) preparing actuators` | `no actuator could be brought under control` | 제한 시간 안에 어느 actuator도 enable되지 않았거나, 모든 actuator가 `disabled_actuators` 필드에 지정됨 |
+| `(1/3) preparing actuators` | `some actuators could not be prepared for homing` | homing 준비가 제한 시간 안에 끝나지 않음 |
+| `(3/3) setting origin` | `some actuators reported a homing error` | drive가 homing 오류를 보고함 |
+| `(3/3) setting origin` | `some actuators did not finish homing` | homing을 시작한 뒤 제한 시간 안에 drive가 완료를 알리지 않음 |
 
-[`set_command()`](08_cpp_api_reference/hand.md#handset_command)는 값이 잘못돼도 예외를 던지지 않습니다.
-값 검사를 통과하지 못한 command는 적용되지 않고 **직전 command가 그대로 계속 전송됩니다.**
-warning log가 남으므로 감지는
-[`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.nan_command_count` 필드로 합니다 —
-[C++ guide](07_cpp_usage_guide.md#522-rejected-by-value)를 보십시오.
+enable 단계에서 일부 actuator만 응답하면, 응답하지 않은 actuator는 homing에서 제외되고 `<list>`에도
+나오지 않습니다.
 
-## 4. `WrongCallOrder`
+```text
+[E503] cannot <action>: drives did not reach quick stop within 500 ms
+```
 
-Situation 열의 상태 이름은 [`HandLifecycle`](08_cpp_api_reference/types_state.md#enum-handlifecycle) enum의 값이고, 상태 전이 함수가
-어느 상태에서 허용되는지는 [C++ guide](07_cpp_usage_guide.md#22-state-transition-calls)에 표로 정리돼 있습니다.
-
-아래 표의 Reason 열은 `Cannot <동작>: ` 뒤에 붙는 이유입니다. 현재 lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)`.lifecycle` 필드로 확인합니다.
-
-| Reason | Situation | Remedy |
-|---|---|---|
-| `already connected — call disconnect() first to rebuild the link` | `Running`·`Stopped`에서 [`connect()`](08_cpp_api_reference/hand.md#handconnect) | 통신을 다시 세우려면 [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect)를 호출한 뒤 `connect()`를 호출합니다 |
-| `not connected — call connect() first` | `Disconnected`에서 [`run()`](08_cpp_api_reference/hand.md#handrun)·[`stop()`](08_cpp_api_reference/hand.md#handstop)·[`home()`](08_cpp_api_reference/hand.md#handhome)·[`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias)·[`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | `connect()`를 먼저 호출합니다 |
-| `not connected yet — call connect()` | `Disconnected`에서 `reconnect()` | 최초 연결은 `connect()`를 호출합니다. `reconnect()`는 복구용입니다 |
-| `not connected yet — call connect(), then run()` | `Disconnected`에서 [`set_command()`](08_cpp_api_reference/hand.md#handset_command) | 연결·실행 뒤 다시 보냅니다 |
-| `control not running — call run() first` | `Connected`에서 `stop()` | 그대로 두십시오. 제어 중이 아니라 세울 것이 없습니다 |
-| `not faulted — reconnect() recovers from Faulted only` | `Faulted`가 아닌데 `reconnect()` | `Faulted`에서만 복구용으로 호출하십시오. `Faulted`가 아닌 상태에서는 호출하지 마십시오 |
-| `not running — call run() first` | `Connected`·`Stopped`에서 `set_command()`, 또는 enable이 확인되기 전 | [`run()`](08_cpp_api_reference/hand.md#handrun)이 성공한 뒤에 보냅니다 |
-| `not homed — call home() first` | 원점 전에 [`Idle`](08_cpp_api_reference/types_command.md#idle)이 아닌 command | `home()` 성공 후 다시 보냅니다 |
-| `hand is destroyed — create a hand` | 파기된 `HandCore`를 가리키는 handle | [`create()`](08_cpp_api_reference/hand_manager.md#handmanagercreate)로 새로 만듭니다 |
-| `Hand is no longer valid (destroyed or manager gone)` | manager가 먼저 소멸 | manager 수명을 handle보다 길게 잡습니다 |
-| `Cannot home hand: interrupted during homing — call run() and home() again` | homing 중 `Running`에서 벗어남 | 원인을 확인한 뒤 다시 수행합니다 |
-| `CAN transport already open: <이름> — close it before reopening` | 같은 handle이 이미 열려 있음 | `disconnect()` 후 다시 연결합니다 |
-
-`Faulted` 상태에서 거부되면 `WrongCallOrder` 예외가 아니라 멈춘 원인을 담은 예외를 던집니다.
-[10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.
-
-## 5. `InterfaceUnavailable`
-
-| Message | Cause | Remedy |
-|---|---|---|
-| `CAN interface '<이름>' not found (check the name with `ip link`)` | 그런 interface가 없음 | `ip link`로 이름을 대조하고 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)와 맞춥니다 |
-| `CAN interface '<이름>' is down and cannot be configured (needs CAP_NET_ADMIN). Bring it up manually: sudo ip link set <이름> type can bitrate 1000000 sample-point 0.875 sjw 10 …` | interface가 `DOWN`이고 SDK에 올릴 권한이 없음 | 메시지에 실린 명령을 그대로 실행하거나 [CAN-FD setup](05_can_fd_setup.md)의 절차를 따릅니다 |
-| `CAN interface '<이름>' not found (check the name with `ip link`, and that it exists)` | bind 시점에 interface가 사라짐 | adapter 연결 상태를 확인합니다 |
-| `permission denied opening CAN socket on '<이름>' (need root or CAP_NET_RAW)` | socket 생성 권한 부족 | `CAP_NET_RAW`를 주거나 root로 실행합니다 |
-| `CAN not supported by the kernel (try `modprobe can can_raw`)` | kernel에 CAN module 없음 | `modprobe can can_raw`를 실행합니다 |
-| `kernel or interface '<이름>' is not configured for CAN-FD (CAN_RAW_FD_FRAMES); check with `ip -details link show <이름>`` | CAN-FD 미지원 | 메시지의 명령으로 확인하고 CAN-FD를 지원하는 adapter를 씁니다 |
-| `failed to open CAN interface '<이름>': <사유>` | 그 밖의 socket 열기 실패 | `<사유>`의 errno 설명을 확인합니다 |
-| `failed to bring up CAN interface '<이름>': <사유>` | link up 실패 | adapter 연결과 driver를 확인합니다 |
-| `failed to configure CAN interface '<이름>': <사유>` | bit timing 설정 실패 | CAN-FD 지원 여부와 timing 값을 확인합니다 |
-| `failed to set CAN error mask on <이름>` | socket 옵션 설정 실패 | kernel의 SocketCAN 지원을 확인합니다 |
-| `failed to set CAN RX filters on <이름>` | filter 설정 실패 | 위와 같습니다 |
-| `another master is commanding this hand on <이름>` | 다른 process가 같은 hand를 제어 중 | 중복 실행을 정리하고 하나만 남깁니다 |
-
-## 6. `CommunicationLost`
-
-| Message | Cause | Remedy |
-|---|---|---|
-| `Cannot <동작>: no data received from <이름> within 300 ms — check hand power and CAN wiring` | [`connect()`](08_cpp_api_reference/hand.md#handconnect)가 첫 frame을 받지 못함 | 전원·배선·termination·bit rate를 확인한 뒤 `connect()`를 다시 호출합니다. `lifecycle` 값은 `Disconnected`로 남습니다 |
-| `Cannot stop hand: cannot confirm quick stop — no RX on <이름>; drives may hold last command. Restore CAN link and hand power` | [`stop()`](08_cpp_api_reference/hand.md#handstop)이 quick stop을 확인하지 못함 | 통신과 전원을 복구하거나 전원을 내립니다. `lifecycle` 값은 `Running`으로 남습니다 |
-| `Cannot disconnect hand: cannot confirm stop — no RX on <이름>; drives may hold last command. Use reconnect() or destroy` | [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect)가 quick stop을 확인하지 못함 | 위와 같습니다. [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) 또는 [`destroy()`](08_cpp_api_reference/hand_manager.md#handmanagerdestroy)로 처리합니다 |
-| `Cannot run hand: cannot confirm drive enable — no RX on <이름>; restore CAN link and hand power, then reconnect()` | [`run()`](08_cpp_api_reference/hand.md#handrun)이 drive enable을 확인하지 못함 | 통신과 전원을 복구한 뒤 `reconnect()`를 호출합니다 |
-| `Cannot enable hand: interface <이름> is gone — reconnect the CAN adapter, then recover with reconnect()` | interface가 사라짐 | adapter를 다시 연결하면 `lifecycle` 값이 `Faulted`로 전이하므로, 전이한 뒤에 `reconnect()`를 호출합니다 |
-| `Cannot enable hand: interface <이름> was re-created — recover with reconnect() once the hand faults` | 같은 이름으로 재생성되어 기존 socket이 무효 | 수신이 끊겼으므로 `lifecycle` 값이 곧 `Faulted`로 전이합니다. 전이한 뒤에 `reconnect()`를 호출합니다 |
-| `Cannot enable hand: communication not restored (no RX on <이름>) — restore CAN link and hand power, then recover with reconnect()` | 아직 수신이 없음 | 통신과 전원을 복구하면 `lifecycle` 값이 `Faulted`로 전이하므로, 전이한 뒤에 `reconnect()`를 호출합니다 |
-| `Cannot set tactile bias: no RX on <이름> — restore CAN link and hand power` | [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias)를 호출한 시점에 수신이 없음 | 통신과 전원을 복구한 뒤 다시 호출합니다. bias는 바뀌지 않습니다 |
-
-`Faulted` 상태에서 호출이 거부되면 message가 이 표의 문구가 아니라 `hand faulted (<원인>)` 형태입니다 —
-[10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.
-
-SDK는 RX가 약 100 ms 없으면 통신 오류로 판정합니다. 송신 큐가 일시적으로 가득 찬 경우(`EAGAIN`·`EWOULDBLOCK`·
-`ENOBUFS`)는 오류로 보지 않습니다.
-
-quick stop을 요구한 동안 제어·통신 루프는 매 cycle quick stop을 계속 전송합니다. 그래서 통신을
-복구하면 drive가 quick stop을 수신합니다. `stop()`을 다시 호출하면 호출 시점의 상태를 다시
-판정하므로 확인 수단으로 쓸 수 있습니다 — 여전히 도달하지 못했으면 다시 예외를 던지고, 도달했으면
-`lifecycle` 값이 `Stopped`로 전이합니다.
+- 원인: 통신은 정상이지만 drive가 500 ms 안에 quick stop 상태가 되지 않음
+- `stop()`이 실패한 경우: `lifecycle` 값은 바뀌지 않습니다. `stop()`을 다시 호출하거나 로봇 핸드 전원을 내립니다
+- `disconnect()`가 실패한 경우: 연결이 끊기지 않습니다. 로봇 핸드 전원을 내리거나, 그대로 끊어야 하면 `destroy()`를 호출합니다
+- `destroy()`의 경우: 예외 없이 파기를 마치고, `cannot stop hand`로 시작하는 같은 message를 log에 남깁니다
 
 > [!WARNING]
 > quick stop을 확인하지 못한 채 끝나면 drive가 마지막 command를 그대로 유지할 수 있습니다.
 
-## 7. `HardwareFault`
+```text
+[E504] actuator <index> fault set (<name> 0x<code>)
+```
 
-| Message | Cause | Remedy |
-|---|---|---|
-| `Cannot home hand: no actuator could be brought under control (actuators <목록>)` | 어느 actuator도 제어 상태로 들어가지 못함 | 전원과 drive fault를 확인합니다 |
-| `Cannot home hand: some actuators could not be prepared for homing (actuators <목록>)` | 일부 actuator가 homing 준비 단계를 넘기지 못함 | 해당 index의 fault와 배선을 확인합니다 |
-| `Cannot home hand: some actuators reported a homing error (actuators <목록>)` | drive가 homing 오류를 보고함 | 기구적 걸림과 hard stop 주변을 확인합니다 |
-| `Cannot home hand: some actuators did not finish homing (actuators <목록>)` | 일부 actuator가 제한 시간 안에 homing을 끝내지 못함 | 기구적 저항과 hard stop 도달 여부를 확인합니다 |
-| `Cannot home hand: homing did not complete (actuators <목록>)` | 위 어디에도 해당하지 않는 종료 | log를 남기고 SDK에 보고합니다 |
-| `Cannot stop hand: drives did not reach quick stop within 500 ms — retry stop() or power off the hand` | 통신은 살아 있으나 drive가 quick stop에 도달하지 못함 | [`stop()`](08_cpp_api_reference/hand.md#handstop)을 다시 호출하거나 전원을 내립니다 |
-| `Cannot disconnect hand: drives did not reach quick stop within 500 ms — power off the hand, or destroy the hand to disconnect anyway` | 위와 같음. quick stop을 확인하지 못했으므로 연결을 끊지 않음 | 전원을 내리거나, 그대로 끊어야 하면 [`destroy()`](08_cpp_api_reference/hand_manager.md#handmanagerdestroy)를 호출합니다 |
-| `Cannot run hand: drives did not reach operation enabled within 4000 ms — retry run(), or check actuator faults via diagnostics()` | 통신은 살아 있고 fault도 없는데 drive가 Operation Enabled에 도달하지 못함 | actuator fault와 전원을 확인한 뒤 다시 [`run()`](08_cpp_api_reference/hand.md#handrun)을 호출합니다 |
+- 원인: drive가 actuator fault를 보고함. `<name>`은 [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) 값의 이름이고 `0x<code>`는 drive가 보낸 code입니다
+- 상태: `lifecycle` 값은 바뀌지 않습니다. 그 actuator는 command 적용 대상에서 제외되고, 제어·통신 루프가 fault reset을 반복 시도합니다. fault가 풀리면 info level로 `actuator <index> fault cleared`가 남습니다
+- 조치: 대응은 application이 결정합니다([C++ guide](07_cpp_usage_guide.md#81-actuator-faults))
 
-homing 실패 문구는 모두 ` — retry home(), or check actuator faults via diagnostics()`로 끝납니다.
-`<목록>`에는 실패한 actuator index가 들어가고, `disabled_actuators` 필드에 지정한 index는 보고되지 않습니다.
+## 7. E6xx `HandFaulted`
 
-문구에 적힌 `diagnostics()`는 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)입니다.
-값별 점검 항목은 [11. Actuator fault](#11-actuator-fault)에 있습니다.
+이 범위는 로봇 핸드가 `Faulted` 상태라서 호출을 거부했다는 뜻입니다. `Faulted`로 만든 원인은 그보다
+먼저 log에 남은 줄과 [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics)의
+`fault_code` 필드에 있습니다.
 
-`run()`이 enable을 확인하지 못하면 이미 올라온 actuator가 있을 수 있어 command를 지우고 quick stop을
-요구합니다. 그래서 예외를 받은 뒤 lifecycle은 quick stop이 확인되는 시점에 `Stopped`가 됩니다.
+```text
+[E601] cannot <action>: hand faulted (E<code> <event>)
+```
 
-## 8. `ControlLoopFault`
+- 원인: `lifecycle` 값이 `Faulted`일 때 `reconnect()`가 아닌 함수를 호출함. 괄호 안은 `Faulted`로 만든 사건의 번호와, 그 사건이 log에 남긴 말입니다. 원인이 기록되지 않았으면 괄호 없이 `hand faulted`로 끝나며, 이는 SDK 내부 오류입니다
+- 상태: `Faulted`로 남습니다
+- 조치: 괄호 안 번호([E404](#5-e4xx-communicationlost), [E405](#5-e4xx-communicationlost), [E702](#8-e7xx-controlloopfault))의 조치를 따른 뒤 `reconnect()`를 호출합니다
 
-| Message | Cause | Remedy |
-|---|---|---|
-| `Cannot connect hand: failed to start SDK threads (<사유>)` | thread 생성 실패 | 자원 한도와 권한을 확인합니다 |
-| `hand faulted (control loop terminated at cycle <n>) — call reconnect()` | 제어·통신 루프가 예외로 종료 | [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect)로 복구하고, 재현 조건과 log를 SDK에 보고합니다 |
+## 8. E7xx `ControlLoopFault`
 
-`Faulted` 상태에서 호출이 거부되면 `hand faulted (<원인>)` 형태입니다 —
-[10. Faulted 원인 문구](#10-faulted-원인-문구)를 보십시오.
+```text
+[E701] cannot connect hand: failed to start SDK threads (<reason>)
+```
 
-`auto_reconnect` 값은 호출이 거부된 경우에는 동작하지 않습니다. 조건과 동작은
-[C++ guide](07_cpp_usage_guide.md#94-recovering-from-faulted)에 있습니다.
+- 원인: SDK의 thread를 만들지 못함. `<reason>`은 OS가 반환한 오류입니다
+- `connect()`가 실패한 경우: `lifecycle` 값은 `Disconnected`로 남습니다
+- `reconnect()`가 실패한 경우: `lifecycle` 값은 `Faulted`로 남습니다
+- 조치: process의 thread·메모리 한도를 확인한 뒤 실패한 함수를 다시 호출합니다
 
-## 9. `UnexpectedError`
+```text
+[E702] control loop terminated, quick stop sent without confirmation (<reason>)
+```
 
-| Message | Cause | Remedy |
-|---|---|---|
-| `Unexpected failure in <동작>: <내용>` | 분류되지 않은 예외 | 재현 조건과 전체 log를 SDK에 보고합니다 |
-| `Unexpected failure in <동작>: unknown exception` | 알 수 없는 예외 | 위와 같습니다 |
+- 원인: 제어·통신 루프가 예외로 끝남. SDK 내부 오류입니다
+- 상태: `Faulted`이고 `fault_code` 필드 값은 `702`입니다. SDK는 quick stop을 보내지만 확인하지는 못합니다. `auto_reconnect` 값이 `true`여도 자동으로 복구하지 않고, 그 뒤 호출은 [E601](#7-e6xx-handfaulted)로 거부됩니다
+- 조치: `reconnect()`를 직접 호출합니다
 
-## 10. Faulted 원인 문구
+```text
+[E703] event logging thread terminated (<reason>)
+```
 
-`Faulted` 상태에서 호출이 거부되면 `Cannot <동작>: hand faulted (<원인>)<안내>` 형태이고, error code는
-`<원인>`에 따라 갈립니다.
+- 원인: 제어·통신 루프의 사건을 log로 옮기는 thread가 예외로 끝남. SDK 내부 오류입니다
+- 상태: 제어는 계속되지만, 그 뒤의 사건(통신 끊김, actuator fault, homing 실패 등)은 log에 남지 않습니다
+- 조치: [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)로 상태를 감시합니다
 
-| `<원인>` | Meaning | [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) |
-|---|---|---|
-| `no RX since cycle <n>` | 해당 cycle 이후 수신이 끊김 | `CommunicationLost` |
-| `CAN TX failed at cycle <n> (errno <번호>: <설명>)` | 송신이 비일시적 오류로 실패 | `CommunicationLost` |
-| `control loop terminated at cycle <n>` | 제어·통신 루프가 예외로 종료 | `ControlLoopFault` |
+## 9. E9xx `UnexpectedError`
 
-`<안내>`는 부른 함수에 따라 달라집니다.
+```text
+[E901] cannot <action>: unexpected failure (<detail>)
+```
 
-| Call | `<안내>` |
-|---|---|
-| [`connect()`](08_cpp_api_reference/hand.md#handconnect) | ` — call reconnect() to rebuild` |
-| [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect) | ` — use reconnect() or destroy` |
-| [`run()`](08_cpp_api_reference/hand.md#handrun) | ` — call reconnect(), then run()` |
-| [`home()`](08_cpp_api_reference/hand.md#handhome) | ` — call reconnect() first` |
-| [`stop()`](08_cpp_api_reference/hand.md#handstop) · [`set_command()`](08_cpp_api_reference/hand.md#handset_command) | ` — call reconnect()` |
+- 원인: 분류되지 않은 예외. SDK 내부 오류입니다. `<action>`은 실패한 호출이고, `<detail>`은 예외의 내용입니다. 내용을 알 수 없으면 `unknown exception`으로 적힙니다
 
-`no RX since cycle <n>` 뒤에는 마지막 수신 오류가 붙기도 합니다. 오류 없이 수신만 끊긴
-경우에는 붙지 않습니다.
+```text
+[E902] cannot connect hand: CAN transport already open on '<name>'
+```
 
-| Suffix | Check first |
-|---|---|
-| `, last RX error: bus off` | 물리 bus 원인을 제거한 뒤 [CAN-FD setup](05_can_fd_setup.md)으로 interface를 다시 올리고, `ip -details link show`로 state를 확인합니다 |
-| `, last RX error: bus error (no ACK)` | 전원이 꺼졌거나 hand가 분리됐는지 확인합니다 |
-| `, last RX error: bus error` | termination·noise·bit timing을 확인합니다 |
-| `, last RX error: malformed data` | bit rate와 CAN-FD 지원을 확인합니다 |
-| `, last RX error: conflicting command` | 다른 master가 같은 hand를 제어 중인지 확인합니다 |
-| `, last RX error: unknown data` | bus에 섞인 다른 traffic을 확인합니다 |
+- 원인: SDK 내부 상태가 예상과 다름. SDK 내부 오류입니다. 같은 hand의 `connect()`를 두 thread에서 동시에 호출해도 나옵니다
+- 조치: `Hand`와 그 사본은 한 thread에서만 호출합니다
 
-## 11. Actuator fault
+## 10. Actuator fault values
 
 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)의 `actuator_health.fault` 필드는
-[`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode)와 서로 독립적인 정보입니다. 예외를 던지지 않아도 값이 남으므로 이 값도 함께 기록하십시오.
-값은 [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) enum이고 `None`이면 해당 actuator에
-fault가 없습니다. 배열 전체를 훑는 예제는 [C++ guide](07_cpp_usage_guide.md#81-actuator-faults)에
-있습니다.
+drive가 보고한 actuator별 fault입니다. 예외를 던지지 않아도 값이 남으므로 이 값도 함께 기록하십시오.
+값은 [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) enum이고, `None`이면 해당
+actuator에 fault가 없습니다. fault가 생기는 순간에는 [E504](#6-e5xx-hardwarefault) log도 남습니다. 배열
+전체를 훑는 예제는 [C++ guide](07_cpp_usage_guide.md#81-actuator-faults)에 있습니다.
 
-| `to_string()` value | Check first |
+| Value | Code |
 |---|---|
-| `OverVoltageError` · `UnderVoltageError` | 공급 전압, cable 전압 강하, 회생 조건 |
-| `OverCurrentError` · `OverLoadError` | 기구적 걸림, 충돌, gain, effort 상한 |
-| `OverTemperatureError` | duty cycle, 냉각, 주변 온도 |
-| `CurrentDetectionError` | drive 전류 센싱 계통 |
-| `FollowingError` · `SpeedError` | 목표 step 크기, 부하, encoder, controller 튜닝 |
-| `CommunicationError` | drive 쪽 bus와 cable |
-| `HallSensorError` | hall sensor 배선과 connector |
-| `PositiveLimitSwitchError` · `NegativeLimitSwitchError` | limit switch와 기구 위치 |
-| `EmergencySwitchError` · `Sto1Error` · `Sto2Error` (STO = Safe Torque Off) | 비상 정지 회로와 safety 배선 |
-| `SerialEncoderChannelAError` · `SerialEncoderChannelBError` | encoder 신호 품질과 connector |
-| `SerialEncoderChannelADisconnectedError` · `SerialEncoderChannelBDisconnectedError` | encoder cable 분리 |
-| `Unknown` | 위 이름에 없는 코드 |
-
-`Unknown`은 SDK의 RT log에 `UnknownError 0x<코드>`로 남으므로 해당 코드를 함께 보고하십시오.
-
-원인을 제거하기 전에 반복해서 재가동하지 마십시오.
+| `OverVoltageError` · `UnderVoltageError` | `0x3210` · `0x3220` |
+| `OverCurrentError` · `OverLoadError` | `0x2310` · `0xFF02` |
+| `OverTemperatureError` | `0x4210` |
+| `CurrentDetectionError` | `0x5210` |
+| `FollowingError` · `SpeedError` | `0x8611` · `0x7310` |
+| `CommunicationError` | `0x7500` |
+| `HallSensorError` | `0xFF01` |
+| `PositiveLimitSwitchError` · `NegativeLimitSwitchError` | `0xFF03` · `0xFF04` |
+| `EmergencySwitchError` · `Sto1Error` · `Sto2Error` | `0xFF05` · `0xFF06` · `0xFF07` |
+| `SerialEncoderChannelAError` · `SerialEncoderChannelBError` | `0xFF24` · `0xFF26` |
+| `SerialEncoderChannelADisconnectedError` · `SerialEncoderChannelBDisconnectedError` | `0xFF25` · `0xFF27` |
+| 표에 없는 값 | drive가 보낸 code가 그대로 들어옴. `to_string()`은 `"Unknown"`을 반환하고, E504 log에는 `UnknownError`로 적힘 |
