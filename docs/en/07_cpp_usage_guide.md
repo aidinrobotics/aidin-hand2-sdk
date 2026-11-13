@@ -433,10 +433,6 @@ hand.set_controller_config(controller);
 | `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
 | `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the low-pass filter [Hz], 0 or more |
 
-> [!NOTE]
-> The SDK does not yet reduce the error at which friction stops a joint short of its target. The
-> behavior may change in a later version.
-
 > [!TIP]
 > The following examples run what this chapter describes, one file per controller.
 >

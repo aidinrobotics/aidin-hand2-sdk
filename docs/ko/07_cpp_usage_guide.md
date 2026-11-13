@@ -408,10 +408,6 @@ hand.set_controller_config(controller);
 | `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
 | `cutoff_freq` | `double` | `10.0` | low-pass filter의 차단 주파수 [Hz], 0 이상 |
 
-> [!NOTE]
-> 마찰 때문에 목표 앞에서 멈추는 오차를 줄이는 기능은 아직 없습니다. 거동은 이후 버전에서 바뀔 수
-> 있습니다.
-
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다. controller마다 파일이 하나씩입니다.
 >
