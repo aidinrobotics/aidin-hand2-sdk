@@ -81,7 +81,7 @@ Your application's CMakeLists.txt is two lines. Always request the version: a di
 not compatible, and CMake skips the version check when none is requested.
 
 ```cmake
-find_package(aidin_hand2 0.8 REQUIRED)
+find_package(aidin_hand2 0.9 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -98,7 +98,7 @@ Tell your application's CMakeLists.txt where the prefix is.
 
 ```cmake
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
-find_package(aidin_hand2 0.8 REQUIRED)
+find_package(aidin_hand2 0.9 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
