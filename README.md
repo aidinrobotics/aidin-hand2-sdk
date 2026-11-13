@@ -132,7 +132,7 @@ sudo ldconfig
 ### Operations
 
 - [Workspace limits](docs/en/14_workspace_limits.md) — the range commands are clamped to
-- [Error messages](docs/en/15_error_messages.md) — the cause and remedy for each message
+- [Error messages](docs/en/15_error_messages.md) — the cause and remedy for each error code
 
 ## Related repositories
 

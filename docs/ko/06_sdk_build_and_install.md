@@ -1,8 +1,8 @@
 # SDK build & install
 
-SDK를 빌드·테스트·설치하고 예제로 동작을 확인합니다. 먼저
-[Real-time kernel setup](04_real_time_kernel_setup.md)과 [CAN-FD setup](05_can_fd_setup.md)을
-마치십시오.
+SDK를 빌드·테스트·설치하고 예제로 동작을 확인합니다. 먼저 [CAN-FD setup](05_can_fd_setup.md)을
+마치십시오. [Real-time kernel setup](04_real_time_kernel_setup.md)은 권장 사항이며, 빌드와 설치에는
+필요하지 않습니다.
 
 ## Contents
 
@@ -34,8 +34,8 @@ cd aidin-hand2-sdk
 ```
 
 > [!NOTE]
-> hand type(`Gen2`·`Gen2_B`)은 빌드할 때 고르지 않습니다. 한 빌드가 두 type의 kinematics를 모두
-> 담고, 프로그램이 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)의 `hand_type` 필드로
+> hand model(`Gen2`·`Gen2B`)은 빌드할 때 고르지 않습니다. 한 빌드가 두 모델의 kinematics를 모두
+> 담고, 프로그램이 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)의 `hand_model` 필드로
 > 고릅니다.
 
 ```bash

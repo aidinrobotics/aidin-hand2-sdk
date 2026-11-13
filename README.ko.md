@@ -131,7 +131,7 @@ sudo ldconfig
 ### Operations
 
 - [Workspace limits](docs/ko/14_workspace_limits.md) — 명령이 clamp 되는 범위
-- [Error messages](docs/ko/15_error_messages.md) — 오류 문구별 원인과 조치
+- [Error messages](docs/ko/15_error_messages.md) — 오류 번호별 원인과 조치
 
 ## Related repositories
 

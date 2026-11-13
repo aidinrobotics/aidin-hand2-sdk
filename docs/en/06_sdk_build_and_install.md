@@ -1,8 +1,8 @@
 # SDK build & install
 
 Build, test, and install the SDK, then confirm it works with the example. Complete
-[Real-time kernel setup](04_real_time_kernel_setup.md) and
-[CAN-FD setup](05_can_fd_setup.md) first.
+[CAN-FD setup](05_can_fd_setup.md) first. [Real-time kernel setup](04_real_time_kernel_setup.md) is
+recommended, and the build and the installation do not need it.
 
 ## Contents
 
@@ -34,8 +34,8 @@ cd aidin-hand2-sdk
 ```
 
 > [!NOTE]
-> The hand type (`Gen2` or `Gen2_B`) is not a build choice. One build carries the kinematics of
-> both types, and the program picks one through the `hand_type` field of
+> The hand model (`Gen2` or `Gen2B`) is not a build choice. One build carries the kinematics of
+> both models, and the program picks one through the `hand_model` field of
 > [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig).
 
 ```bash

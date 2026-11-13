@@ -8,7 +8,7 @@ those ranges and how the clamp works.
 
 To compute the same limits yourself before sending a command, for example to settle a target in a
 higher-level controller, implement them from the formulas and tables in this document. The ranges
-and formulas are the same for hand types `Gen2` and `Gen2_B`.
+and formulas are the same for hand models `Gen2` and `Gen2B`.
 
 ## Contents
 

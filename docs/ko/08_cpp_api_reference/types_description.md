@@ -6,9 +6,9 @@
 |---|---|---|
 | [상수](#constants) | `constexpr` | actuator·joint·tactile 개수 |
 | [`HandSide`](#enum-handside) | enum | 왼손 / 오른손 |
-| [`HandType`](#enum-handtype) | enum | 로봇 핸드 type |
-| [`parse_hand_type()`](#parse_hand_type) | function | 문자열 → `HandType` |
-| [`to_string()`](#to_string) | function | `HandType` → 문자열 |
+| [`HandModel`](#enum-handmodel) | enum | 로봇 핸드 모델 |
+| [`parse_hand_model()`](#parse_hand_model) | function | 문자열 → `HandModel` |
+| [`to_string()`](#to_string) | function | `HandModel` → 문자열 |
 | [`Finger`](#enum-finger) | enum | tactile finger index |
 
 ---
@@ -42,31 +42,30 @@ enum class HandSide { Left, Right };
 
 ---
 
-## enum `HandType`
+## enum `HandModel`
 
 ```cpp
-enum class HandType { Gen2, Gen2_B };
+enum class HandModel { Gen2, Gen2B };
 ```
 
-`Gen2_B`는 엄지 d1·d2의 screw lead가 2 mm인 모델입니다. 어느 type인지는 로봇 핸드 전달과 함께
-알려드립니다.
+모델에 따라 kinematics와 joint impedance의 hard stiffness가 달라집니다. 어느 모델인지는 로봇 핸드
+전달과 함께 알려드립니다.
 
-### `parse_hand_type()`
+### `parse_hand_model()`
 
 ```cpp
-std::optional<HandType> parse_hand_type(std::string_view text);
+constexpr std::optional<HandModel> parse_hand_model(std::string_view text) noexcept;
 ```
 
-`"gen2"`·`"gen2-b"`를 대소문자 구분 없이 읽고(`"gen2_b"`도 허용), 그 밖의 문자열이면 `std::nullopt`를
-돌려줍니다.
+`"gen2"`·`"gen2b"`를 대소문자 구분 없이 읽고, 그 밖의 문자열이면 `std::nullopt`를 돌려줍니다.
 
 ### `to_string()`
 
 ```cpp
-const char* to_string(HandType type);
+constexpr const char* to_string(HandModel model) noexcept;
 ```
 
-`"gen2"` 또는 `"gen2-b"`를 돌려줍니다.
+`"gen2"` 또는 `"gen2b"`를 돌려줍니다.
 
 ---
 
@@ -78,7 +77,7 @@ enum class Finger { Thumb, Index, Middle, Ring, Baby };   // tactile finger inde
 
 ---
 
-## 배열 규약
+## Array conventions
 
 길이와 단위가 맞는지 확인하고 쓰십시오.
 
@@ -121,5 +120,5 @@ index 공간은 세 가지입니다.
 | Active joint index | 0 | 1 | 2 | 3 | — | 4 | 5 | 6 | — | 7 | 8 | 9 | — | 10 | 11 | 12 | — | 13 | 14 | 15 | — |
 
 T=Thumb · I=Index · M=Middle · R=Ring · B=Baby. passive joint는 각 finger 그룹의 마지막
-슬롯이고, command 대상이 아니며 FK 결과로만 전달됩니다. 예를 들어 active index `4`(index finger의
+슬롯이고, command 대상이 아니며 관측값(`JointState`)으로만 전달됩니다. 예를 들어 active index `4`(index finger의
 첫 joint)는 `JointState`의 `5`입니다.

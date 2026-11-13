@@ -14,11 +14,11 @@
 ### `HandConfig::HandConfig()`
 
 ```cpp
-HandConfig(std::string interface_name, HandSide hand_side, HandType hand_type);
+HandConfig(std::string interface_name, HandSide hand_side, HandModel hand_model);
 ```
 
-**Parameters**     ｜ `interface_name` — CAN interface 이름 · `hand_side` — `Left` 또는 `Right` · `hand_type` — `Gen2` 또는 `Gen2_B`<br>
-**Throws**         ｜ `InvalidArgument` — `interface_name` 필드가 비었거나 `hand_side`·`hand_type` 필드가 범위 밖일 때
+**Parameters**     ｜ `interface_name` — CAN interface 이름 · `hand_side` — `Left` 또는 `Right` · `hand_model` — `Gen2` 또는 `Gen2B`<br>
+**Throws**         ｜ `InvalidArgument` — `interface_name` 필드가 비었거나 `hand_side`·`hand_model` 필드가 범위 밖일 때
 
 ---
 
@@ -28,8 +28,7 @@ HandConfig(std::string interface_name, HandSide hand_side, HandType hand_type);
 |---|---|---|---|
 | `interface_name` | `std::string` | 필수 | CAN interface 이름 |
 | `hand_side` | [`HandSide`](types_description.md#enum-handside) | 필수 | 로봇 핸드 좌우 구분 |
-| `hand_type` | [`HandType`](types_description.md#enum-handtype) | 필수 | 로봇 핸드 type. kinematics와 joint impedance의 hard stiffness가 이 값을 따릅니다 |
-| `control_rate` | `int` | `500` | 제어 주기 [Hz]. `0` 이하면 [`create()`](hand_manager.md#handmanagercreate)가 `InvalidArgument` |
+| `hand_model` | [`HandModel`](types_description.md#enum-handmodel) | 필수 | 로봇 핸드 모델. kinematics와 joint impedance의 hard stiffness가 이 값을 따릅니다 |
 | `auto_home` | `bool` | `true` | [`run()`](hand.md#handrun)의 자동 homing 여부. `homing_state` 값이 `Succeeded`가 아닐 때만 수행 |
 | `rt_cpu_affinity` | `int` | `-1` | 제어·통신 루프를 실행하는 thread를 고정할 CPU 번호. `-1`은 고정 안 함. 고정 실패는 알리지 않음 |
 | `auto_reconnect` | `bool` | `false` | 통신 오류 후 자동 재연결 여부 |

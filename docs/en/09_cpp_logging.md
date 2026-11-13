@@ -16,8 +16,8 @@ you read state and diagnostics, see the [C++ guide](07_cpp_usage_guide.md#7-hand
 
 ## 1. Sinks
 
-A sink is an exit that the log goes out through, and there are three kinds. With no setup at all
-the log goes to the console only.
+A sink is a destination the log is delivered to. The SDK provides three: console, file and
+callback. With no setup the log goes to the console only.
 
 | Sink | Default | Level |
 |---|---|---|
@@ -96,7 +96,7 @@ ah2::set_log_callback(
 | Other sinks | Independent of the console and file sinks |
 
 The body that the callback receives is the message part from [5. Log record](#5-log-record), so
-`[left]` and `[cycle N]` come with it.
+`[left]` and the error code come with it.
 
 The SDK calls the callback synchronously on the thread that produced the log, and that thread
 includes the control and communication loop. The time that the callback takes is spent inside the
@@ -110,6 +110,10 @@ ah2::set_log_callback(
       queue.try_push(level, message);
     });
 ```
+
+A callback that returns late lets events of the control and communication loop pile up before they
+reach the log. Past a limit, the SDK leaves some events out of the log and writes the warning
+`<count> realtime events dropped (event ring full)`.
 
 ## 4. When to configure
 
@@ -138,7 +142,8 @@ once at startup and do not change it afterwards.
 One log line consists of the following pieces.
 
 ```text
-[1756713600.123456789] [aidin_hand2] [info]     [left] [cycle 12345] homing complete — home position established
+[1756713600.123456789] [aidin_hand2] [info]     [left] homing complete — home position established
+[1756713600.223456789] [aidin_hand2] [critical] [left] [E404] communication lost (no RX)
 ```
 
 | Piece | Description |
@@ -147,42 +152,80 @@ One log line consists of the following pieces.
 | `[aidin_hand2]` | The logger name |
 | `[info]` | The level. The console sink pads it to 10 columns and colors it |
 | `[left]` | Which side of the robot hand. Only on lines that carry hand context |
-| `[cycle N]` | The cycle number of an event that the control and communication loop wrote |
+| `[E404]` | The error code. Only on lines whose cause and remedy are in [Error messages](15_error_messages.md) |
 | message | The body |
 
-`[left]` and `[cycle N]` go into the message body rather than into the formatter pattern, and some
-lines carry neither.
+`[left]` and the error code go into the message body rather than into the formatter pattern, and some
+lines carry neither. The wall clock in front tells when an event happened. The events of the control
+and communication loop are written in batches every 50 ms, so this time can trail the event by up to
+50 ms.
 
-Where the SDK throws an exception, it leaves the following form at the error level. The example
-below carries the message part only; a real line carries the leading pieces from the table above as
-they are.
+When [`connect()`](08_cpp_api_reference/hand.md#handconnect) succeeds, the SDK writes a multi-line
+Connection Info record at the info level. It shows in one place the settings of this run and what
+the control and communication loop got from the system. The example below shows the message part
+only.
 
 ```text
-[exception] CommunicationLost: Cannot stop hand: cannot confirm quick stop — no RX on can0; drives may hold last command. Restore CAN link and hand power
+[left] connect() succeeded
+-------------------------- Connection Info -------------------------
+side        left
+model       gen2
+interface   can0
+rate        500 Hz
+auto_home   on
+scheduler   SCHED_FIFO 90
+cpu         3
+affinity    none
+memory      locked
+actuators   16
+disabled    0
+faulted     0
+sdk         0.9.0
+--------------------------------------------------------------------
 ```
 
-[`Exception::what()`](08_cpp_api_reference/types_error.md#exception--stdruntime_error) does not hold the error
-code. The following example writes the code alongside on the application side, which is what lets
-you line the SDK log and the application log up by time.
+| Row | Description |
+|---|---|
+| `side`, `model`, `interface` | The `hand_side`, `hand_model` and `interface_name` fields of `HandConfig` |
+| `rate` | The rate of the control and communication loop, fixed at 500 Hz |
+| `auto_home` | The `auto_home` field |
+| `scheduler` | The `SCHED_FIFO` priority of the control loop, or `SCHED_OTHER` without the privilege |
+| `cpu` | The CPU the control loop runs on |
+| `affinity` | The `rt_cpu_affinity` field, `none` for `-1` |
+| `memory` | `locked` if the memory of the control loop is locked, `not locked` otherwise |
+| `actuators` | The number of actuators |
+| `disabled` | How many actuators the `disabled_actuators` field turns off |
+| `faulted` | How many actuators are in fault at connect |
+| `sdk` | The SDK version |
+
+The SDK log holds the events that happen apart from any call. An event in the control and
+communication loop carries the error code. The example below carries the message part only; a real
+line carries the leading pieces from the table above.
+
+```text
+[left] [E404] communication lost (no RX)
+```
+
+An exception that a function throws does not reach the SDK log, so write `what()` to the application
+log one time. [`Exception::what()`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)
+carries an error code such as `[E601]` too, which lines it up with the SDK log by the same code.
 
 ```cpp
 try {
   // an SDK call
 } catch (const ah2::Exception& error) {
-  app_logger.error("SDK {}: {}",
-                   ah2::to_string(error.code()),
-                   error.what());
+  app_logger.error("SDK {}", error.what());
 }
 ```
 
-To narrow a cause down from the message that remains, see
-[Error messages](15_error_messages.md). For what you must record alongside to trace the cause of
-an incident, see the [C++ guide](07_cpp_usage_guide.md#82-diagnostic-record).
+The cause and remedy of each code are in [Error messages](15_error_messages.md). For what you must
+record alongside to trace the cause of an incident, see the
+[C++ guide](07_cpp_usage_guide.md#82-diagnostic-record).
 
 > [!IMPORTANT]
 > Do not rely on the log for a safety decision. Read the
 > [`lifecycle`](07_cpp_usage_guide.md#8-diagnostics) field and the
-> [actuator fault](15_error_messages.md#11-actuator-faults) directly. The same holds for a safety
+> [actuator fault](15_error_messages.md#10-actuator-fault-values) directly. The same holds for a safety
 > circuit that you placed outside the SDK.
 
 ## 6. Shutdown
@@ -238,7 +281,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandType::Gen2};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     ah2::Hand hand = manager.create(config);
     hand.connect();
     hand.run();
@@ -246,9 +289,8 @@ int main()
     // the control code
 
   } catch (const ah2::Exception& error) {
-    // the SDK already wrote it at the error level. the application writes the code alongside
-    app_log(ah2::LogLevel::Error,
-            std::string(ah2::to_string(error.code())) + ": " + error.what());
+    // the SDK does not log a thrown exception, so what() goes here, code included
+    app_log(ah2::LogLevel::Error, error.what());
     exit_code = 1;
   }
 

@@ -21,7 +21,7 @@ this repository has to carry.
 | [Eigen](https://eigen.tuxfamily.org) | 3.4.0 | MPL-2.0, with BSD-3-Clause parts | Compiled into `libaidin_hand2_kinematics.so.<version>` |
 | [spdlog](https://github.com/gabime/spdlog) | ≥ 1.9 | MIT | Linked into `libaidin_hand2.so` |
 | [fmt](https://github.com/fmtlib/fmt) | as packaged with spdlog | MIT with an optional exception | Linked transitively through spdlog |
-| Linux userspace API headers | kernel headers of the build host | BSD-3-Clause, or GPL-2.0 WITH Linux-syscall-note | Included when the SDK is compiled |
+| Linux userspace API headers | kernel headers of the build host | BSD-3-Clause, dual-licensed with GPL-2.0-only WITH Linux-syscall-note | Included when the SDK is compiled |
 
 ## Eigen
 
@@ -84,30 +84,20 @@ https://github.com/fmtlib/fmt.
 ## Linux userspace API headers
 
 The CAN-FD transport is built on SocketCAN and includes the kernel's userspace API headers.
-These headers declare the socket, frame and netlink structures the kernel exposes; the SDK
-does not link any kernel code.
+These headers declare the socket and frame structures the kernel exposes; the SDK does not
+link any kernel code.
 
 | Header | SPDX identifier |
 |---|---|
 | `linux/can.h`, `linux/can/error.h`, `linux/can/raw.h` | `(GPL-2.0-only WITH Linux-syscall-note) OR BSD-3-Clause` |
-| `linux/can/netlink.h` | `GPL-2.0-only WITH Linux-syscall-note` |
-| `linux/netlink.h`, `linux/rtnetlink.h` | `GPL-2.0 WITH Linux-syscall-note` |
 
-For the three dual-licensed CAN headers the SDK takes the BSD-3-Clause option, so no GPL
-term applies to them. The notice is reproduced in
+The SDK takes the BSD-3-Clause option for these three headers, so no GPL term applies to
+them. The notice is reproduced in
 [licenses/BSD-3-Clause-SocketCAN.txt](licenses/BSD-3-Clause-SocketCAN.txt).
-
-The remaining three headers are available only under GPL-2.0 with the `Linux-syscall-note`
-exception. The exception states that the kernel's copyright does not cover user programs
-that use kernel services through normal system calls, and that such use is not a derived
-work. The SDK is such a user program, so the GPL does not extend to it. The exception text
-is in the kernel tree at `LICENSES/exceptions/Linux-syscall-note`, and the kernel source is
-available from https://www.kernel.org.
 
 ## can-utils
 
 [README.md](README.md) recommends installing can-utils for bringing up and inspecting a CAN
-interface. The SDK never invokes it: interface configuration is done through netlink from
-`src/hand_core/comms/canfd/interface_setup.cpp`, and no code path starts an external
-process. can-utils is therefore a separate program a user may choose to run, not a
-dependency of this software, and its license imposes no obligation on this repository.
+interface. The SDK never invokes it, and no code path starts an external process. can-utils
+is therefore a separate program a user may choose to run, not a dependency of this software,
+and its license imposes no obligation on this repository.

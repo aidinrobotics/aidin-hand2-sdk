@@ -42,7 +42,7 @@ void connect();
 Opens the CAN socket and starts receiving state. It applies no torque.
 
 **Throws**         ｜ `InterfaceUnavailable` · `CommunicationLost` ·
-`ControlLoopFault` · `WrongCallOrder`<br>
+`ControlLoopFault` · `HandFaulted` · `WrongCallOrder`<br>
 **Preconditions**  ｜ `Disconnected` · `Connected` (no-op)<br>
 **Postconditions** ｜ `Connected`<br>
 **Notes**          ｜ Waits up to 300 ms for the first frame
@@ -57,7 +57,7 @@ Requests a quick stop from the actuators and then closes the CAN connection. If 
 requested, it confirms that the actuators reached the quick stop state.
 
 **Throws**         ｜ `CommunicationLost` · `HardwareFault` ·
-`ControlLoopFault` · `WrongCallOrder`<br>
+`HandFaulted` · `WrongCallOrder`<br>
 **Preconditions**  ｜ `Disconnected` (no-op) · `Connected` · `Running` · `Stopped`<br>
 **Postconditions** ｜ `Disconnected`<br>
 **Notes**          ｜ Waits up to 500 ms for the confirmation. If it cannot confirm, it throws
@@ -96,7 +96,7 @@ retrying the fault reset on it. With [`auto_home`](types_config.md#handconfig)`=
 `Succeeded`, it homes first.
 
 **Throws**         ｜ `CommunicationLost` · `HardwareFault` ·
-`ControlLoopFault` · `WrongCallOrder`<br>
+`HandFaulted` · `WrongCallOrder`<br>
 **Preconditions**  ｜ `Connected` · `Running` (no-op) · `Stopped`<br>
 **Postconditions** ｜ `Running`<br>
 **Notes**          ｜ Waits up to 4000 ms for the actuator enable, and on the path that homes it
@@ -115,7 +115,7 @@ Requests a quick stop and confirms that the actuators reached the quick stop sta
 not become `Stopped` before that confirmation. It resets the last command to [`Idle`](types_command.md#idle).
 
 **Throws**         ｜ `CommunicationLost` · `HardwareFault` ·
-`ControlLoopFault` · `WrongCallOrder`<br>
+`HandFaulted` · `WrongCallOrder`<br>
 **Preconditions**  ｜ `Running` · `Stopped` (no-op)<br>
 **Postconditions** ｜ `Stopped`<br>
 **Notes**          ｜ Waits up to 500 ms for the confirmation. If it cannot confirm, it throws and
@@ -133,7 +133,7 @@ Starts homing and waits for it to end. It enables the drives internally, so ther
 call [`run()`](#handrun) first.
 
 **Throws**         ｜ `HardwareFault` (naming the actuators that failed) · `CommunicationLost` ·
-`ControlLoopFault` ·
+`HandFaulted` ·
 `WrongCallOrder`<br>
 **Preconditions**  ｜ `Connected` · `Running` · `Stopped`<br>
 **Postconditions** ｜ `Running`, `homing_state = Succeeded`<br>
@@ -155,7 +155,7 @@ joint command goes through the workspace projection automatically. The range mod
 [Workspace limits](../14_workspace_limits.md).
 
 **Parameters**     ｜ `command` — one of the five command types<br>
-**Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
+**Throws**         ｜ `HandFaulted` ·
 `WrongCallOrder` (not `Running`, or `homing_state != Succeeded`, from which [`Idle`](types_command.md#idle) is exempt)<br>
 **Preconditions**  ｜ `Running` — the actuator enable must be confirmed, so this comes after
 [`run()`](#handrun) succeeds<br>
@@ -206,7 +206,7 @@ cycle become the bias, and from that cycle the `tactile` field of [`HandState`](
 holds the raw value minus the bias, which can be negative. The log records that cycle as a
 `tactile bias set` line.
 
-**Throws**         ｜ `CommunicationLost` (the SDK receives no state) · `ControlLoopFault` ·
+**Throws**         ｜ `CommunicationLost` (the SDK receives no state) · `HandFaulted` ·
 `WrongCallOrder` (`Disconnected`, destroyed `HandCore` or invalidated handle)<br>
 **Preconditions**  ｜ `Connected` · `Running` · `Stopped`<br>
 **Notes**          ｜ Call it while nothing is in contact. The bias stays until you call
@@ -223,7 +223,7 @@ Requests the bias back to `0` and returns at once. From the next cycle, the `tac
 [`HandState`](types_state.md#handstate) holds the raw values. The log records that cycle as a
 `tactile bias reset` line.
 
-**Throws**         ｜ `CommunicationLost` · `ControlLoopFault` ·
+**Throws**         ｜ `HandFaulted` ·
 `WrongCallOrder` (`Disconnected`, destroyed `HandCore` or invalidated handle)<br>
 **Preconditions**  ｜ `Connected` · `Running` · `Stopped`
 
@@ -266,7 +266,7 @@ Returns the latest state of the SDK and the control loop.
 
 **Returns**        ｜ [`Diagnostics`](types_diagnostics.md#diagnostics)<br>
 **Throws**         ｜ `WrongCallOrder` (destroyed `HandCore` or invalidated handle)<br>
-**Notes**          ｜ One call mixes two moments — `lifecycle`, `homing_state` and
+**Notes**          ｜ One call mixes two moments — `lifecycle`, `fault_code`, `homing_state` and
 `nan_command_count` are read
 at call time, the rest come from the last cycle the control loop published
 

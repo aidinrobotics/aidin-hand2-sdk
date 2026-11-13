@@ -12,11 +12,11 @@
 ### `HandConfig::HandConfig()`
 
 ```cpp
-HandConfig(std::string interface_name, HandSide hand_side, HandType hand_type);
+HandConfig(std::string interface_name, HandSide hand_side, HandModel hand_model);
 ```
 
-**Parameters**     ｜ `interface_name` — CAN interface name · `hand_side` — `Left` or `Right` · `hand_type` — `Gen2` or `Gen2_B`<br>
-**Throws**         ｜ `InvalidArgument` — `interface_name` is empty, or `hand_side` or `hand_type` is out of range
+**Parameters**     ｜ `interface_name` — CAN interface name · `hand_side` — `Left` or `Right` · `hand_model` — `Gen2` or `Gen2B`<br>
+**Throws**         ｜ `InvalidArgument` — `interface_name` is empty, or `hand_side` or `hand_model` is out of range
 
 ### Member variables
 
@@ -24,8 +24,7 @@ HandConfig(std::string interface_name, HandSide hand_side, HandType hand_type);
 |---|---|---|---|
 | `interface_name` | `std::string` | required | CAN interface name |
 | `hand_side` | [`HandSide`](types_description.md#enum-handside) | required | Which side the robot hand is |
-| `hand_type` | [`HandType`](types_description.md#enum-handtype) | required | The robot hand's type. The kinematics and the joint impedance hard stiffness follow it |
-| `control_rate` | `int` | `500` | Control period [Hz]. `0` or less makes [`create()`](hand_manager.md#handmanagercreate) raise `InvalidArgument` |
+| `hand_model` | [`HandModel`](types_description.md#enum-handmodel) | required | The robot hand's model. The kinematics and the joint impedance hard stiffness follow it |
 | `auto_home` | `bool` | `true` | Whether [`run()`](hand.md#handrun) homes first. Only when `homing_state` is not `Succeeded` |
 | `rt_cpu_affinity` | `int` | `-1` | The CPU that the SDK pins the thread of the control and communication loop to. `-1` for no pinning. A failed pinning is not reported |
 | `auto_reconnect` | `bool` | `false` | Whether to reconnect automatically after a communication error |

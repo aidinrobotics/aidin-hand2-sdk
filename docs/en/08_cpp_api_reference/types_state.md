@@ -9,10 +9,10 @@
 | [`ActuatorFault`](#enum-actuatorfault) | enum | Drive error code |
 | [`CommandSource`](#enum-commandsource) | enum | What the SDK used this cycle |
 | [`HandState`](#handstate) | struct | What [`get_state()`](hand.md#handget_state) returns |
-| [`ActuatorState`](#actuatorstate) | struct | Actuator observation |
-| [`JointState`](#jointstate) | struct | FK output |
-| [`TactileState`](#tactilestate) | struct | Tactile |
-| [`CommandedState`](#commandedstate) | struct | This cycle's command input and output |
+| [`ActuatorState`](#actuatorstate) | struct | Position, velocity and current of the 16 actuators |
+| [`JointState`](#jointstate) | struct | Angle, velocity and estimated torque of the 21 joints |
+| [`TactileState`](#tactilestate) | struct | Tactile sensor values |
+| [`CommandedState`](#commandedstate) | struct | Command input and output of this cycle |
 | [`ActuatorHealth`](#actuatorhealth) | struct | Per-actuator enable and fault |
 | [`ControllerOutput`](#type-aliases) | alias | Setpoint variant |
 
@@ -52,34 +52,34 @@ Read through `Diagnostics::homing_state`.
 
 ```cpp
 enum class ActuatorFault : std::uint16_t {
-  None                     = 0x0000,  // healthy
-  OverCurrentError         = 0x2310,  // electrical
-  OverVoltageError         = 0x3210,  // electrical
-  UnderVoltageError        = 0x3220,  // electrical
-  OverTemperatureError     = 0x4210,  // thermal
-  CurrentDetectionError    = 0x5210,  // electrical
-  SpeedError               = 0x7310,  // control
-  CommunicationError       = 0x7500,  // communication
-  FollowingError           = 0x8611,  // control, tracking failed
-  HallSensorError          = 0xFF01,  // hall sensor
-  OverLoadError            = 0xFF02,  // mechanical load
-  PositiveLimitSwitchError = 0xFF03,  // limit
-  NegativeLimitSwitchError = 0xFF04,  // limit
-  EmergencySwitchError     = 0xFF05,  // safety
-  Sto1Error                = 0xFF06,  // safety (STO = Safe Torque Off)
-  Sto2Error                = 0xFF07,  // safety (STO = Safe Torque Off)
-  SerialEncoderChannelAError             = 0xFF24,  // encoder
-  SerialEncoderChannelADisconnectedError = 0xFF25,  // encoder
-  SerialEncoderChannelBError             = 0xFF26,  // encoder
-  SerialEncoderChannelBDisconnectedError = 0xFF27,  // encoder
+  None                     = 0x0000,
+  OverCurrentError         = 0x2310,
+  OverVoltageError         = 0x3210,
+  UnderVoltageError        = 0x3220,
+  OverTemperatureError     = 0x4210,
+  CurrentDetectionError    = 0x5210,
+  SpeedError               = 0x7310,
+  CommunicationError       = 0x7500,
+  FollowingError           = 0x8611,
+  HallSensorError          = 0xFF01,
+  OverLoadError            = 0xFF02,
+  PositiveLimitSwitchError = 0xFF03,
+  NegativeLimitSwitchError = 0xFF04,
+  EmergencySwitchError     = 0xFF05,
+  Sto1Error                = 0xFF06,
+  Sto2Error                = 0xFF07,
+  SerialEncoderChannelAError             = 0xFF24,
+  SerialEncoderChannelADisconnectedError = 0xFF25,
+  SerialEncoderChannelBError             = 0xFF26,
+  SerialEncoderChannelBDisconnectedError = 0xFF27,
 };
 
 constexpr const char* to_string(ActuatorFault fault) noexcept;
 ```
 
 The drive's `0x603F` error code. The SDK does not stop by itself when a fault appears, and indices
-listed in `disabled_actuators` are never reported. What to check for each code is in
-[Error messages](../15_error_messages.md#11-actuator-faults).
+listed in `disabled_actuators` are never reported. The log line and what to do when a fault is
+reported are in [E504 in Error messages](../15_error_messages.md#6-e5xx-hardwarefault).
 
 ## enum `CommandSource`
 
@@ -96,14 +96,14 @@ enum class CommandSource {
 
 | Field | Type | Description |
 |---|---|---|
-| `timestamp` | `std::int64_t` | That cycle's `CLOCK_REALTIME` epoch ns. `0` means there is no value yet |
-| `actuators` | [`ActuatorState`](#actuatorstate) | Actuator observation |
-| `joints` | [`JointState`](#jointstate) | FK output |
-| `tactile` | [`TactileState`](#tactilestate) | Tactile |
-| `commanded` | [`CommandedState`](#commandedstate) | This cycle's command input and output |
+| `timestamp` | `std::int64_t` | The time of that cycle |
+| `actuators` | [`ActuatorState`](#actuatorstate) | Position, velocity and current of the 16 actuators |
+| `joints` | [`JointState`](#jointstate) | Angle, velocity and estimated torque of the 21 joints |
+| `tactile` | [`TactileState`](#tactilestate) | Tactile sensor values |
+| `commanded` | [`CommandedState`](#commandedstate) | Command input and output of this cycle |
 
-`timestamp` is for lining up with rosbag or a ROS `header.stamp`. Use
-`Diagnostics::last_period_ms` to measure the period.
+`timestamp` is in `CLOCK_REALTIME` epoch ns, and `0` means there is no value yet. It is for lining
+up with rosbag or a ROS `header.stamp`. Use `Diagnostics::last_period_ms` to measure the period.
 
 ## `ActuatorState`
 
@@ -115,21 +115,15 @@ enum class CommandSource {
 
 ## `JointState`
 
-| Field | Type | Unit |
-|---|---|---|
-| `position_rad` | `std::array<double, kJointCount>` | rad |
+| Field | Type | Unit | Description |
+|---|---|---|---|
+| `position_rad` | `std::array<double, kJointCount>` | rad | Angles of the 21 joints |
+| `velocity_rad_s` | `std::array<double, kJointCount>` | rad/s | Velocities of the 21 joints, the passive joint4 included |
+| `effort_Nm` | `std::array<double, kJointCount>` | N·m | Estimated torque of the active joints. NaN on joint4 |
 
-## `HandStateJointVelEff`
-
-What [`compute_joint_vel_eff()`](hand_kinematics.md#compute_joint_vel_eff) returns. Every field holds
-the 16 active joints.
-
-| Field | Type | Description |
-|---|---|---|
-| `velocity_rad_s` | `std::array<double, kActiveJointCount>` | Joint velocity from `velocity_rpm` [rad/s] |
-| `effort_Nm` | `std::array<double, kActiveJointCount>` | Joint effort from `current_mA` [N·m] |
-| `commanded_effort_Nm` | `std::array<double, kActiveJointCount>` | Joint effort from the effort setpoint of this cycle [N·m]. NaN when the setpoint is a position |
-| `rated_effort_Nm` | `std::array<double, kActiveJointCount>` | Joint effort at which the most loaded actuator reaches its rated current [N·m] |
+`effort_Nm` is the joint torque estimated from the actuator current (`current_mA`) with the motor
+torque constant. It leaves out transmission losses and friction, so it can differ from the actual
+joint torque. The passive joint4 has no effort and reads NaN.
 
 ## `TactileState`
 

@@ -1,7 +1,7 @@
 # C++ API Reference
 
 Public 심볼을 header 파일 단위로 정리했습니다. 함수는 선언과 계약을, struct는 필드 표를
-싣습니다. 쓰는 순서와 배경은 [C++ guide](07_cpp_usage_guide.md), 오류 문구별 조치는
+싣습니다. 쓰는 순서와 배경은 [C++ guide](07_cpp_usage_guide.md), 오류 번호별 조치는
 [Error messages](15_error_messages.md)에 있습니다.
 
 ```cpp
@@ -22,12 +22,12 @@ header 파일별 문서는 다음과 같습니다.
 &nbsp;&nbsp;[**`hand/hand_manager.hpp`**](08_cpp_api_reference/hand_manager.md) — `HandManager`<br>
 &nbsp;&nbsp;[**`hand/hand.hpp`**](08_cpp_api_reference/hand.md) — `Hand`<br>
 &nbsp;&nbsp;[**`hand/hand_kinematics.hpp`**](08_cpp_api_reference/hand_kinematics.md) — FK / IK<br>
-&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — 상수, `HandSide`, `HandType`, `Finger`, 배열 규약<br>
+&nbsp;&nbsp;[**`types/description.hpp`**](08_cpp_api_reference/types_description.md) — 상수, `HandSide`, `HandModel`, `Finger`, 배열 규약<br>
 &nbsp;&nbsp;[**`types/config.hpp`**](08_cpp_api_reference/types_config.md) — `HandConfig`, `ControllerConfig`<br>
 &nbsp;&nbsp;[**`types/command.hpp`**](08_cpp_api_reference/types_command.md) — `CommandMode`, command 5종<br>
 &nbsp;&nbsp;[**`types/state.hpp`**](08_cpp_api_reference/types_state.md) — `HandLifecycle`, `HomingState`, `HandState`, `ActuatorFault`<br>
 &nbsp;&nbsp;[**`types/diagnostics.hpp`**](08_cpp_api_reference/types_diagnostics.md) — `Diagnostics`<br>
-&nbsp;&nbsp;[**`types/error.hpp`**](08_cpp_api_reference/types_error.md) — `ErrorCode`, `Exception`<br>
+&nbsp;&nbsp;[**`types/error.hpp`**](08_cpp_api_reference/types_error.md) — `ErrorKind`, `Exception`, 오류 번호 상수(`types/error_codes.hpp`)<br>
 &nbsp;&nbsp;[**`logging/logging.hpp`**](08_cpp_api_reference/logging.md) — `LogLevel`, logging 함수<br>
 &nbsp;&nbsp;[**`version.hpp`**](08_cpp_api_reference/version.md) — version 상수와 `find_package`
 
@@ -80,14 +80,13 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 |---|---|
 | [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | actuator encoder 16개 → joint 21개 |
 | [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | active joint 16개 → actuator encoder 16개 |
-| [`compute_joint_vel_eff()`](08_cpp_api_reference/hand_kinematics.md#compute_joint_vel_eff) | `HandState` 하나 → active joint 16개의 속도와 effort |
 
 **[`types/description.hpp`](08_cpp_api_reference/types_description.md)**
 
 | 함수 | 역할 |
 |---|---|
-| [`parse_hand_type()`](08_cpp_api_reference/types_description.md#parse_hand_type) | 문자열 → `HandType` |
-| [`to_string()`](08_cpp_api_reference/types_description.md#to_string) | `HandType` → 문자열 |
+| [`parse_hand_model()`](08_cpp_api_reference/types_description.md#parse_hand_model) | 문자열 → `HandModel` |
+| [`to_string()`](08_cpp_api_reference/types_description.md#to_string) | `HandModel` → 문자열 |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
 
@@ -115,9 +114,11 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 
 | 함수 | 역할 |
 |---|---|
-| [`to_string(ErrorCode)`](08_cpp_api_reference/types_error.md#enum-errorcode) | error code 이름 |
-| [`Exception::Exception()`](08_cpp_api_reference/types_error.md#exceptionexception) | code와 message로 예외 생성 |
-| [`Exception::code()`](08_cpp_api_reference/types_error.md#exceptioncode) | `ErrorCode` 반환 |
+| [`to_string(ErrorKind)`](08_cpp_api_reference/types_error.md#enum-errorkind) | 실패 분류 이름 |
+| [`kind_of()`](08_cpp_api_reference/types_error.md#kind_of) | 오류 번호가 속한 `ErrorKind` |
+| [`Exception::Exception()`](08_cpp_api_reference/types_error.md#exceptionexception) | 로봇 핸드·오류 번호나 분류와 message로 예외 생성 |
+| [`Exception::kind()`](08_cpp_api_reference/types_error.md#exceptionkind) | `ErrorKind` 반환 |
+| [`Exception::code()`](08_cpp_api_reference/types_error.md#exceptioncode) | 오류 번호 반환 |
 
 **[`logging/logging.hpp`](08_cpp_api_reference/logging.md)**
 
@@ -151,7 +152,7 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 |---|---|---|
 | [상수](08_cpp_api_reference/types_description.md#constants) | `constexpr` | actuator·joint·tactile 개수 |
 | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | enum | 왼손 / 오른손 |
-| [`HandType`](08_cpp_api_reference/types_description.md#enum-handtype) | enum | 로봇 핸드 type |
+| [`HandModel`](08_cpp_api_reference/types_description.md#enum-handmodel) | enum | 로봇 핸드 모델 |
 | [`Finger`](08_cpp_api_reference/types_description.md#enum-finger) | enum | tactile finger index |
 
 **[`types/config.hpp`](08_cpp_api_reference/types_config.md)**
@@ -184,11 +185,10 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 | [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) | enum | actuator error code |
 | [`CommandSource`](08_cpp_api_reference/types_state.md#enum-commandsource) | enum | 이번 cycle에 쓴 출처 |
 | [`HandState`](08_cpp_api_reference/types_state.md#handstate) | struct | [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state)가 돌려주는 값 |
-| [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | actuator 관측 |
-| [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | FK 결과 |
-| [`HandStateJointVelEff`](08_cpp_api_reference/types_state.md#handstatejointveleff) | struct | active joint의 속도와 effort |
-| [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | 촉각 |
-| [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | struct | 이번 cycle의 command 입력·출력 |
+| [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | actuator 16개의 위치·속도·전류 |
+| [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | joint 21개의 각도·속도·추정 토크 |
+| [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | 촉각 센서 값 |
+| [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | struct | 이번 cycle의 command 입력과 출력 |
 | [`ActuatorPositionSetpoint` / `ActuatorEffortSetpoint`](08_cpp_api_reference/types_state.md#actuatorpositionsetpoint--actuatoreffortsetpoint) | struct | controller 출력 setpoint |
 | [`ActuatorHealth`](08_cpp_api_reference/types_state.md#actuatorhealth) | struct | actuator별 enable·fault |
 | [`ControllerOutput`](08_cpp_api_reference/types_state.md#type-aliases) | alias | setpoint variant |
@@ -203,8 +203,9 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 
 | 타입 | 종류 | 역할 |
 |---|---|---|
-| [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) | enum | 실패 분류 |
+| [`ErrorKind`](08_cpp_api_reference/types_error.md#enum-errorkind) | enum | 실패 분류 |
 | [`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error) | class | public 호출이 던지는 예외 |
+| [`error_code`](08_cpp_api_reference/types_error.md#namespace-error_code) | namespace | 오류 번호 상수 |
 
 **[`logging/logging.hpp`](08_cpp_api_reference/logging.md)**
 
