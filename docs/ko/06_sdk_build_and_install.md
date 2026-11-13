@@ -1,8 +1,8 @@
 # SDK build & install
 
-SDK를 빌드·테스트·설치하고 예제로 동작을 확인합니다. 먼저
-[Real-time kernel setup](04_real_time_kernel_setup.md)과 [CAN-FD setup](05_can_fd_setup.md)을
-마치십시오.
+SDK를 빌드·테스트·설치하고 예제로 동작을 확인합니다. 먼저 [CAN-FD setup](05_can_fd_setup.md)을
+마치십시오. [Real-time kernel setup](04_real_time_kernel_setup.md)은 권장 사항이며, 빌드와 설치에는
+필요하지 않습니다.
 
 ## Contents
 
@@ -33,39 +33,13 @@ sudo apt install -y build-essential cmake libspdlog-dev can-utils
 cd aidin-hand2-sdk
 ```
 
-> [!IMPORTANT]
-> **AIDIN Hand Gen2에는 hand type A·B·C가 있고, 빌드할 때 type을 선택합니다.** type에 따라
-> kinematics가 다르게 계산됩니다. type은 로봇 핸드 전달과 함께 알려드립니다.
-
-아래 셋 중 해당하는 쪽만 실행하십시오.
-
-**a) type A**
+> [!NOTE]
+> hand model(`Gen2`·`Gen2B`)은 빌드할 때 고르지 않습니다. 한 빌드가 두 모델의 kinematics를 모두
+> 담고, 프로그램이 [`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)의 `hand_model` 필드로
+> 고릅니다.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#   -- aidin_hand2: hand type = a
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_a.a
-```
-
-**b) type B**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=b
-#   -- aidin_hand2: hand type = b
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_b.a
-```
-
-**c) type C**
-
-```bash
-cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DAIDIN_HAND2_HAND_TYPE=c
-#   -- aidin_hand2: hand type = c
-#   -- aidin_hand2: kinematics = .../libaidin_hand2_kinematics_type_c.a
-```
-
-출력 두 줄로 선택된 값을 확인한 뒤 빌드합니다.
-
-```bash
 cmake --build cpp/build -j"$(nproc)"
 ```
 
@@ -107,7 +81,7 @@ application의 CMakeLists.txt는 두 줄입니다. 버전을 반드시 지정하
 호환되지 않는데, 지정하지 않으면 CMake가 버전 검사를 건너뜁니다.
 
 ```cmake
-find_package(aidin_hand2 0.8 REQUIRED)
+find_package(aidin_hand2 0.9 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 
@@ -124,7 +98,7 @@ application의 CMakeLists.txt에 prefix를 알려 줍니다.
 
 ```cmake
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
-find_package(aidin_hand2 0.8 REQUIRED)
+find_package(aidin_hand2 0.9 REQUIRED)
 target_link_libraries(your_app PRIVATE aidin_hand2::aidin_hand2)
 ```
 

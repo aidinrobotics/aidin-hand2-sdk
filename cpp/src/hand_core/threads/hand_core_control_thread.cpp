@@ -1,9 +1,11 @@
 #include "hand_core/hand_core.hpp"
 
+#include <link.h>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>
@@ -15,7 +17,7 @@
 #include <string>
 #include <variant>
 
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
+#include "hand_core/kinematics/kinematics.hpp"
 #include "hand_core/util/monotonic_clock.hpp"
 #include "logging/log.hpp"
 
@@ -28,15 +30,26 @@ namespace
 // Silence longer than this is a lost link, converted to cycles when the loop starts
 constexpr long kCommunicationLossTimeoutMs = 100;
 
-// No quick stop within this window after the latch makes the verdict NotConfirmed
-constexpr long kStopConfirmationWindowMs = 200;
-
 // Below the kernel critical threads at 99, above the PREEMPT_RT IRQ threads at 50
 constexpr int kThreadPriority = 90;
+
+// Stack kept in RAM below the loop's frame, far more than the loop uses
+constexpr std::uintptr_t kLockedStackBytes = 512 * 1024;
+
+// Lowest stack address to lock for the calling thread: kLockedStackBytes below `top`, above the
+// guard page
+std::uintptr_t locked_stack_floor(std::uintptr_t top);
+
+// Locks the loaded segments (code, constants, static data) of the object holding `address` for
+// the rest of the process; errno of the first failure, 0 when all are locked
+int lock_segments_holding(const void* address);
 
 // Fills HandState.commanded with the controller input and the setpoint it produced
 void fill_commanded(CommandedState& echo, const HandCommand& command,
                     const canfd::CommandFrames& frames, bool output_available);
+
+// Joint index of an active joint: thumb j0..j3, then j1..j3 of each long finger, skipping each j4
+std::size_t joint_of_active(std::size_t active);
 
 }  // namespace
 
@@ -44,7 +57,10 @@ void fill_commanded(CommandedState& echo, const HandCommand& command,
 
 void HandCore::run_control_loop()
 {
-  apply_realtime_scheduling();
+  // This frame and the ones below it stay in RAM while the loop runs
+  const auto stack_top = reinterpret_cast<std::uintptr_t>(__builtin_frame_address(0));
+  const std::uintptr_t stack_floor = locked_stack_floor(stack_top);
+  apply_realtime_scheduling(stack_floor, stack_top);
 
   // Outside the try, so the failure handler can record the cycle it died on
   std::uint64_t cycle_count = 0;
@@ -53,9 +69,7 @@ void HandCore::run_control_loop()
   LoopState loop{};
   
   const long communication_loss_cycles =
-      std::max<long>(1, kCommunicationLossTimeoutMs * 1000000L / period_nanoseconds_);
-  const long confirmation_window_cycles =
-      std::max<long>(1, kStopConfirmationWindowMs * 1000000L / period_nanoseconds_);
+      std::max<long>(1, kCommunicationLossTimeoutMs * 1000000L / kPeriodNanoseconds);
 
   long next_wakeup = now_nanoseconds();
 
@@ -79,14 +93,13 @@ void HandCore::run_control_loop()
         }
       }
       if (loop.auto_reconnect_deadline != 0 && now_nanoseconds() > loop.auto_reconnect_deadline) {
-        log_critical(hand_side_, "auto-reconnect timed out — giving up; call reconnect() to recover");
+        log_critical(hand_side_, error_code::kAutoReconnectTimeout, "auto-reconnect timed out");
         break;
       }
       if (try_reconnect_once()) {
         // The new session starts from scratch, so the change detectors have to as well
         loop.previous_receiving = true;
         loop.first_frame_reported = false;
-        loop.previous_latched = false;
         loop.homing_was_active = false;
         loop.previous_fault.fill(ActuatorFault::None);
       }
@@ -111,13 +124,15 @@ void HandCore::run_control_loop()
         (requested == HandLifecycle::Running) ? loop.active_command : HandCommand{};
 
     // Outside Running the homing request is dropped rather than started, closing the race with stop()
-    if (request_homing_.exchange(false)) {
+    // active_homing_ rises before request_homing_ falls, so is_homing() never reads both false
+    if (request_homing_.load()) {
       if (requested == HandLifecycle::Running) {
-        (void)comms_.home();
-        active_homing_.store(true, std::memory_order_relaxed);
+        active_homing_.store(true);
+        (void)comms_.start_homing();
       } else {
         homing_state_.store(HomingState::Failed, std::memory_order_relaxed);
       }
+      request_homing_.store(false);
     }
 
     // 2) Observe the hand
@@ -130,7 +145,7 @@ void HandCore::run_control_loop()
 
     // 3) Watch the link and the drives
     const bool receiving = watch_link(loop, observed, cycle_count, communication_loss_cycles);
-    watch_actuator_faults(loop, actuator_health, observed, cycle_count);
+    watch_actuator_faults(loop, actuator_health, cycle_count);
 
     // 4) Control
     // The hold pose comes from this cycle's own observation, so it cannot be stale
@@ -139,26 +154,25 @@ void HandCore::run_control_loop()
     }
     canfd::CommandFrames frames{};
     bool write_ok = true;
-    const bool control_session = requested == HandLifecycle::Running ||
-                                 requested == HandLifecycle::Stopped ||
-                                 observed == HandLifecycle::Faulted;
+    // Nothing is sent once the link has faulted: no node acknowledges a frame then, so it waits
+    // in the adapter queue and reaches the hand only when the bus comes back
+    const bool control_session = observed != HandLifecycle::Faulted &&
+                                 (requested == HandLifecycle::Running ||
+                                  requested == HandLifecycle::Stopped);
     if (control_session) {
       frames = command_to_frames(command, loop.active_controller_config, hand_state, actuator_health);
 
-      // Re-read, because a stop() or a fault may have landed during this same cycle
+      // Re-read, because a stop() may have landed during this same cycle
       const HandLifecycle latest = requested_lifecycle_.load(std::memory_order_relaxed);
-      const bool quick_stop =
-          latest != HandLifecycle::Running || observed == HandLifecycle::Faulted;
-      write_ok = comms_.write(frames, quick_stop) == ErrorCode::None;
+      const bool quick_stop = latest != HandLifecycle::Running;
+      write_ok = comms_.write(frames, quick_stop);
 
       // A full TX queue is not a lost link, and treating it as one loops recovery against failure
       const int tx_errno = comms_.last_transmit_errno();
       const bool tx_transient = tx_errno == EAGAIN || tx_errno == EWOULDBLOCK || tx_errno == ENOBUFS;
-      if (!write_ok && !tx_transient && latest == HandLifecycle::Running &&
-          observed != HandLifecycle::Faulted) {
-        (void)event_ring_.push({RealtimeEventKind::TransmitFailure, cycle_count, -1,
-                                tx_errno, 0, HandLifecycle::Running, true});
-        last_stop_cause_ = {RealtimeEventKind::TransmitFailure, cycle_count, tx_errno, 0};
+      if (!write_ok && !tx_transient && latest == HandLifecycle::Running) {
+        (void)event_ring_.push({RealtimeEventKind::TransmitFailure, cycle_count, -1, tx_errno});
+        last_stop_cause_ = {RealtimeEventKind::TransmitFailure, cycle_count, tx_errno};
         lifecycle_.store(HandLifecycle::Faulted, std::memory_order_release);
         observed = HandLifecycle::Faulted;
       }
@@ -170,7 +184,6 @@ void HandCore::run_control_loop()
     check_communication_.store(control_session ? (receiving && write_ok) : receiving,
                                std::memory_order_relaxed);
     watch_drive_state(receiving);
-    watch_stop_verdict(loop, receiving, cycle_count, confirmation_window_cycles);
     watch_homing(loop, cycle_count);
 
     // 6) Publish and wait
@@ -178,8 +191,7 @@ void HandCore::run_control_loop()
     const HandLifecycle echo_request = requested_lifecycle_.load(std::memory_order_relaxed);
     hand_state.commanded.selected_source =
         !control_session ? CommandSource::None
-        : (echo_request == HandLifecycle::Stopped || observed == HandLifecycle::Faulted)
-            ? CommandSource::QuickStop
+        : echo_request == HandLifecycle::Stopped ? CommandSource::QuickStop
         : comms_.is_homing() ? CommandSource::Homing
                              : CommandSource::Controller;
     state_buffer_.write(hand_state);
@@ -187,7 +199,7 @@ void HandCore::run_control_loop()
     // lifecycle is added by diagnostics() on the user thread
     const long cycle_end = now_nanoseconds();
     const double compute_ms = static_cast<double>(cycle_end - cycle_start) / 1000000.0;
-    if ((cycle_end - cycle_start) > period_nanoseconds_) ++loop.deadline_misses;
+    if ((cycle_end - cycle_start) > kPeriodNanoseconds) ++loop.deadline_misses;
     ++cycle_count;
     Diagnostics diagnostics{};
     diagnostics.control_cycles  = cycle_count;
@@ -198,7 +210,7 @@ void HandCore::run_control_loop()
     diagnostics_buffer_.write(diagnostics);
 
     // An overrun proceeds immediately instead of skipping the cycle
-    next_wakeup += period_nanoseconds_;
+    next_wakeup += kPeriodNanoseconds;
     sleep_until_nanoseconds(next_wakeup);
   }
   } catch (const std::exception& loop_exception) {
@@ -207,6 +219,10 @@ void HandCore::run_control_loop()
   } catch (...) {
     handle_control_loop_failure("unknown exception", cycle_count);
   }
+
+  // The SDK's code stays locked for the other hands
+  (void)munlock(reinterpret_cast<const void*>(stack_floor), stack_top - stack_floor);
+  (void)munlock(this, sizeof(*this));
 }
 
 // ------------------------------ Loop internals ------------------------------
@@ -224,43 +240,28 @@ bool HandCore::watch_link(LoopState& loop, HandLifecycle& observed, std::uint64_
     return false;
   }
 
+  // The loop does not run in Faulted, so this edge is the only report of the silence
   const bool receiving = comms_.cycles_since_last_frame() <= loss_cycles;
   if (loop.previous_receiving && !receiving) {
-    const HandLifecycle state_before_silence = observed;
-    bool transitioned_now = false;
-    if (observed != HandLifecycle::Faulted) {
-      last_stop_cause_ = {RealtimeEventKind::ReceiveSilence, cycle,
-                          static_cast<std::int32_t>(comms_.last_receive_anomaly()),
-                          comms_.last_error_frame_class()};
-      lifecycle_.store(HandLifecycle::Faulted, std::memory_order_release);
-      observed = HandLifecycle::Faulted;
-      transitioned_now = true;
-    }
-    const bool redundant_symptom = !transitioned_now && observed == HandLifecycle::Faulted;
-    if (!redundant_symptom) {
-      (void)event_ring_.push({RealtimeEventKind::ReceiveSilence, cycle, -1,
-                              static_cast<std::int32_t>(comms_.last_receive_anomaly()),
-                              comms_.last_error_frame_class(), state_before_silence,
-                              state_before_silence == HandLifecycle::Running});
-    }
-  }
-  if (!loop.previous_receiving && receiving) {
-    (void)event_ring_.push({RealtimeEventKind::ReceiveRestored, cycle, -1, 0, 0, observed, false});
+    const auto anomaly = static_cast<std::int32_t>(comms_.last_receive_anomaly());
+    last_stop_cause_ = {RealtimeEventKind::ReceiveSilence, cycle, anomaly};
+    lifecycle_.store(HandLifecycle::Faulted, std::memory_order_release);
+    observed = HandLifecycle::Faulted;
+    (void)event_ring_.push({RealtimeEventKind::ReceiveSilence, cycle, -1, anomaly});
   }
   loop.previous_receiving = receiving;
   return receiving;
 }
 
 void HandCore::watch_actuator_faults(LoopState& loop, const ActuatorHealth& actuator_health,
-                                     HandLifecycle lifecycle, std::uint64_t cycle)
+                                     std::uint64_t cycle)
 {
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     const ActuatorFault fault = actuator_health.fault[i];
     if (fault == loop.previous_fault[i]) continue;
     (void)event_ring_.push({fault == ActuatorFault::None ? RealtimeEventKind::ActuatorFaultCleared
                                                          : RealtimeEventKind::ActuatorFaultSet,
-                            cycle, static_cast<std::int32_t>(i),
-                            static_cast<std::int32_t>(fault), 0, lifecycle, false});
+                            cycle, static_cast<std::int32_t>(i), static_cast<std::int32_t>(fault)});
     loop.previous_fault[i] = fault;
   }
 }
@@ -289,48 +290,6 @@ void HandCore::watch_drive_state(bool receiving)
   }
 }
 
-// Only an automatic stop reports events, because stop() reports through its own wait
-// The latch is a requested stop, or a fault, which quick stops without being asked
-void HandCore::watch_stop_verdict(LoopState& loop, bool receiving, std::uint64_t cycle, long window)
-{
-  const HandLifecycle latch_state = lifecycle_.load(std::memory_order_relaxed);
-  const bool latched = requested_lifecycle_.load(std::memory_order_relaxed) ==
-                           HandLifecycle::Stopped ||
-                       latch_state == HandLifecycle::Faulted;
-  if (latched) {
-    if (!loop.previous_latched) {
-      stop_confirmation_.store(StopConfirmation::Waiting, std::memory_order_relaxed);
-      loop.confirmation_cycles = 0;
-      loop.confirmation_by_fault = latch_state == HandLifecycle::Faulted;
-      loop.confirmation_confirmed_reported = false;
-      loop.confirmation_not_confirmed_reported = false;
-    }
-    const bool confirmed = receiving && comms_.quick_stop_attained();
-    const StopConfirmation prev_confirmation = stop_confirmation_.load(std::memory_order_relaxed);
-    const StopConfirmation next_confirmation = evaluate_stop_confirmation(
-        prev_confirmation, confirmed, loop.confirmation_cycles, window);
-    if (next_confirmation != prev_confirmation) {
-      stop_confirmation_.store(next_confirmation, std::memory_order_relaxed);
-    }
-    if (next_confirmation == StopConfirmation::Confirmed) {
-      if (prev_confirmation != StopConfirmation::Confirmed && loop.confirmation_by_fault &&
-          !loop.confirmation_confirmed_reported) {
-        (void)event_ring_.push({RealtimeEventKind::StopConfirmed, cycle, -1, 0, 0,
-                                latch_state, false});
-        loop.confirmation_confirmed_reported = true;
-      }
-    } else if (next_confirmation == StopConfirmation::NotConfirmed &&
-               prev_confirmation != StopConfirmation::NotConfirmed) {
-      if (loop.confirmation_by_fault && !loop.confirmation_not_confirmed_reported) {
-        (void)event_ring_.push({RealtimeEventKind::StopNotConfirmed, cycle, -1, 0, 0,
-                                latch_state, false});
-        loop.confirmation_not_confirmed_reported = true;
-      }
-    }
-  }
-  loop.previous_latched = latched;
-}
-
 // The single completion point for every homing path, blocking home() included
 void HandCore::watch_homing(LoopState& loop, std::uint64_t cycle)
 {
@@ -339,7 +298,7 @@ void HandCore::watch_homing(LoopState& loop, std::uint64_t cycle)
     const HomingPhase phase = comms_.homing_phase();
     if (!loop.homing_was_active || phase != loop.previous_homing_phase) {
       (void)event_ring_.push({RealtimeEventKind::HomingPhaseEntered, cycle, -1,
-                              static_cast<std::int32_t>(phase), 0, HandLifecycle::Running, false});
+                              static_cast<std::int32_t>(phase)});
       loop.previous_homing_phase = phase;
     }
   }
@@ -348,14 +307,17 @@ void HandCore::watch_homing(LoopState& loop, std::uint64_t cycle)
   if (!active_homing_.load(std::memory_order_relaxed) || comms_.is_homing()) {
     return;
   }
-  const bool homing_ok = comms_.last_homing_succeeded();
-  result_homing_.store(homing_ok, std::memory_order_relaxed);
-  active_homing_.store(false, std::memory_order_relaxed);
-  homing_state_.store(homing_ok ? HomingState::Succeeded : HomingState::Failed,
-                      std::memory_order_relaxed);
+  const bool homing_ok = comms_.last_homing_outcome() == HomingOutcome::Succeeded;
 
   // On failure the Idle latched at the request stays, so the hand ends torque-free
   if (homing_ok) set_command_to_home_hold();
+
+  result_homing_.store(homing_ok, std::memory_order_relaxed);
+  homing_state_.store(homing_ok ? HomingState::Succeeded : HomingState::Failed,
+                      std::memory_order_relaxed);
+  // Released last, so once is_homing() reads false home() sees this result and state, and a
+  // command sent after home() returns is not overwritten by the hold
+  active_homing_.store(false, std::memory_order_release);
 
   std::int32_t failed_mask = 0;
   if (!homing_ok) {
@@ -366,7 +328,7 @@ void HandCore::watch_homing(LoopState& loop, std::uint64_t cycle)
   (void)event_ring_.push({homing_ok ? RealtimeEventKind::HomingCompleted
                                     : RealtimeEventKind::HomingFailed,
                           cycle, -1, static_cast<std::int32_t>(comms_.last_homing_outcome()),
-                          0, HandLifecycle::Running, false, failed_mask});
+                          failed_mask});
 
   // Per actuator status words for the debug log
   if (!homing_ok) {
@@ -375,16 +337,20 @@ void HandCore::watch_homing(LoopState& loop, std::uint64_t cycle)
     for (std::size_t i = 0; i < kActuatorCount; ++i) {
       if (!failed[i]) continue;
       (void)event_ring_.push({RealtimeEventKind::HomingFailed, cycle,
-                              static_cast<std::int32_t>(i), static_cast<std::int32_t>(status[i]),
-                              0, HandLifecycle::Running, false, 0});
+                              static_cast<std::int32_t>(i), static_cast<std::int32_t>(status[i])});
     }
   }
 }
 
-// Logs what was applied, once, before the loop starts
-void HandCore::apply_realtime_scheduling() const
+// Once, before the loop starts
+void HandCore::apply_realtime_scheduling(std::uintptr_t stack_floor, std::uintptr_t stack_top)
 {
-  (void)mlockall(MCL_CURRENT | MCL_FUTURE);
+  // mlock also faults the pages in, and the loop takes no first-touch fault on them
+  int lock_error = 0;
+  if (mlock(reinterpret_cast<const void*>(stack_floor), stack_top - stack_floor) != 0) lock_error = errno;
+  if (mlock(this, sizeof(*this)) != 0 && lock_error == 0) lock_error = errno;
+  const int code_error = lock_segments_holding(&kThreadPriority);
+  if (lock_error == 0) lock_error = code_error;
 
   sched_param param{};
   param.sched_priority = kThreadPriority;
@@ -397,24 +363,18 @@ void HandCore::apply_realtime_scheduling() const
     (void)pthread_setaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
   }
 
-  if (fifo_applied) {
-    std::string message = "realtime scheduling applied — SCHED_FIFO priority " +
-                          std::to_string(kThreadPriority) + ", memory locked";
-    message += rt_cpu_affinity_ >= 0 ? ", CPU affinity " + std::to_string(rt_cpu_affinity_)
-                                     : ", no CPU affinity (any core)";
-    message += ", running on CPU " + std::to_string(sched_getcpu());
-    log_info(hand_side_, message);
-  } else {
-    log_warn(hand_side_, "SCHED_FIFO not applied (need privileges) — continuing without realtime scheduling");
-  }
+  // The realtime row of Connection Info reports these, since they describe the setup, not a failure
+  realtime_report_.fifo_priority = fifo_applied ? kThreadPriority : 0;
+  realtime_report_.running_cpu   = sched_getcpu();
+  realtime_report_.memory_locked = lock_error == 0;
 }
 
 // Reopens comms only, without rebuilding the core, and returns to Running on success
 // An open socket is not a recovery, so it waits for a decoded frame before believing the link
 bool HandCore::try_reconnect_once()
 {
-  comms_.disconnect();
-  if (!comms_.connect().ok()) {
+  comms_.deactivate();
+  if (!comms_.activate().ok()) {
     return false;
   }
   {
@@ -430,11 +390,10 @@ bool HandCore::try_reconnect_once()
       nanosleep(&poll, nullptr);
     }
     if (!observed) {
-      comms_.disconnect();
+      comms_.deactivate();
       return false;
     }
   }
-  (void)comms_.run();
 
   // "auto" may have resolved to a different channel
   interface_name_ = comms_.interface_name();
@@ -474,12 +433,22 @@ void HandCore::fill_joint_state(HandState& hand_state)
 
   // Fingertip positions are not carried in HandState
   std::array<double, kinematics::TASK_NUM>  task{};
-  kinematics::fk_actuator_to_joint(encoder, joint_rad, task);
+  solver_.fk_actuator_to_joint(encoder, joint_rad, task);
   for (std::size_t i = 0; i < kJointCount; ++i) {
     if (std::isfinite(joint_rad[i])) {
       last_valid_joint_rad_[i] = joint_rad[i];
     }
     hand_state.joints.position_rad[i] = last_valid_joint_rad_[i];
+  }
+
+  // Velocity on every joint through the Jacobians, effort on the active ones, the passive j4 having
+  // no actuator to take it from
+  hand_state.joints.velocity_rad_s = kinematics::fk_actuator_to_joint_velocity(solver_, actuator_, hand_state);
+  const std::array<double, kActiveJointCount> effort =
+      kinematics::fk_actuator_to_joint_effort(solver_, actuator_, hand_state);
+  hand_state.joints.effort_Nm.fill(std::numeric_limits<double>::quiet_NaN());
+  for (std::size_t active = 0; active < kActiveJointCount; ++active) {
+    hand_state.joints.effort_Nm[joint_of_active(active)] = effort[active];
   }
 }
 
@@ -495,7 +464,7 @@ void HandCore::apply_tactile_bias(HandState& hand_state, std::uint64_t cycle)
     tactile_bias_buffer_.write(tactile_bias_);
     const RealtimeEventKind kind = request == TactileBiasRequest::Set ? RealtimeEventKind::TactileBiasSet
                                                                       : RealtimeEventKind::TactileBiasReset;
-    (void)event_ring_.push({kind, cycle, -1, 0, 0, lifecycle_.load(std::memory_order_relaxed), false, 0});
+    (void)event_ring_.push({kind, cycle, -1, 0});
   }
 
   for (std::size_t finger = 0; finger < kFingerCount; ++finger) {
@@ -567,16 +536,17 @@ canfd::CommandFrames HandCore::command_to_frames(const HandCommand& command,
 // Faulted is final for this core: only reconnect() recovers, while state() still reads
 void HandCore::handle_control_loop_failure(const char* reason, std::uint64_t cycle)
 {
-  last_stop_cause_ = {RealtimeEventKind::ControlLoopFailure, cycle, 0, 0};
+  last_stop_cause_ = {RealtimeEventKind::ControlLoopFailure, cycle, 0};
 
   // Releases a blocking home() or stop() that is still waiting
   lifecycle_.store(HandLifecycle::Faulted, std::memory_order_release);
 
-  // Says "unconfirmed" because this path has no RX left to confirm the stop with
-  log_critical(hand_side_, std::string("RT control loop terminated: ") + reason +
-               " — attempting quick stop (unconfirmed); call reconnect() to recover");
+  // Says "without confirmation" because this path has no loop left to read the status words with
+  log_critical(hand_side_, error_code::kControlLoopTerminated,
+               std::string("control loop terminated, quick stop sent without confirmation (") + reason + ")");
 
-  // The drives hold the last command when the link drops, so try to leave them torque-free
+  // Unlike a link fault the link is still up, and without the loop the drives hold the last
+  // command, so quick stop is what leaves them torque-free
   try {
     canfd::CommandFrames frames{};
     for (int cycle = 0; cycle < 30; ++cycle) {
@@ -593,6 +563,50 @@ void HandCore::handle_control_loop_failure(const char* reason, std::uint64_t cyc
 
 namespace
 {
+
+std::uintptr_t locked_stack_floor(std::uintptr_t top)
+{
+  void* stack = nullptr;
+  std::size_t size = 0;
+  pthread_attr_t attributes;
+  if (pthread_getattr_np(pthread_self(), &attributes) == 0) {
+    (void)pthread_attr_getstack(&attributes, &stack, &size);
+    pthread_attr_destroy(&attributes);
+  }
+  const auto page = static_cast<std::uintptr_t>(sysconf(_SC_PAGESIZE));
+  return std::max(reinterpret_cast<std::uintptr_t>(stack) + page, top - kLockedStackBytes);
+}
+
+int lock_segments_holding(const void* address)
+{
+  struct Search {
+    std::uintptr_t address;
+    int error;
+  } search{reinterpret_cast<std::uintptr_t>(address), 0};
+  dl_iterate_phdr(
+      [](dl_phdr_info* info, std::size_t, void* data) -> int {
+        auto& found = *static_cast<Search*>(data);
+        bool holds = false;
+        for (int i = 0; i < info->dlpi_phnum; ++i) {
+          const ElfW(Phdr)& segment = info->dlpi_phdr[i];
+          const std::uintptr_t start = info->dlpi_addr + segment.p_vaddr;
+          if (segment.p_type == PT_LOAD && found.address >= start &&
+              found.address < start + segment.p_memsz) {
+            holds = true;
+          }
+        }
+        if (!holds) return 0;
+        for (int i = 0; i < info->dlpi_phnum; ++i) {
+          const ElfW(Phdr)& segment = info->dlpi_phdr[i];
+          if (segment.p_type != PT_LOAD) continue;
+          const auto* start = reinterpret_cast<const void*>(info->dlpi_addr + segment.p_vaddr);
+          if (mlock(start, segment.p_memsz) != 0 && found.error == 0) found.error = errno;
+        }
+        return 1;
+      },
+      &search);
+  return search.error;
+}
 
 void fill_commanded(CommandedState& echo, const HandCommand& command,
                     const canfd::CommandFrames& frames, bool output_available)
@@ -617,6 +631,11 @@ void fill_commanded(CommandedState& echo, const HandCommand& command,
     }
     echo.controller_output = output;
   }
+}
+
+std::size_t joint_of_active(std::size_t active)
+{
+  return active < 4 ? active : 5 + 4 * ((active - 4) / 3) + (active - 4) % 3;
 }
 
 }  // namespace

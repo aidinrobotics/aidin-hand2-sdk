@@ -70,7 +70,7 @@ Same as [`JointPositionCommand::clamp()`](#jointpositioncommandclamp).
 
 | Field | Type | Unit | Description |
 |---|---|---|---|
-| `target` | `std::array<double, kActuatorCount>` | encoder count | 16 motor position targets |
+| `target` | `std::array<double, kActuatorCount>` | encoder count | 16 actuator position targets |
 
 ## `ActuatorEffortCommand`
 

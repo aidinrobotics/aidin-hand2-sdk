@@ -3,6 +3,8 @@
 SDK의 500 Hz 제어·통신 루프를 실시간으로 스케줄링하려면 `PREEMPT_RT` kernel과, root가 아닌 user가
 real-time priority(`SCHED_FIFO`)로 실행하고 메모리를 잠글 수 있는 permission이 필요합니다. 이
 문서는 Ubuntu(x86_64 / arm64)에서 그 kernel을 source에서 빌드하고 permission을 부여합니다.
+둘 다 없어도 SDK는 동작하지만 다른 process의 부하에 따라 제어 주기가 늦어질 수 있으므로, 로봇 핸드를
+제어하는 컴퓨터에는 이 설정을 권장합니다.
 
 ## Contents
 
@@ -190,8 +192,8 @@ sudo reboot
 
 ## 2. Real-time settings
 
-root가 아닌 user가 `SCHED_FIFO` priority와 `mlockall`을 쓰려면 permission이 필요합니다. `realtime`
-group을 만들어 user를 넣고 limit을 부여합니다.
+root가 아닌 user가 `SCHED_FIFO` priority를 쓰고 메모리를 잠그려면(`mlock`) permission이 필요합니다.
+`realtime` group을 만들어 user를 넣고 limit을 부여합니다.
 
 ```bash
 sudo groupadd -r realtime
@@ -202,8 +204,10 @@ sudo tee /etc/security/limits.d/99-realtime.conf >/dev/null <<'EOF'
 EOF
 ```
 
-SDK는 제어·통신 루프를 priority 90으로 올리므로 `rtprio`는 그 이상, `mlockall`은 이후 할당분까지
-잠그므로 `memlock`은 `unlimited`여야 합니다.
+SDK는 제어·통신 루프를 priority 90으로 올리므로 `rtprio`는 90 이상이어야 합니다. 또 제어·통신 루프의
+stack과 상태, SDK 코드를 메모리에 잠그므로, `memlock`은 로봇 핸드 하나를 연결하면 약 1.1 MB, 둘이면
+약 1.7 MB 이상이어야 합니다. application이 따로 잠그는 메모리도 같은 한도에 포함되므로 위 설정은
+`unlimited`로 둡니다.
 
 로그아웃 후 다시 로그인해 새 세션에서 확인합니다.
 
@@ -211,6 +215,15 @@ SDK는 제어·통신 루프를 priority 90으로 올리므로 `rtprio`는 그 �
 id -nG         # 현재 user의 group → realtime 포함 확인
 ulimit -r      # rtprio  → 99
 ulimit -l      # memlock → unlimited
+```
+
+SDK가 설정을 적용했는지는 `connect()`가 남기는 [Connection Info](09_cpp_logging.md#5-log-record)에서
+확인합니다. `scheduler` 줄이 `SCHED_FIFO 90`이면 `rtprio`가, `memory` 줄이 `locked`이면 `memlock`이
+적용된 것입니다.
+
+```text
+scheduler   SCHED_FIFO 90
+memory      locked
 ```
 
 ---

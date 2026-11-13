@@ -16,7 +16,8 @@ logging은 SDK가 남기는 log를 console·file·callback 세 곳으로 보내�
 
 ## 1. Sinks
 
-sink는 log가 나가는 출구이며 세 종류입니다. 아무것도 설정하지 않으면 console로만 출력됩니다.
+sink는 log가 전달되는 대상입니다. SDK는 console, file, callback 세 가지를 제공하며, 아무것도 설정하지 않으면
+log는 console로만 전달됩니다.
 
 | Sink | Default | Level |
 |---|---|---|
@@ -93,8 +94,8 @@ ah2::set_log_callback(
 | Count | 1개. 다시 호출하면 교체, `nullptr`이면 해제 |
 | Other sinks | console·file sink와 무관 |
 
-callback이 받는 본문은 [5. Log record](#5-log-record)의 message 부분이라 `[left]`와 `[cycle N]`도
-함께 전달됩니다.
+callback이 받는 본문은 [5. Log record](#5-log-record)의 message 부분이라 `[left]`와 오류 번호도 함께
+전달됩니다.
 
 callback은 log를 만든 thread에서 동기적으로 호출되고, 그 thread에는 제어·통신 루프도 포함됩니다.
 callback에 드는 시간은 제어 주기 안에서 소모되므로, block I/O를 하거나 SDK를 다시 호출하거나 예외를
@@ -107,6 +108,10 @@ ah2::set_log_callback(
       queue.try_push(level, message);
     });
 ```
+
+callback이 늦게 반환하면 제어·통신 루프의 사건이 log로 옮겨지기 전에 쌓입니다. 쌓인 양이 한도를
+넘으면 SDK는 일부 사건을 log에 남기지 못하고 `<count> realtime events dropped (event ring full)`
+warning을 남깁니다.
 
 ## 4. When to configure
 
@@ -134,7 +139,8 @@ hand.connect();
 log 한 줄은 다음 조각으로 이루어집니다.
 
 ```text
-[1756713600.123456789] [aidin_hand2] [info]     [left] [cycle 12345] homing complete — home position established
+[1756713600.123456789] [aidin_hand2] [info]     [left] homing complete — home position established
+[1756713600.223456789] [aidin_hand2] [critical] [left] [E404] communication lost (no RX)
 ```
 
 | Piece | Description |
@@ -143,40 +149,75 @@ log 한 줄은 다음 조각으로 이루어집니다.
 | `[aidin_hand2]` | logger 이름 |
 | `[info]` | level. console sink는 10칸으로 맞추고 색을 입힘 |
 | `[left]` | 로봇 핸드 좌우 구분. hand context가 있는 줄에만 붙음 |
-| `[cycle N]` | 제어·통신 루프가 남긴 사건의 cycle 번호 |
+| `[E404]` | 오류 번호. [Error messages](15_error_messages.md)에 원인과 조치가 있는 줄에만 붙음 |
 | message | 본문 |
 
-`[left]`와 `[cycle N]`은 formatter pattern이 아니라 message 본문에 들어가고, 붙지 않는 줄도
-있습니다.
+`[left]`와 오류 번호는 formatter pattern이 아니라 message 본문에 들어가고, 붙지 않는 줄도 있습니다.
+사건이 생긴 시각은 앞의 wall clock으로 확인합니다. 제어·통신 루프의 사건은 50 ms마다 모아서 쓰므로,
+이 시각은 사건보다 최대 50 ms 늦을 수 있습니다.
 
-예외를 던지는 자리에는 error level로 다음 형태가 남습니다. 아래 예에는 message 부분만 실었고,
-실제 줄에는 위 표의 앞 조각이 그대로 붙습니다.
+[`connect()`](08_cpp_api_reference/hand.md#handconnect)가 성공하면 info level로 여러 줄짜리 Connection
+Info를 남깁니다. 이 실행에 쓴 설정과 제어·통신 루프가 받은 실행 환경을 한 곳에서 확인할 수 있습니다.
+아래 예에는 message 부분만 실었습니다.
 
 ```text
-[exception] CommunicationLost: Cannot stop hand: cannot confirm quick stop — no RX on can0; drives may hold last command. Restore CAN link and hand power
+[left] connect() succeeded
+-------------------------- Connection Info -------------------------
+side        left
+model       gen2
+interface   can0
+rate        500 Hz
+auto_home   on
+scheduler   SCHED_FIFO 90
+cpu         3
+affinity    none
+memory      locked
+actuators   16
+disabled    0
+faulted     0
+sdk         0.9.0
+--------------------------------------------------------------------
 ```
 
-[`Exception::what()`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)에는 error
-code가 들어 있지 않습니다. 다음은 application 쪽에서 code를 함께 남기는 예이며, 이렇게 해야 SDK
-log와 application log를 시각으로 맞출 수 있습니다.
+| Row | Description |
+|---|---|
+| `side`·`model`·`interface` | `HandConfig`의 `hand_side`·`hand_model`·`interface_name` 필드 |
+| `rate` | 제어·통신 루프의 주기. 500 Hz로 고정 |
+| `auto_home` | `auto_home` 필드 |
+| `scheduler` | 제어·통신 루프의 `SCHED_FIFO` 우선순위. 권한이 없으면 `SCHED_OTHER` |
+| `cpu` | 제어·통신 루프가 실행 중인 CPU |
+| `affinity` | `rt_cpu_affinity` 필드. `-1`이면 `none` |
+| `memory` | 제어·통신 루프의 메모리를 잠갔으면 `locked`, 못 했으면 `not locked` |
+| `actuators` | 전체 actuator 수 |
+| `disabled` | `disabled_actuators` 필드로 끈 actuator 수 |
+| `faulted` | 연결 시점에 fault 상태인 actuator 수 |
+| `sdk` | SDK 버전 |
+
+SDK log에는 호출과 상관없이 생긴 사건이 남습니다. 제어·통신 루프에서 생긴 사건은 오류 번호를 붙여
+남습니다. 아래 예에는 message 부분만 실었고, 실제 줄에는 위 표의 앞 조각이 그대로 붙습니다.
+
+```text
+[left] [E404] communication lost (no RX)
+```
+
+함수가 던진 예외는 SDK log에 남지 않으므로 application 쪽 log에 `what()`을 한 번 남기십시오.
+[`Exception::what()`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)에도 `[E601]` 같은
+오류 번호가 들어 있어서, SDK log와 같은 번호로 맞춰 볼 수 있습니다.
 
 ```cpp
 try {
   // SDK 호출
 } catch (const ah2::Exception& error) {
-  app_logger.error("SDK {}: {}",
-                   ah2::to_string(error.code()),
-                   error.what());
+  app_logger.error("SDK {}", error.what());
 }
 ```
 
-남은 오류 문구로 원인을 좁히려면 [Error messages](15_error_messages.md)를 보십시오. 사고 원인을
-추적하기 위해 무엇을 함께 남겨야 하는지는
-[C++ guide](07_cpp_usage_guide.md#82-diagnostic-record)에 정리돼 있습니다.
+번호별 원인과 조치는 [Error messages](15_error_messages.md)에 있습니다. 사고 원인을 추적하기 위해
+무엇을 함께 남겨야 하는지는 [C++ guide](07_cpp_usage_guide.md#82-diagnostic-record)에 정리돼 있습니다.
 
 > [!IMPORTANT]
 > 안전 판단은 log에 의존하지 말고 [`lifecycle`](07_cpp_usage_guide.md#8-diagnostics) 필드와
-> [actuator fault](15_error_messages.md#11-actuator-fault)를 직접 확인하십시오. SDK 밖에 둔 안전
+> [actuator fault](15_error_messages.md#10-actuator-fault-values)를 직접 확인하십시오. SDK 밖에 둔 안전
 > 회로도 마찬가지입니다.
 
 ## 6. Shutdown
@@ -232,7 +273,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     ah2::Hand hand = manager.create(config);
     hand.connect();
     hand.run();
@@ -240,9 +281,8 @@ int main()
     // 제어 코드
 
   } catch (const ah2::Exception& error) {
-    // SDK는 이미 error level로 남겼고, application 쪽에는 code를 함께 남깁니다
-    app_log(ah2::LogLevel::Error,
-            std::string(ah2::to_string(error.code())) + ": " + error.what());
+    // SDK는 던진 예외를 log에 남기지 않으므로, 오류 번호가 붙은 what()을 여기서 남깁니다
+    app_log(ah2::LogLevel::Error, error.what());
     exit_code = 1;
   }
 

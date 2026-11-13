@@ -7,12 +7,8 @@ nearest reachable pose on its own, so sending a command needs nothing more. This
 those ranges and how the clamp works.
 
 To compute the same limits yourself before sending a command, for example to settle a target in a
-higher-level controller, implement them from the formulas and tables in this document.
-
-> [!IMPORTANT]
-> The ranges and formulas in this document are those of hand types A and B. An SDK built for type C
-> keeps the ranges of 0.7.0 and has no lower bound on the long finger `joint3`. Those ranges are in
-> [Workspace limits of 0.7.0](https://github.com/aidinrobotics/aidin-hand2-sdk/blob/v0.7.0/docs/en/14_workspace_limits.md).
+higher-level controller, implement them from the formulas and tables in this document. The ranges
+and formulas are the same for hand models `Gen2` and `Gen2B`.
 
 ## Contents
 

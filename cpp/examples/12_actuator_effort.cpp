@@ -14,7 +14,7 @@
 //
 // The example then asks for more than the cap allows, to show which of the two wins.
 //
-// Run as: 12_actuator_effort [right|left] [interface=can0]
+// Run as: 12_actuator_effort [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, and the index finger then
 // pulls in each direction until it reaches its own stops. Keep the cap low, as it is here.
 
@@ -44,15 +44,19 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   // One of the index finger's three actuators, which are 4, 5 and 6. Everything this example
   // prints is in actuator space, so no index mapping comes up.
   constexpr std::size_t kActuator = 5;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -130,7 +134,7 @@ int main(int argc, char** argv)
     hand.stop();
     std::printf("[example] done — the cap bounds the command, and the command carries the sign\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

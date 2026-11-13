@@ -6,6 +6,9 @@
 |---|---|---|
 | [Constants](#constants) | `constexpr` | Actuator, joint, and tactile counts |
 | [`HandSide`](#enum-handside) | enum | Left / right |
+| [`HandModel`](#enum-handmodel) | enum | The robot hand's model |
+| [`parse_hand_model()`](#parse_hand_model) | function | string → `HandModel` |
+| [`to_string()`](#to_string) | function | `HandModel` → string |
 | [`Finger`](#enum-finger) | enum | Tactile finger index |
 
 ## Constants
@@ -32,6 +35,31 @@ inline constexpr std::size_t kPalm2Count             = 18;
 ```cpp
 enum class HandSide { Left, Right };
 ```
+
+## enum `HandModel`
+
+```cpp
+enum class HandModel { Gen2, Gen2B };
+```
+
+The kinematics and the joint impedance hard stiffness depend on the model. AIDIN tells you the model
+when it delivers the robot hand.
+
+### `parse_hand_model()`
+
+```cpp
+constexpr std::optional<HandModel> parse_hand_model(std::string_view text) noexcept;
+```
+
+Reads `"gen2"` and `"gen2b"` in any letter case and returns `std::nullopt` for any other string.
+
+### `to_string()`
+
+```cpp
+constexpr const char* to_string(HandModel model) noexcept;
+```
+
+Returns `"gen2"` or `"gen2b"`.
 
 ## enum `Finger`
 
@@ -83,7 +111,7 @@ There are 3 index spaces.
 | Active joint index | 0 | 1 | 2 | 3 | — | 4 | 5 | 6 | — | 7 | 8 | 9 | — | 10 | 11 | 12 | — | 13 | 14 | 15 | — |
 
 T=Thumb · I=Index · M=Middle · R=Ring · B=Baby. The passive joint is the last slot of each finger
-group, it is not a command target, and it arrives only as FK output. For example, active index `4`,
+group, it is not a command target, and it arrives only in `JointState`. For example, active index `4`,
 the first joint of the index finger, is `5` in `JointState`.
 
 ---

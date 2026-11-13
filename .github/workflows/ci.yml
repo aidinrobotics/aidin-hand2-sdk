@@ -19,15 +19,13 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.runner }} · type ${{ matrix.type }}
+    name: ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        # Every hand type ships, so every one is built and tested here. A type that CI skipped
-        # would go out having never been linked or run on the architecture it runs on.
+        # Every build carries both hand types, so one build per runner links and tests both.
         runner: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
-        type: [a, b, c]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -48,8 +46,7 @@ jobs:
 
       - name: Configure
         run: |
-          cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DAIDIN_HAND2_HAND_TYPE=${{ matrix.type }}
+          cmake -S cpp -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
       - name: Build
         run: cmake --build build -j"$(nproc)"
@@ -60,13 +57,16 @@ jobs:
       # The kinematics archive is absorbed into the library, and none of it may reach the
       # library's exports. The archive is compiled with hidden visibility and linked with
       # --exclude-libs; this is what proves both worked on the artifact that ships.
+      # The check compares the functions the archives define with the library's exports, so it
+      # follows the archives' names rather than a pattern of them
       - name: Kinematics symbols are not exported
         run: |
           so=$(ls build/libaidin_hand2.so.*.* | head -1)
-          n=$(nm -D --defined-only "$so" | c++filt | grep -c 'kinematics::' || true)
-          m=$(nm -D --defined-only "$so" | grep -c 'aidin_hand2_kin_' || true)
-          echo "$so: kinematics:: $n, aidin_hand2_kin_ $m"
-          [ "$n" = "0" ] && [ "$m" = "0" ]
+          nm --defined-only --extern-only cpp/prebuilt/"$(uname -m)"/*.a | awk '$2 == "T" {print $3}' | sort -u > archive.txt
+          nm -D --defined-only "$so" | awk '{print $3}' | sort -u > exports.txt
+          n=$(comm -12 archive.txt exports.txt | wc -l)
+          echo "$so: $(wc -l < archive.txt) archive functions, $n exported"
+          [ "$(wc -l < archive.txt)" -gt 0 ] && [ "$n" = "0" ]
 
   docs:
     name: docs regression (ko/en)

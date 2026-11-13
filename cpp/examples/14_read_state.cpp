@@ -3,17 +3,16 @@
 
 // AIDIN Hand Gen2 SDK, reading HandState and knowing what each field is worth
 //
-// get_state() returns one snapshot: the actuator measurements, the joint angles derived from
+// get_state() returns one snapshot: the actuator measurements, the joint values derived from
 // them, the tactile readings, and the command as it was applied this cycle. It is a copy, so
 // it does not change underneath you, and reading it does not need a command to be running.
 //
-// Three things about it are easy to get wrong, so the example prints each one:
-//   - two fields are still placeholders, and they read 0 rather than reading nothing;
+// Two things about it are easy to get wrong, so the example prints each one:
 //   - the command echo is a variant that holds nothing at all outside a control session;
 //   - get_state() and get_diagnostics() are separate reads, so pairing values across the two
 //     means reading each once and reusing the result.
 //
-// Run as: 14_read_state [right|left] [interface=can0]
+// Run as: 14_read_state [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, and the index finger then
 // flexes so the command echo has something in it.
 
@@ -43,6 +42,11 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   // The index finger, named once per index space. commanded.controller_input is indexed by
   // active joint, joints is indexed by joint, and actuators and controller_output are indexed
@@ -53,9 +57,8 @@ int main(int argc, char** argv)
   constexpr std::size_t kActuator = 5;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -159,7 +162,7 @@ int main(int argc, char** argv)
     hand.stop();
     std::printf("[example] done — the snapshot is a copy, so it stays put while the loop moves on\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

@@ -12,11 +12,11 @@
 ### `HandConfig::HandConfig()`
 
 ```cpp
-HandConfig(std::string interface_name, HandSide hand_side);
+HandConfig(std::string interface_name, HandSide hand_side, HandModel hand_model);
 ```
 
-**Parameters**     ｜ `interface_name` — CAN interface name · `hand_side` — `Left` or `Right`<br>
-**Throws**         ｜ `InvalidArgument` — `interface_name` is empty or `hand_side` is out of range
+**Parameters**     ｜ `interface_name` — CAN interface name · `hand_side` — `Left` or `Right` · `hand_model` — `Gen2` or `Gen2B`<br>
+**Throws**         ｜ `InvalidArgument` — `interface_name` is empty, or `hand_side` or `hand_model` is out of range
 
 ### Member variables
 
@@ -24,7 +24,7 @@ HandConfig(std::string interface_name, HandSide hand_side);
 |---|---|---|---|
 | `interface_name` | `std::string` | required | CAN interface name |
 | `hand_side` | [`HandSide`](types_description.md#enum-handside) | required | Which side the robot hand is |
-| `control_rate` | `int` | `500` | Control period [Hz]. `0` or less makes [`create()`](hand_manager.md#handmanagercreate) raise `InvalidArgument` |
+| `hand_model` | [`HandModel`](types_description.md#enum-handmodel) | required | The robot hand's model. The kinematics and the joint impedance hard stiffness follow it |
 | `auto_home` | `bool` | `true` | Whether [`run()`](hand.md#handrun) homes first. Only when `homing_state` is not `Succeeded` |
 | `rt_cpu_affinity` | `int` | `-1` | The CPU that the SDK pins the thread of the control and communication loop to. `-1` for no pinning. A failed pinning is not reported |
 | `auto_reconnect` | `bool` | `false` | Whether to reconnect automatically after a communication error |
@@ -66,22 +66,12 @@ non-finite or negative, [`set_controller_config()`](hand.md#handset_controller_c
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | see table | Gain on position error |
-| `damping` | `std::array<double, kActuatorCount>` | `1e-5` on every axis | Gain on velocity |
+| `stiffness` | `std::array<double, kActiveJointCount>` | all `0.8` | Stiffness per active joint, 0 to 1. 1 = the joint's hard stiffness |
+| `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
+| `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the target low-pass filter [Hz] |
 
-Computed in encoder space:
-
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-| Actuator index | stiffness | damping |
-|---|---:|---:|
-| 0 – 3 (thumb) | `0.02` | `1e-5` |
-| 4, 5 / 7, 8 / 10, 11 / 13, 14 (long finger a1, a2) | `0.01` | `1e-5` |
-| 6 / 9 / 12 / 15 (long finger a3) | `0.02` | `1e-5` |
-
-If any axis is non-finite or negative, [`set_controller_config()`](hand.md#handset_controller_config) throws `InvalidArgument`. How to
-choose the values is in the [C++ guide](../07_cpp_usage_guide.md#422-joint-impedance-controller).
+`stiffness` follows the order of [`JointImpedanceCommand::target`](types_command.md#jointimpedancecommand).
+[`set_controller_config()`](hand.md#handset_controller_config) throws `InvalidArgument` when `stiffness` is non-finite or
+outside 0 to 1, or when `cutoff_freq` is non-finite or negative.
 
 ---

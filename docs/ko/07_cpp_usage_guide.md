@@ -11,11 +11,11 @@ AIDIN Hand Gen2는 5 손가락을 actuator 16개로 joint 21개(active 16 + pass
 
 각 장 끝에는 장에서 설명한 내용을 실행해 확인하는 예제를 적었습니다. 예제는
 [`cpp/examples/`](../../cpp/examples)에 있고 SDK를 빌드할 때 함께 만들어지므로, `cpp/build/` 아래의
-같은 이름 실행 파일을 실행하면 됩니다. 인자는 왼손·오른손 구분과 interface 두 개이고, 기본값은
-`right`와 `can0`입니다.
+같은 이름 실행 파일을 실행하면 됩니다. 인자는 왼손·오른손 구분, interface, hand model 세 개이고,
+기본값은 `right`·`can0`·`gen2`입니다.
 
 ```bash
-./cpp/build/04_homing left can0      # [right|left] [interface]
+./cpp/build/04_homing left can0 gen2b      # [right|left] [interface] [gen2|gen2b]
 ```
 
 모든 예제는 결과를 터미널에 출력하고, `Ctrl-C`를 받으면 진행 중인 반복을 중단한 뒤 quick stop을 확인하고
@@ -84,15 +84,14 @@ SDK는 [`HandManager`](08_cpp_api_reference/hand_manager.md#handmanager)와 [`Ha
 
 ### 1.2 HandConfig
 
-[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)는 `Hand`의 동작을 설정합니다. `interface_name`과 `hand_side` 필드는 생성자
-인자이고, 나머지 필드는 기본값이 존재합니다.
+[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig)는 `Hand`의 동작을 설정합니다. `interface_name`, `hand_side`, `hand_model`
+필드는 생성자 인자이고, 나머지 필드는 기본값이 존재합니다.
 
 다음은 모든 필드를 명시하여 config를 구성하는 예입니다.
 
 ```cpp
 // 기본값이 아니라 설정 예시입니다. 기본값은 아래 표에 있습니다.
-ah2::HandConfig config{"can0", ah2::HandSide::Left};   // 생성자 인자 2개는 필수
-config.control_rate              = 500;                // Hz
+ah2::HandConfig config{"can0", ah2::HandSide::Left, ah2::HandModel::Gen2};  // 생성자 인자 3개는 필수
 config.auto_home                 = false;
 config.rt_cpu_affinity           = -1;
 config.auto_reconnect            = true;
@@ -105,7 +104,7 @@ config.disabled_actuators        = {};                 // 예: {3, 7}
 |---|---|---|---|
 | `interface_name` | `std::string` | 필수 | CAN interface 이름 |
 | `hand_side` | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | 필수 | 로봇 핸드 좌우 구분 (왼손/오른손) |
-| `control_rate` | `int` | `500` | 제어 주기 [Hz] |
+| `hand_model` | [`HandModel`](08_cpp_api_reference/types_description.md#enum-handmodel) | 필수 | 로봇 핸드 모델 (`Gen2`/`Gen2B`) |
 | `auto_home` | `bool` | `true` | [`run()`](08_cpp_api_reference/hand.md#handrun)의 자동 homing 여부.</br> `homing_state` 값이 `Succeeded`가 아닐 때만 수행 |
 | `rt_cpu_affinity` | `int` | `-1` | 제어·통신 루프를 실행하는 thread를 고정할 CPU 번호.</br> `-1`은 고정 안 함.|
 | `auto_reconnect` | `bool` | `false` | 통신 오류 발생 시, 자동 재연결 시도 여부 |
@@ -113,14 +112,13 @@ config.disabled_actuators        = {};                 // 예: {3, 7}
 | `auto_reconnect_home` | `bool` | `false` | 자동 재연결에서 자동 homing 여부. </br> 수동 [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect)에는 적용되지 않음 |
 | `disabled_actuators` | `std::vector<int>` | `{}` | 사용하지 않을 [actuator index](08_cpp_api_reference/types_description.md#actuator-index) |
 
-생성자와 `create()`는 다음 두 경우를 거부합니다.
-
-- `interface_name` 필드가 비었거나 `hand_side` 필드가 정의되지 않은 값이면 생성자가 예외를 던집니다.
-- `control_rate` 값이 `0` 이하이면 `create()`가 `InvalidArgument` 예외를 던집니다.
+`interface_name` 필드가 비었거나 `hand_side`·`hand_model` 필드가 정의되지 않은 값이면 생성자가 예외를
+던집니다. 제어·통신 루프는 500 Hz로 고정되어 있습니다.
 
 `disabled_actuators` 필드는 전원을 인가하지 않을 actuator를 지정합니다. 물리적으로 없는 actuator 또는
 고장으로 당장 사용하지 않을 actuator를 제외하고 구동할 때 사용합니다.
-되도록 **finger 단위**로 지정하십시오.
+되도록 **finger 단위**로 지정하십시오. `0`~`15` 밖의 index는 `create()`가 무시하고
+`disabled_actuators: ignoring out-of-range index <index>` warning log를 남깁니다.
 
 ### 1.3 Create and destroy
 
@@ -143,8 +141,7 @@ manager.destroy(hand);       // copy도 함께 무효가 됩니다
   무효가 되고, method를 호출하면 예외를 던집니다.
 - `destroy()`는 연결 중이면 actuator quick stop을 확인하고 연결을 끊은 뒤 `HandCore`를 파기하므로,
   `destroy()` 앞의 [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect)는 생략해도 됩니다.
-- `Hand`는 thread-safe하지 않습니다. 여러 thread에서 같은 `Hand`를 호출한다면 동기화는
-  application의 책임입니다.
+- `Hand`와 그 사본은 한 thread에서만 호출하십시오.
 
 `HandManager` 하나가 다수의 `HandCore`를 소유할 수 있습니다. 로봇 핸드 두 대를 함께 사용하려면
 `interface_name`과 `hand_side` 필드가 다른 config로 `create()`를 두 번 호출하십시오. hand마다
@@ -180,8 +177,9 @@ lifecycle은 `get_diagnostics()`로 확인합니다.</br></br>
 ### 2.2 State transition calls
 
 상태 전이 함수는 아래 표의 precondition에 해당하는 lifecycle에서 호출할 수 있습니다. 허용되지
-않은 state에서 호출하면 `WrongCallOrder` 예외가 발생합니다. 문구별 정리는
-[Error messages](15_error_messages.md#4-wrongcallorder)에 있습니다.
+않은 state에서 호출하면 `WrongCallOrder` 예외가 발생하고, `Faulted`에서 `reconnect()`가 아닌 함수를
+호출하면 `HandFaulted` 예외가 발생합니다. 오류 번호별 정리는
+[Error messages](15_error_messages.md#3-e2xx-wrongcallorder)에 있습니다.
 
 각 함수는 요청을 전달한 뒤 곧바로 반환하지 않습니다. 표의 confirmation 조건이 확인될 때까지
 대기하며, 제한 시간 안에 확인되지 않으면 예외를 던집니다.
@@ -191,15 +189,12 @@ lifecycle은 `get_diagnostics()`로 확인합니다.</br></br>
 | [`connect()`](08_cpp_api_reference/hand.md#handconnect) | `Disconnected` | `Connected` | 첫 state 수신 | 300 ms |
 | [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect) | `Connected` · `Running` · `Stopped` | `Disconnected` | actuator quick stop | 500 ms |
 | [`run()`](08_cpp_api_reference/hand.md#handrun) | `Connected` · `Stopped` | `Running` | actuator enable | 4000 ms |
-| [`home()`](08_cpp_api_reference/hand.md#handhome) | `Connected` · `Running` · `Stopped` | `Running` | actuator enable과 homing 완료 | 500 Hz에서 최대 22 s |
+| [`home()`](08_cpp_api_reference/hand.md#handhome) | `Connected` · `Running` · `Stopped` | `Running` | actuator enable과 homing 완료 | 단계별 ([E502](15_error_messages.md#6-e5xx-hardwarefault)) |
 | [`stop()`](08_cpp_api_reference/hand.md#handstop) | `Running` | `Stopped` | actuator quick stop | 500 ms |
 | [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) | `Faulted` | `Connected` | 첫 state 수신 | 300 ms |
 
 `auto_home=true`이고 `homing_state` 값이 `Succeeded`가 아니면 `run()`이 homing까지 수행합니다. 이
 경우 `run()`에도 `home()`과 같은 제한 시간이 적용됩니다.
-
-`home()`의 제한 시간은 homing 단계별 cycle 예산의 합으로 결정되므로 `control_rate` 값에 따라
-달라집니다. 나머지 상태 전이 함수의 제한 시간은 `control_rate` 값과 무관합니다.
 
 이미 postcondition을 만족하는 state에서 같은 함수를 호출하는 경우에는 별도의 동작 없이 성공하고
 로그만 남깁니다.
@@ -307,8 +302,7 @@ try {
   `Running` 상태가 됩니다. 그래서 [`run()`](08_cpp_api_reference/hand.md#handrun)을 먼저 호출할 필요가 없습니다.
 - `auto_home=true`이면 `run()`이 homing을 자동으로 진행합니다. `homing_state` 값이 `Succeeded`가
   아니면 `Running` 상태에서 호출한 `run()`도 homing을 시작하므로, finger가 hard stop까지 이동합니다.
-- 성공하면 원점 자세를 유지하는 command가 적용됩니다. 이어서 필요한 command를 전송하십시오.
-  자세한 내용은 [5.3 Command lifetime](#53-command-lifetime)에 있습니다.
+- 성공하면 hard stop에서 1000 count 떨어진 자세를 유지하는 command가 적용됩니다.
 - 실패하면 `HardwareFault` 예외를 던지고 message에 실패한 actuator index가 포함됩니다.
 - [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect)는 `homing_state` 값을 `NotRun`으로 되돌리므로 homing을 다시 진행해야 합니다.
 
@@ -328,7 +322,7 @@ try {
 
 control setting은 max effort와 controller 설정 두 가지이며, command가 drive 전송값으로 변환되는
 방식을 결정합니다. SDK가 매 cycle drive에 전송하는 값은 actuator마다 position(encoder count)과
-effort(정격 전류의 0.1%, 부호가 방향) 둘 중 하나입니다. 정격 전류는 모든 모터가 400 mA이므로
+effort(정격 전류의 0.1%, 부호가 방향) 둘 중 하나입니다. 정격 전류는 모든 actuator가 400 mA이므로
 `1000`(100%)이 400 mA입니다.
 
 두 설정은 lifecycle과 무관하게 언제든 호출할 수 있고
@@ -369,23 +363,13 @@ controller는 command를 drive에 전송할 값으로 변환합니다. 변환에
 인자로 받으므로 두 controller의 설정이 함께 적용됩니다. 호출 시점에는 제약이 없고 다음 cycle부터
 반영됩니다. 한 번도 호출하지 않으면 각 필드의 기본값이 적용됩니다.
 
-값이 non-finite이거나 음수면 `set_controller_config()`가 `InvalidArgument` 예외를 던지고 기존
-설정을 유지합니다.
+값이 non-finite이거나 허용 범위 밖이면 `set_controller_config()`가 `InvalidArgument` 예외를 던지고
+기존 설정을 유지합니다. 허용 범위는 각 controller 절의 표에 있습니다.
 
 #### 4.2.1 Joint position controller
 
-joint position controller는 joint 각도 명령을 actuator position으로 변환합니다. 입력된 명령은 매
-cycle 다음 세 단계를 거칩니다.
-
-1. 직전에 통과한 명령에서 deadband 이내로 움직인 입력은 무시합니다.
-2. 3차 low-pass filter가 적용됩니다. `cutoff_freq` 값보다 빠른 변화가 줄어듭니다.
-3. [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator)로 actuator position으로 변환됩니다.
-
-deadband는 입력에 섞인 noise를 억제하고, low-pass filter는 SDK 제어 주기보다 낮은 rate로 들어와
-불연속한 입력을 여러 cycle에 걸쳐 반영합니다. `deadband`나 `cutoff_freq` 값을 `0`으로 설정하면
-해당 단계만 생략됩니다.
-
-다음은 `joint_position_controller` 필드의 세 항목을 기본값과 같은 값으로 지정하는 예입니다.
+joint position controller는 joint 각도 명령을 actuator position으로 변환합니다. 입력에는 deadband와
+low-pass filter가 적용되어 잡음과 불연속한 변화를 거릅니다.
 
 ```cpp
 ah2::ControllerConfig controller;
@@ -397,58 +381,36 @@ hand.set_controller_config(controller);
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `filter_enabled` | `bool` | `true` | filter 사용 여부. `false`면 두 단계를 모두 생략 |
+| `filter_enabled` | `bool` | `true` | filter 사용 여부. `false`면 deadband와 low-pass filter를 모두 생략 |
 | `cutoff_freq` | `double` | `10.0` | 차단 주파수 [Hz]. `0`이면 생략 |
 | `deadband` | `double` | `0.000873` | 무시할 변화의 크기 [rad]. `0`이면 생략 |
 
-`cutoff_freq` 값은 입력이 실제로 갱신되는 주기를 기준으로 결정합니다. `set_command()`를 호출하는
-주기는 기준이 아닙니다. 낮은 값에서 시작해 올려 가며 조정하십시오. 낮추면 지연이 커지고 높이면
-filter 효과가 감소합니다. 어느 값에서도 overshoot은 발생하지 않습니다.
-
-`deadband` 필드가 필요한 이유는 감속비가 크기 때문입니다. joint에서 미세한 변동이라도 모터축에서는
-큰 반전이 되어 backlash 구간을 반복해서 통과합니다. 입력에 섞인 변동의 크기를 확인하며
-조정하십시오.
+`cutoff_freq` 값은 입력이 실제로 갱신되는 주기에 맞춥니다. 낮추면 지연이 커지고 높이면 filter 효과가
+줄어듭니다.
 
 #### 4.2.2 Joint impedance controller
 
-joint impedance controller는 joint 각도 명령을 actuator effort로 변환합니다. 명령을
-`ik_joint_to_actuator()`로 목표 actuator position으로 변환한 뒤, encoder 공간에서 다음 식으로
-effort를 산출합니다.
+joint impedance controller는 joint 각도 명령을 actuator effort로 변환합니다. effort가 목표와의
+변위에 비례하므로 finger가 외력에 밀리게 두거나 파지력을 제어할 때 사용합니다. `stiffness`는
+joint별 0~1이고 damping은 SDK가 정합니다.
 
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-접촉 힘이 변위에 비례하므로 파지력을 제어할 때 사용합니다. 두 gain은 길이가 `kActuatorCount`이고,
-joint가 아니라 **actuator 공간**의 값입니다.
-
-다음은 `joint_impedance_controller` 필드의 두 gain을 기본값과 같은 값으로 지정하는 예입니다.
+다음은 index finger의 j2를 `0.5`로, 나머지 joint를 기본값 `0.8`로 설정하는 예입니다.
 
 ```cpp
 ah2::ControllerConfig controller;
-controller.joint_impedance_controller.stiffness = {
-    0.02, 0.02, 0.02, 0.02,   // thumb   a0 a1 a2 a3
-    0.01, 0.01, 0.02,         // index   a1 a2 a3
-    0.01, 0.01, 0.02,         // middle
-    0.01, 0.01, 0.02,         // ring
-    0.01, 0.01, 0.02};        // baby
-controller.joint_impedance_controller.damping = {
-    1e-5, 1e-5, 1e-5, 1e-5,   // thumb
-    1e-5, 1e-5, 1e-5,         // index
-    1e-5, 1e-5, 1e-5,         // middle
-    1e-5, 1e-5, 1e-5,         // ring
-    1e-5, 1e-5, 1e-5};        // baby
+controller.joint_impedance_controller.stiffness[5] = 0.5;   // index j2
 hand.set_controller_config(controller);
 ```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | thumb `0.02`, 나머지 finger는 `0.01`·`0.01`·`0.02` | 위치 오차에 곱하는 gain |
-| `damping` | `std::array<double, kActuatorCount>` | `1e-5` × 16 | 속도에 곱하는 gain |
+| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `0.8` | joint별 stiffness, 0~1 |
+| `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
+| `cutoff_freq` | `double` | `10.0` | low-pass filter의 차단 주파수 [Hz], 0 이상 |
 
 > [!NOTE]
-> joint impedance controller는 아직 개발 중이므로 사용하지 마십시오. 동작하지만 이후 버전에서
-> 거동이 바뀔 수 있습니다.
+> 마찰 때문에 목표 앞에서 멈추는 오차를 줄이는 기능은 아직 없습니다. 거동은 이후 버전에서 바뀔 수
+> 있습니다.
 
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다. controller마다 파일이 하나씩입니다.
@@ -460,8 +422,8 @@ hand.set_controller_config(controller);
 >   filter를 끈 상태와 차단 주파수가 다른 두 상태에서 각각 전송해 setpoint를 나란히 출력하고,
 >   `deadband` 값보다 작은 변화가 무시되는 것을 확인합니다.
 > - [`07_impedance_controller.cpp`](../../cpp/examples/07_impedance_controller.cpp) — 같은 target을
->   유지한 채 `stiffness` 필드만 올리며 effort setpoint가 증가하는 것을 출력합니다. finger를 붙잡아
->   변위를 만들면 값이 달라집니다.
+>   유지한 채 index j2의 `stiffness` 값만 0.2·0.5·1로 올리며 effort setpoint가 증가하는 것을
+>   출력합니다. finger를 붙잡아 변위를 만들면 값이 달라집니다.
 
 ## 5. Command
 
@@ -481,7 +443,7 @@ command는 5종류의 struct로 구분되며, [`set_command()`](08_cpp_api_refer
 
 `target` 필드는 네 command 모두 길이가 16이고 finger별 index 묶음이 동일합니다. thumb 4개 뒤에 나머지
 finger가 3개씩 배치됩니다. 세 index 공간의 정의는
-[API reference](08_cpp_api_reference/types_description.md#배열-규약)에 있습니다.
+[API reference](08_cpp_api_reference/types_description.md#array-conventions)에 있습니다.
 
 다음은 command마다 값을 채워 전송하는 예입니다.
 
@@ -634,18 +596,18 @@ kinematics 함수는 joint 공간과 actuator 공간을 변환하는 free functi
 ### 6.1 Conversion functions
 
 변환 함수는 forward kinematics와 inverse kinematics 두 개이며, 입력과 출력의 단위가 서로
-반대입니다.
+반대입니다. 두 함수 모두 첫 인자로 `HandConfig`에 넣은 것과 같은 hand model을 받습니다.
 
 | Function | Input | Output |
 |---|---|---|
-| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `std::array<int, kActuatorCount>`, encoder count | `std::array<double, kJointCount>`, rad |
-| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `std::array<double, kActiveJointCount>`, rad | `std::array<int, kActuatorCount>`, encoder count |
+| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `HandModel`, `std::array<int, kActuatorCount>` encoder count | `std::array<double, kJointCount>`, rad |
+| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `HandModel`, `std::array<double, kActiveJointCount>` rad | `std::array<int, kActuatorCount>`, encoder count |
 
 다음은 target을 actuator position으로 변환한 뒤 다시 joint 각도로 되돌리는 예입니다.
 
 ```cpp
-const auto encoder = ah2::ik_joint_to_actuator(command.target);
-const auto joints  = ah2::fk_actuator_to_joint(encoder);
+const auto encoder = ah2::ik_joint_to_actuator(config.hand_model, command.target);
+const auto joints  = ah2::fk_actuator_to_joint(config.hand_model, encoder);
 ```
 
 `get_state().joints.position_rad` 필드는 SDK가 `fk_actuator_to_joint()`로 채운 값입니다. 같은 encoder
@@ -655,7 +617,7 @@ const auto joints  = ah2::fk_actuator_to_joint(encoder);
 
 active joint는 command로 각도를 지정하는 16개이고, passive joint는 지정 대상이 아닌 5개입니다.
 inverse kinematics 입력은 active joint 16개이고 forward kinematics 출력은 passive를 포함한
-21개이므로, 두 함수는 입력과 출력의 크기가 다릅니다. 배열 배치는 [API reference](08_cpp_api_reference/types_description.md#배열-규약)에
+21개이므로, 두 함수는 입력과 출력의 크기가 다릅니다. 배열 배치는 [API reference](08_cpp_api_reference/types_description.md#array-conventions)에
 있습니다.
 
 > [!IMPORTANT]
@@ -680,25 +642,24 @@ const ah2::HandState state = hand.get_state();
 
 | Field | Type | Description |
 |---|---|---|
-| `timestamp` | `std::int64_t` | 해당 cycle의 `CLOCK_REALTIME` epoch ns. `0`은 아직 값이 없다는 뜻 |
-| `actuators` | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | actuator 관측 |
-| `joints` | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | forward kinematics 결과 |
-| `tactile` | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | 촉각 |
-| `commanded` | [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | 이번 cycle의 command 입력·출력 |
+| `timestamp` | `std::int64_t` | 그 cycle의 시각 |
+| `actuators` | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | actuator 16개의 위치·속도·전류 |
+| `joints` | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | joint 21개의 각도·속도·추정 토크 |
+| `tactile` | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | 촉각 센서 값 |
+| `commanded` | [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | 이번 cycle의 command 입력과 출력 |
+
+`timestamp` 필드는 `CLOCK_REALTIME` 기준 epoch ns이며, `0`이면 아직 값이 없다는 뜻입니다. rosbag과
+시각을 맞추는 용도이고, 주기 측정에는 `last_period_ms` 필드를 사용하십시오. snapshot이 얼마나 지난
+값인지 판단하려면 `get_state()`를 호출한 monotonic 시각을 application이 함께 기록하십시오.
 
 `get_state()`와 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)는 각각 최신
 buffer를 개별적으로 읽습니다. 두 호출 사이에 cycle이 하나 경과할 수 있으므로, 양쪽 값을 비교할
 때는 한 번 읽은 결과를 재사용하십시오.
 
-SDK는 snapshot의 최신 여부를 boolean으로 제공하지 않습니다. snapshot을 읽은 monotonic 시각을
-application이 함께 기록해야 경과 시간을 판단할 수 있습니다. `timestamp` 필드는 해당 cycle의
-`CLOCK_REALTIME`이므로 rosbag과 시각을 맞추는 용도이며, 주기 측정에는 `last_period_ms` 필드를
-사용하십시오.
-
 ### 7.1 Actuators and joints
 
-`actuators` 필드는 drive가 보고한 값이고, `joints` 필드는 actuator 값을 forward kinematics로
-변환한 결과입니다.
+`actuators` 필드는 drive가 보고한 값이고, `joints` 필드는 actuator 값을 kinematics로 joint 공간에
+옮긴 값입니다.
 
 | Field | Type | Unit |
 |---|---|---|
@@ -706,9 +667,12 @@ application이 함께 기록해야 경과 시간을 판단할 수 있습니다. 
 | `actuators.velocity_rpm` | `std::array<std::int32_t, kActuatorCount>` | rpm |
 | `actuators.current_mA` | `std::array<std::int16_t, kActuatorCount>` | mA |
 | `joints.position_rad` | `std::array<double, kJointCount>` | rad |
+| `joints.velocity_rad_s` | `std::array<double, kJointCount>` | rad/s |
+| `joints.effort_Nm` | `std::array<double, kJointCount>` | N·m |
 
 `joints` 필드는 passive를 포함해 21개이고 `actuators` 필드는 16개입니다. 두 공간의 변환은
-[6. Kinematics](#6-kinematics)에 있습니다.
+[6. Kinematics](#6-kinematics)에 있습니다. `joints.effort_Nm`은 모터 토크 상수를 고려하여 추정된
+joint 토크이고 passive joint인 joint4에서는 NaN입니다([`JointState`](08_cpp_api_reference/types_state.md#jointstate)).
 
 ### 7.2 Applied command
 
@@ -777,7 +741,7 @@ const TactileState bias = hand.get_tactile_bias();   // 빼고 있는 값
 | [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 값을 돌려줍니다. 설정하지 않았으면 모두 `0`입니다 |
 
 bias가 적용된 cycle부터 `state.tactile` 필드는 taxel마다 raw value에서 bias를 뺀 값이며, 이 값은
-음수일 수 있습니다. 적용된 cycle은 log에 `[cycle N] tactile bias set` 줄로 남습니다. bias는
+음수일 수 있습니다. bias가 적용되면 log에 `tactile bias set` 줄이 남습니다. bias는
 `reset_tactile_bias()`를 호출할 때까지 유지되고 `reconnect()`와 `disconnect()` 뒤에도 남습니다.
 
 두 함수는 `Connected`·`Running`·`Stopped`에서 호출할 수 있고 토크가 필요하지 않습니다.
@@ -790,9 +754,9 @@ bias가 적용된 cycle부터 `state.tactile` 필드는 taxel마다 raw value에
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다.
 >
-> - [`14_read_state.cpp`](../../cpp/examples/14_read_state.cpp) — 필드를 차례로 출력하며 placeholder
->   두 개가 `0`으로 읽히는 것, control session 밖에서 `controller_output` 필드가 `std::monostate`인
->   것, 두 호출이 각각 buffer를 개별적으로 읽는 것을 확인합니다.
+> - [`14_read_state.cpp`](../../cpp/examples/14_read_state.cpp) — 필드를 차례로 출력하며 control session
+>   밖에서 `controller_output` 필드가 `std::monostate`인 것과 두 호출이 각각 buffer를 개별적으로
+>   읽는 것을 확인합니다.
 > - [`15_tactile.cpp`](../../cpp/examples/15_tactile.cpp) — 접촉이 없는 상태에서 `set_tactile_bias()`로
 >   bias를 잡고, 이후 bias와의 차이를 finger와 palm 영역별로 갱신해 출력합니다. 토크를 걸지 않습니다.
 
@@ -805,18 +769,17 @@ bias가 적용된 cycle부터 `state.tactile` 필드는 taxel마다 raw value에
 const ah2::Diagnostics diag = hand.get_diagnostics();
 ```
 
-정상 운전 중에는 Normal 열의 조건이 성립합니다. 값이 다르면 Check 열이 지시하는 절을
-참고하십시오.
+제어·통신 루프가 정상적으로 동작하는 동안 각 필드는 Expected 열의 값을 가집니다. 값이 다르면
+If not 열의 절을 보십시오.
 
-| Field | Normal | Check |
+| Field | Expected | If not |
 |---|---|---|
 | `lifecycle` | `Running` | [9.4 Recovering from Faulted](#94-recovering-from-faulted) |
 | `homing_state` | `Succeeded` | [3. Homing](#3-homing) |
 | `nan_command_count` | 늘지 않음 | [5.2 Validation and clamp](#52-validation-and-clamp) |
 | `actuator_health` | fault 없음 | [8.1 Actuator faults](#81-actuator-faults) |
 
-제어·통신 루프의 상태는 다음 네 필드로 확인합니다. 개별 값보다 네 값의 조합으로 판정하므로
-Normal 열을 두지 않았습니다.
+제어·통신 루프의 상태는 다음 네 필드로 확인합니다.
 
 | Field | Description |
 |---|---|
@@ -864,8 +827,8 @@ enable되지 않은 actuator는 command 적용 대상에서 mask되어, position
 급격히 움직이기 때문입니다.
 
 다만 fault가 발생해도 SDK는 스스로 정지하지 않습니다. 대응은 application이 결정합니다. 값의 종류는
-[`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) enum에, 값별 점검 항목은
-[Error messages](15_error_messages.md#11-actuator-fault)에 있습니다.
+[`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) enum에, fault가 보고됐을 때 남는 log와 조치는
+[Error messages의 E504](15_error_messages.md#6-e5xx-hardwarefault)에 있습니다.
 
 `disabled_actuators` 필드에 지정한 index는 보고 자체가 이루어지지 않으므로, 지정한 목록을 함께 남겨야
 "정상이어서 fault가 없는 actuator"와 "보고 대상이 아닌 actuator"를 구분할 수 있습니다.
@@ -886,8 +849,7 @@ enable되지 않은 actuator는 command 적용 대상에서 mask되어, position
 
 `controller_output` 필드는 [`ControllerOutput`](08_cpp_api_reference/types_state.md#type-aliases) variant이라 setpoint 종류에 따라 담기는
 값이 달라집니다. `std::monostate`면 control session 밖이라 setpoint 자체가 없다는 뜻입니다.
-`std::monostate`를 `0`으로 기록하면 무토크 command와 구분되지 않습니다. `joints` 필드의 velocity와 effort가 placeholder인
-점은 [7.1 Actuators and joints](#71-actuators-and-joints)를 참고하십시오.
+`std::monostate`를 `0`으로 기록하면 무토크 command와 구분되지 않습니다.
 
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다.
@@ -898,53 +860,53 @@ enable되지 않은 actuator는 command 적용 대상에서 mask되어, position
 
 ## 9. Error handling
 
-예외는 SDK가 실패를 알리는 유일한 수단입니다. 실패란 public 호출이 요청한 동작을 완료하지 못한
-경우를 말합니다. 9장은 실패를 감지하는 방법과 감지 이후 제어를 재개하는 방법을 다룹니다.
+이 장은 SDK 호출이 실패했을 때 그것을 알아채고 제어를 다시 시작하는 방법을 다룹니다. 여기서 호출
+실패는 `connect()`·`run()`·`home()` 같은 호출이 요청한 동작을 끝내지 못한 경우이며, SDK는 이를 항상
+예외로 알립니다.
 
-다음 두 조건은 호출의 실패가 아니므로 예외가 아니라 진단으로 관측하며, 9장에서 다루지 않습니다.
+이름이 비슷한 세 가지를 구별하십시오.
 
-| Condition | Observed by |
-|---|---|
-| actuator fault | `actuator_health`. lifecycle을 바꾸지 않습니다([8.1 Actuator faults](#81-actuator-faults)) |
-| 값이 유효하지 않아 적용되지 않은 command | `nan_command_count` 값이 증가하고 warning log가 남습니다([5.2 Validation and clamp](#52-validation-and-clamp)) |
+| Kind | What it is | Observed by | Section |
+|---|---|---|---|
+| 호출 실패 | 호출이 요청한 동작을 끝내지 못함 | 예외 | 9.1~9.3 |
+| `Faulted` | 통신과 제어가 멈춘 hand의 상태 | `lifecycle` 값 | [9.4 Recovering from Faulted](#94-recovering-from-faulted) |
+| actuator fault | drive가 보고한 actuator별 오류. lifecycle은 그대로 | `actuator_health` | [8.1 Actuator faults](#81-actuator-faults) |
+
+값이 유효하지 않아 적용되지 않은 command도 예외가 아니며, `nan_command_count` 값과 warning log로
+확인합니다([5.2 Validation and clamp](#52-validation-and-clamp)).
 
 ### 9.1 Exception
 
-[`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)은 `std::runtime_error`를 상속하고 [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) enum 값을 함께 담습니다.
+[`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error)은 `std::runtime_error`를
+상속하고, 실패 분류인 [`ErrorKind`](08_cpp_api_reference/types_error.md#enum-errorkind) enum 값과 오류
+번호를 함께 담습니다. `what()`은 오류 번호를 앞에 붙인 message입니다.
 
-SDK는 예외를 던지기 전에 `[exception] <ErrorCode>: <message>`를 error 레벨로 log에 남깁니다.
-그래서 catch에서 같은 내용을 다시 출력할 필요가 없습니다.
+SDK는 던진 예외를 log에 남기지 않습니다. 실패를 기록하려면 catch에서 `what()`을 한 번 남기십시오.
+같은 실패가 주기마다 반복되는 loop라면, 반복을 얼마나 줄여 남길지도 application이 정합니다.
 
-다음은 예외에서 code와 사유를 읽는 예입니다.
+다음은 예외에서 분류·번호·사유를 읽는 예입니다.
 
 ```cpp
 try {
   hand.run();
 } catch (const ah2::Exception& error) {
-  const ah2::ErrorCode code = error.code();   // 무엇이 잘못됐는지
-  const char* reason        = error.what();   // 사람이 읽을 사유. code는 포함되지 않습니다
+  const ah2::ErrorKind kind = error.kind();   // 무엇을 점검해야 하는지
+  const std::uint16_t code  = error.code();   // 오류 번호. E202이면 202
+  const char* reason        = error.what();   // "[right] [E202] cannot run hand: not connected"
 
-  // 두 값의 처리는 application이 결정합니다. 구조는 9.3 Recovery patterns에 있습니다
+  // 세 값의 처리는 application이 결정합니다. 구조는 9.3 Recovery patterns에 있습니다
 }
 ```
 
-`what()`에 code가 포함되지 않으므로 code와 사유를 함께 전달할 때는 [`to_string()`](08_cpp_api_reference/types_error.md#enum-errorcode)으로 code를
-문자열로 변환해 앞에 추가하십시오. 전달받은 값으로 제어를 재개하는 방법은
-[9.3 Recovery patterns](#93-recovery-patterns)에 있고, 상위에 사유를 반환하는 예는 9.3.2에
-있습니다.
+`what()`에 오류 번호가 들어 있으므로 사유를 상위에 전달할 때는 `what()`만 넘겨도 됩니다. 전달받은
+값으로 제어를 재개하는 방법은 [9.3 Recovery patterns](#93-recovery-patterns)에 있고, 상위에 사유를
+반환하는 예는 9.3.2에 있습니다.
 
-`ErrorCode`는 점검 대상에 따라 세 묶음으로 나뉩니다.
-
-| `ErrorCode` | Check | Retryable |
-|---|---|---|
-| `InvalidArgument` · `WrongCallOrder` | 호출한 코드 | 없습니다. 호출을 고쳐야 합니다 |
-| `InterfaceUnavailable` · `CommunicationLost` · `HardwareFault` | 장비와 환경 | 원인이 해소되면 성공합니다 |
-| `ControlLoopFault` · `UnexpectedError` | SDK에 보고 | 없습니다 |
-
-code는 log에 기록하고 사람이 원인을 특정할 때 사용하는 값입니다. 복구 절차를 code로 분기하지
-마십시오. 같은 code가 서로 다른 lifecycle에서 발생하고, 복구 방법은 lifecycle이 결정하기
-때문입니다. 문구별 정리는
-[Error messages](15_error_messages.md)에 있습니다.
+번호별 원인과 조치는 [Error messages](15_error_messages.md)에서 찾고, 번호의 범위와 분류는
+[1.2 Code ranges](15_error_messages.md#12-code-ranges)에 있습니다. 분류와 번호는 log에 기록해 원인을
+찾을 때 씁니다. 복구 절차는 분류나 번호가 아니라 lifecycle로 정하십시오. 같은 번호가 서로 다른
+lifecycle에서 발생하기 때문입니다. 다만 `HandFaulted`는 호출한 순간 `Faulted`였다는 뜻이므로,
+이 분류를 받았다면 [9.4 Recovering from Faulted](#94-recovering-from-faulted)의 절차를 따르면 됩니다.
 
 ### 9.2 Detecting a failure
 
@@ -986,8 +948,8 @@ command를 유지하므로 위험하지는 않지만, 호출한 thread가 확인
 호출별 시간은
 [2.2 State transition calls](#22-state-transition-calls)에 있습니다.
 
-구조는 **lifecycle을 누가 결정하는가**로 갈립니다. command의 출처는 기준이 아닙니다. 어느
-구조에서도 catch를 두는 지점은 한 곳이면 충분합니다.
+application은 lifecycle을 누가 정하느냐에 따라 아래 세 가지 구조로 나눌 수 있습니다. 어느 구조든
+예외는 한 곳에서 받으면 됩니다.
 
 | Pattern | Lifecycle owner | catch |
 |---|---|---|
@@ -995,9 +957,8 @@ command를 유지하므로 위험하지는 않지만, 호출한 thread가 확인
 | [Externally managed](#932-externally-managed-lifecycle) | 외부가 결정합니다. `run`·`stop`·`disconnect`를 지시받습니다 | 요청 처리 함수에 하나 |
 | [Exit on failure](#933-exit-on-failure) | 결정하지 않습니다. 순서대로 호출하고 실패하면 종료합니다 | 전체를 감싸는 하나 |
 
-config는 구조를 바꾸지 않습니다. `auto_reconnect`와 `auto_home` 값을 어떻게 설정하든 아래 세 구조는
-그대로 사용하며, 예제마다 값을 다르게 설정한 것은 여러 경우를 함께 제시하기 위해서입니다. 두
-설정이 복구 절차에 미치는 영향은 9.4에서 다룹니다.
+`auto_reconnect`와 `auto_home` 값과 관계없이 세 구조를 그대로 쓸 수 있습니다. 예제마다 두 값을
+다르게 둔 것은 여러 경우를 보여 주기 위해서이고, 두 값이 복구에 주는 영향은 9.4에서 다룹니다.
 
 세 예제에서 `ah2::` 접두어가 없는 이름은 application이 채울 자리이고, 필요한 항목은 각 예제
 상단의 선언에 명시했습니다.
@@ -1015,6 +976,8 @@ self-managed 구조는 매 주기 lifecycle을 확인해 미완료 단계를 수
 다음은 lifecycle 확인과 command 전송을 한 루프에 둔 예입니다.
 
 ```cpp
+#include <cstdio>
+#include <string>
 #include <aidin_hand2/aidin_hand2.hpp>
 
 namespace ah2 = aidin_hand2;
@@ -1051,7 +1014,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     config.auto_home           = true;   // run()이 homing까지 처리합니다
     config.auto_reconnect      = true;   // 통신 오류는 제어·통신 루프가 복구합니다
     config.auto_reconnect_home = true;
@@ -1061,6 +1024,9 @@ int main()
     ah2::HandManager manager;
     ah2::Hand hand = manager.create(config);
     hand.set_max_effort(1000.0);         // lifecycle과 무관하므로 여기서 설정합니다
+
+    // 마지막으로 출력한 사유. 주기마다 반복되는 실패는 한 번만 출력합니다
+    std::string last_error;
 
     while (!shutdown_requested()) {
       try {
@@ -1072,14 +1038,17 @@ int main()
           case ah2::HandLifecycle::Running:      break;
         }
         hand.set_command(next_command());
-      } catch (const ah2::Exception&) {
-        // 사유는 SDK가 이미 log에 남겼습니다. 이 주기를 건너뛰면
-        // 다음 주기의 switch가 남은 단계를 수행합니다
+        last_error.clear();
+      } catch (const ah2::Exception& error) {
+        // 이 주기를 건너뛰면 다음 주기의 switch가 남은 단계를 수행합니다
+        if (last_error != error.what()) std::fprintf(stderr, "%s\n", error.what());
+        last_error = error.what();
       }
       wait_next_period();
     }
-  } catch (const ah2::Exception&) {
+  } catch (const ah2::Exception& error) {
     // 시작하지 못했습니다. config가 거부됐거나 hand를 만들지 못한 경우입니다
+    std::fprintf(stderr, "%s\n", error.what());
     return 1;
   }
   return 0;
@@ -1087,7 +1056,8 @@ int main()
 ```
 
 try가 둘이지만 역할이 다릅니다. 바깥은 시작하지 못한 경우라 종료하고, 안쪽은 운전 중 실패라
-다음 주기로 이어갑니다.
+다음 주기로 이어갑니다. 안쪽 실패는 복구될 때까지 주기마다 같은 사유로 반복되므로, 사유가 바뀔
+때만 출력합니다.
 
 switch를 catch가 아니라 try 안에 배치한 이유는 셋입니다. `reconnect()` 같은 복구 호출도
 실패할 수 있으므로 복구 실패까지 같은 catch가 잡아야 하고, 첫 주기가 `Disconnected` 상태라 초기
@@ -1105,6 +1075,7 @@ externally managed 구조는 외부가 `run`·`stop`·`disconnect`까지 지시�
 `Reconnect`를 지시할 일이 줄어듭니다.
 
 ```cpp
+#include <cstdio>
 #include <optional>
 #include <string>
 #include <aidin_hand2/aidin_hand2.hpp>
@@ -1153,7 +1124,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     config.auto_home      = false;   // homing 시점을 사용자가 지시하게 둡니다
     config.auto_reconnect = false;   // 복구도 사용자가 지시하게 둡니다
 
@@ -1181,14 +1152,14 @@ int main()
           send_response(*request, true, "");
         } catch (const ah2::Exception& error) {
           // 재시도하지 않고 사유를 돌려줍니다. 다시 시도할지는 사용자가 정합니다
-          send_response(*request, false,
-                        std::string(ah2::to_string(error.code())) + ": " + error.what());
+          send_response(*request, false, error.what());
         }
       }
       wait_next_period();
     }
-  } catch (const ah2::Exception&) {
-    return 1;   // 사유는 SDK가 log에 남겼습니다
+  } catch (const ah2::Exception& error) {
+    std::fprintf(stderr, "%s\n", error.what());
+    return 1;
   }
   return 0;
 }
@@ -1198,7 +1169,7 @@ int main()
 
 exit on failure 구조는 한 번 실행하고 종료하는 프로그램에서 전체를 하나의 try로 감쌉니다. 복구할
 이유가 없으므로 실패하면 그대로 종료합니다. homing만 수행하는 캘리브레이션, 상태를 한 번 읽는
-진단 도구, 정해진 자세를 재생하는 테스트가 해당합니다. 실패하면 사람이 원인을 조치하고 다시
+진단 도구, 정해진 자세를 재생하는 테스트가 해당합니다. 실패하면 원인을 해결한 뒤 다시
 실행합니다.
 
 다음은 logging 설정부터 종료까지 순서대로 호출하는 예입니다. AIDIN Hand Gen2가 실제로 움직이므로
@@ -1207,6 +1178,7 @@ target과 effort 상한은 환경에 맞게 변경하십시오. log 설정은 [L
 
 ```cpp
 #include <chrono>
+#include <cstdio>
 #include <thread>
 #include <aidin_hand2/aidin_hand2.hpp>
 
@@ -1224,7 +1196,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     config.auto_home = true;
 
     ah2::Hand hand = manager.create(config);
@@ -1241,8 +1213,9 @@ int main()
        -0.08,  0.75,  0.60};        // baby
     hand.set_command(command);
     std::this_thread::sleep_for(std::chrono::seconds(1));
-  } catch (const ah2::Exception&) {
-    exit_code = 1;   // 사유는 SDK가 log에 남겼습니다
+  } catch (const ah2::Exception& error) {
+    std::fprintf(stderr, "%s\n", error.what());   // SDK는 던진 예외를 log에 남기지 않습니다
+    exit_code = 1;
   }
 
   ah2::flush_log();
@@ -1289,9 +1262,10 @@ hand.run();         // auto_home=true이면 homing까지 여기서 끝납니다
 - 통신 오류 → 연결이 복구될 때까지 재시도합니다
 - 제어·통신 루프 예외 → 동작하지 않습니다. `reconnect()`를 직접 호출하십시오
 
-둘 중 어느 쪽인지는 예외의 [`code()`](08_cpp_api_reference/types_error.md#exceptioncode)로 갈립니다. `CommunicationLost`면 통신 오류이고
-`ControlLoopFault`면 제어·통신 루프 예외입니다. 문구별 구분은
-[Error messages](15_error_messages.md#10-faulted-원인-문구)에 있습니다.
+둘 중 어느 쪽인지는 [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics)의
+`fault_code` 필드로 갈립니다. `404`·`405`면 통신 오류이고 `702`면 제어·통신 루프 예외입니다.
+`Faulted`에서 거부된 호출은 원인과 상관없이 `HandFaulted`(E601)를 던지고, 같은 원인 번호를 message
+괄호 안에 적습니다([E6xx `HandFaulted`](15_error_messages.md#7-e6xx-handfaulted)).
 
 자동 복구는 [9.4.1](#941-manual-recovery)의 수동 절차와 **동작이 다릅니다.** 제어를 스스로 다시
 요구하므로, `run()`을 따로 호출하지 않아도 actuator enable이 확인되는 시점에 `Running` 상태로
@@ -1310,7 +1284,7 @@ hand.run();         // auto_home=true이면 homing까지 여기서 끝납니다
 > [!TIP]
 > 이 장의 내용은 다음 예제로 확인할 수 있습니다. 뒤의 세 항목이 9.3의 세 구조에 각각 대응합니다.
 >
-> - [`17_fault_recovery.cpp`](../../cpp/examples/17_fault_recovery.cpp) — 예외를 처리하며 `code()`로
+> - [`17_fault_recovery.cpp`](../../cpp/examples/17_fault_recovery.cpp) — 예외를 처리하며 `kind()`로
 >   점검 대상을 구분하고, `Faulted` 상태에서 복구해 command를 다시 전송합니다. 복구 시도 횟수에 상한을
 >   둡니다.
 > - [`18_self_managed.cpp`](../../cpp/examples/18_self_managed.cpp) — 9.3.1의 구조입니다. 매 cycle

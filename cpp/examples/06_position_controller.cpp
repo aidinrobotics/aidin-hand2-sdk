@@ -12,7 +12,7 @@
 // the first cycle. With it on, the same step is spread over cycles, and a lower cutoff spreads
 // it further. The deadband pass then shows targets small enough to be dropped entirely.
 //
-// Run as: 06_position_controller [right|left] [interface=can0]
+// Run as: 06_position_controller [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, and the index finger flexes
 // repeatedly afterwards, so clear the space around the hand.
 
@@ -42,6 +42,11 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
 
@@ -53,9 +58,8 @@ int main(int argc, char** argv)
   constexpr std::size_t kActuator = 5;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -155,7 +159,7 @@ int main(int argc, char** argv)
   } catch (const Exception& error) {
     // An InvalidArgument here is a negative or non-finite field in the config, and the previous
     // config stays in force when that happens.
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

@@ -3,7 +3,7 @@
 
 // AIDIN Hand Gen2 SDK, playing a recorded motion through the joint position controller
 //
-// Run as: 21_motion_sequence [right|left] [interface=can0]
+// Run as: 21_motion_sequence [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop and the motion then swings
 // every finger through most of its range, so clear the space around the hand.
 
@@ -26,7 +26,7 @@ std::atomic<bool> g_shutdown{false};
 
 constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
 
-// The control loop rate, and the interpolation step that follows from it
+// The rate of the SDK control loop, and the interpolation step that follows from it
 constexpr int  kControlRate = 500;  // Hz
 constexpr auto kStep        = std::chrono::microseconds(1000000 / kControlRate);
 
@@ -436,14 +436,18 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   HandManager manager;
   int         exit_code = 0;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate = kControlRate;
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     Hand hand = manager.create(config);
     hand.connect();
@@ -491,7 +495,7 @@ int main(int argc, char** argv)
     hand.set_command(Idle{});
     hand.stop();
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     exit_code = 1;
   }
 

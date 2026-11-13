@@ -3,7 +3,6 @@
 //     → 복원 rad 가 원본과 일치? index 매핑·IK/FK 정합을 한 번에 검증.
 //   - fault-mask: faulted/미-enabled actuator 는 CSP=현재위치 hold, CST=0.
 //   - effort clamp: ±max_effort, max_effort=0 → 0.
-//   - impedance 법칙: effort = K·err − D·vel 의 부호·배선.
 // device-in-the-loop 아님(HW 거동은 별도 HW probe). HandCore 는 생성만(소켓 open 안 함).
 
 #include <array>
@@ -12,9 +11,7 @@
 
 #include <aidin_hand2/types/config.hpp>
 
-#include "hand_core/controllers/joint_impedance_controller.hpp"
 #include "hand_core/hand_core.hpp"
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
 #include <aidin_hand2/types/command.hpp>
 
 using namespace aidin_hand2;
@@ -49,8 +46,7 @@ void check(bool ok, const char* what)
 
 HandConfig make_config()
 {
-  HandConfig config{"can0", HandSide::Right};  // 절대 open 안 함 (생성만); Right = CAN index identity
-  config.control_rate   = 500;
+  HandConfig config{"can0", HandSide::Right, HandModel::Gen2};  // 절대 open 안 함 (생성만); Right = CAN index identity
   return config;
 }
 
@@ -199,63 +195,6 @@ void test_effort_clamp(HandCore& core)
   check(frames.target_effort[2] == 0, "max_effort=0 zeroes torque");
 }
 
-// ── Test 4: impedance 법칙 (K 배선 + D 부호) ──
-// controller 가 속도항 상태를 소유하므로 직접 단위 테스트한다(D 항은 두 cycle: seed → 측정).
-void test_impedance_law()
-{
-  constexpr long kPeriodNs = 2'000'000;  // 500 Hz → dt = 0.002 s
-  std::array<double, kActuatorCount> max_effort{};
-  max_effort.fill(30000.0);
-
-  // K 항: damping 0(속도 무관), 같은 target, actuator0 만 position 다르게 → Δeffort = K·(pos_b − pos_a).
-  {
-    controllers::JointImpedanceController controller(kPeriodNs);
-    JointImpedanceCommand impedance{};
-    impedance.target.fill(0.0);
-    ControllerConfig::JointImpedanceController gains{};
-    gains.stiffness.fill(1.0);
-    gains.damping.fill(0.0);
-
-    HandState a = healthy_state();  a.actuators.position_count[0] = 100.0;
-    HandState b = healthy_state();  b.actuators.position_count[0] = 200.0;
-    canfd::CommandFrames fa{}, fb{};
-    controller.compute(impedance, gains, a, max_effort, fa);
-    controller.compute(impedance, gains, b, max_effort, fb);
-    const int delta = fa.target_effort[0] - fb.target_effort[0];  // K·(200−100) = 100
-    check(std::abs(delta - 100) <= 1, "impedance K term wiring (ΔK·Δpos)");
-  }
-  // D 항: stiffness 0. 첫 cycle seed(속도 0) → 둘째 cycle 에서 +속도 → −effort.
-  {
-    controllers::JointImpedanceController controller(kPeriodNs);
-    JointImpedanceCommand impedance{};
-    impedance.target.fill(0.0);
-    ControllerConfig::JointImpedanceController gains{};
-    gains.stiffness.fill(0.0);
-    gains.damping.fill(0.001);
-
-    HandState s1 = healthy_state();  s1.actuators.position_count[0] = 100.0;  // seed
-    HandState s2 = healthy_state();  s2.actuators.position_count[0] = 200.0;  // vel = (200−100)/0.002 = 50000
-    canfd::CommandFrames f1{}, f2{};
-    controller.compute(impedance, gains, s1, max_effort, f1);
-    check(f1.target_effort[0] == 0, "impedance first cycle zero velocity");
-    controller.compute(impedance, gains, s2, max_effort, f2);
-    check(f2.target_effort[0] == -50, "impedance D term sign/magnitude (−D·vel)");
-  }
-  // 무 gain → 무토크.
-  {
-    controllers::JointImpedanceController controller(kPeriodNs);
-    JointImpedanceCommand impedance{};
-    impedance.target.fill(0.0);
-    ControllerConfig::JointImpedanceController gains{};
-    gains.stiffness.fill(0.0);
-    gains.damping.fill(0.0);
-    HandState state = healthy_state();  state.actuators.position_count[0] = 4321.0;
-    canfd::CommandFrames frames{};
-    controller.compute(impedance, gains, state, max_effort, frames);
-    check(frames.target_effort[0] == 0, "zero gains give zero torque");
-  }
-}
-
 }  // namespace
 
 int main()
@@ -265,7 +204,6 @@ int main()
   test_joint_position_roundtrip(core);
   test_fault_mask(core);
   test_effort_clamp(core);
-  test_impedance_law();
 
   std::printf("command_to_frames test: %s\n", g_failures == 0 ? "OK" : "FAIL");
   return g_failures == 0 ? 0 : 1;

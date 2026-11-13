@@ -8,6 +8,182 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+The hand model is chosen at run time: `HandConfig` takes a `HandModel`, one build serves `Gen2` and
+`Gen2B`, and the build option is gone. Hand type C is no longer shipped. The joint impedance
+controller works in joint space: each active joint takes a stiffness from 0 to 1 of a measured hard
+stiffness, and the damping follows it. Encoder count 0 is now the hard stop, so actuator positions
+read 1000 higher than in 0.8 at the same pose. Every error carries a number such as `[E401]`,
+`ErrorCode` is renamed `ErrorKind`, a call refused in `Faulted` throws the new `HandFaulted` with the
+cause in `Diagnostics::fault_code`, and the SDK no longer logs the exceptions it throws. `HandConfig`,
+`ControllerConfig`, `Diagnostics` and `Exception` change shape: request 0.9 and rebuild.
+
+### Added
+
+- **`HandModel` names the hand: `Gen2` or `Gen2B`.** `parse_hand_model()` reads `"gen2"` and
+  `"gen2b"` in any letter case and `to_string(HandModel)` writes them back, so a launch argument or
+  a settings file carries the same word everywhere. Both are in `types/description.hpp`.
+
+- **`HandState::joints` carries `velocity_rad_s` and `effort_Nm` next to `position_rad`.** The
+  control loop fills them every cycle for the 21 joints. The velocity comes from `velocity_rpm`, and
+  each passive joint4 gets the velocity it follows its joint3 at. The effort is the joint torque
+  estimated from `current_mA` with the motor torque constant; it leaves out
+  transmission losses and friction, so it can differ from the actual joint torque, and it is NaN on
+  joint4. On a real hand the velocity from `velocity_rpm` had about half the error of a position
+  difference that a real-time reader can take, and the Jacobian matched the FK angle's derivative on
+  all 16 active joints.
+
+- **`connect()` logs a Connection Info block once the hand is connected.** Under the
+  `connect() succeeded` line it lists, one item per row, the side, the model, the interface, the
+  control rate, `auto_home`, the scheduler, CPU and affinity the control loop got, whether its
+  memory is locked, how many actuators there are, how many are disabled or faulted, and the SDK
+  version, so a log shows the setup a run used. The `scheduler` and `memory` rows replace the
+  `realtime scheduling applied` info line of 0.8 and the warnings written when `SCHED_FIFO` or the
+  memory lock could not be applied: those describe the setup rather than a failure, and the rows
+  show `SCHED_OTHER` or `not locked` for them.
+
+- **`Diagnostics::fault_code` says what put the hand in `Faulted`.** It holds 404, 405 or 702 while
+  the `lifecycle` value is `Faulted` and 0 otherwise, and goes back to 0 when `reconnect()` or the
+  automatic reconnect succeeds. A program that watched the lifecycle saw `Faulted` but had to make
+  a call that throws, or read the log, to learn why. PLCopen (`MC_ReadAxisError`), CiA 402 (603Fh)
+  and robot SDKs such as Kinova Kortex keep the cause in the state the same way.
+
+- **The error codes are public constants in `types/error_codes.hpp`.** A program compares
+  `error.code()` with `error_code::kNotHomed` instead of 205. The header is included by
+  `aidin_hand2.hpp`.
+
+### Changed
+
+- **Breaking: the hand model is a `HandConfig` field, not a build option.** `HandConfig(interface_name,
+  hand_side, hand_model)` takes `HandModel::Gen2` or `HandModel::Gen2B`, and the conversion functions
+  `fk_actuator_to_joint()`, `fk_actuator_to_task()`, `ik_joint_to_actuator()`, `ik_task_to_joint()`
+  and `ik_oriented_task_to_joint()` take the `HandModel` as their first argument. One build carries
+  the kinematics of both models, so `-DAIDIN_HAND2_HAND_TYPE` is gone; a build directory that still
+  holds it configures with a warning and the value is dropped. Until a `Gen2B` hand is measured, its
+  thumb j1 and j2 hard stiffness is a quarter of `Gen2`'s, an estimate from how the two thumbs
+  differ.
+
+- **Breaking: the joint impedance controller takes a stiffness level per active joint, and
+  `ControllerConfig::JointImpedanceController` changed shape.** The per-actuator `stiffness` and
+  `damping` gains in encoder space are gone. `stiffness` is now 16 values from 0 to 1, one per
+  active joint in the order of `JointImpedanceCommand::target`, where 1 is the joint's measured
+  hard stiffness and the SDK sets the damping to match; the default is 0.8, and
+  `set_controller_config()` rejects a value above 1. The target passes the joint position controller's low-pass (`filter_enabled` and
+  `cutoff_freq`, on at 10 Hz by default). The controller works in joint space so that one value
+  means the same stiffness in every pose.
+- **Breaking: encoder count 0 is the hard stop.** The SDK no longer places its origin 1000 counts
+  off the hard stop at the wire. After homing the robot hand holds 1000 counts off the stop, and the
+  joint angles there are a fraction of a degree rather than 0. An `ActuatorPositionCommand` written
+  for 0.8 now lands 1000 counts closer to the stop, so add 1000 to stored targets.
+
+- **Breaking: every SDK error carries a number, and `ErrorCode` is now `ErrorKind`.**
+  `Exception::code()` returns the number, such as 401, and `what()` carries it after the hand, as in
+  `[left] [E401] cannot connect hand: ...`. `Exception::kind()` returns what `code()` used to, so code that
+  branches on the category reads `kind()`. The hundreds digit is the kind, and the log line the SDK
+  writes for the same cause carries the same number, so a number found in a log leads to its entry
+  in [Error messages](docs/en/15_error_messages.md). `Exception(ErrorKind, message)` still builds an application's own exception, with code 0 and no
+  prefix. With `using namespace std`, `to_string(error.code())` still compiles and prints the number
+  instead of the category.
+
+- **Breaking: a call refused in `Faulted` throws `HandFaulted` (E601), and `ControlLoopFault` moves
+  to E7xx.** The refusal used to carry the code of the cause, E404, E405 or E602, so `kind()` said
+  `CommunicationLost` or `ControlLoopFault` for a call that only `reconnect()` could make possible
+  again, and the same kind came from calls that failed on their own. A rejection code of its own is
+  what gRPC (`FAILED_PRECONDITION`), PLCopen, CiA 301 (SDO abort `0800 0022h`) and Kinova Kortex
+  (`ROBOT_IN_FAULT`) use. The message keeps the cause, as in
+  `hand faulted (E404 communication lost)`, and `Diagnostics::fault_code` holds its number. Code that caught `CommunicationLost` or `ControlLoopFault` to call `reconnect()` checks
+  `HandFaulted` instead. E601 to E603 are now E701 to E703, and `ErrorKind` gains `HandFaulted`
+  before `ControlLoopFault`.
+
+- **The SDK no longer writes the exceptions it throws to the log.** A failure reached the log at the
+  error level and again wherever the application recorded `what()`, and a program that kept calling
+  `set_command()` after a fault wrote one line per refused call. The Google Go and Uber style guides,
+  Abseil and the Python logging guide all leave the logging of a returned or thrown error to the
+  caller. Record `what()` in your catch block. The log keeps what no call reports: the realtime
+  events, the quick stop of `destroy()`, warnings and the Connection Info block.
+
+- **Every error message has one shape and names the cause only.** A failed call reads
+  `[<side>] [E<code>] cannot <action>: <reason> (<detail>)` and a log event
+  `[<side>] [E<code>] <event> (<detail>)`, in lower case without a closing period, the way rustc,
+  GCC and Clang, PostgreSQL and the Go style guide write them. The hand comes first, as a device
+  name does in Linux kernel and EtherCAT messages, so every log line about one hand starts the same
+  way whether it carries a code or not. The interface errors (E3xx), the
+  `HandConfig` errors and E902 gained the call they belong to, as in
+  `cannot connect hand: CAN interface 'can0' not found`, and E901 reads
+  `cannot <action>: unexpected failure (<detail>)`. The ` — <what to do>` endings are gone, and the
+  remedies are in [Error messages](docs/en/15_error_messages.md) under each number. Messages that
+  called for the same action are merged: a link that is not alive refuses `run()`, `home()` and
+  `set_tactile_bias()` with `CAN communication failed`, a failed homing reports
+  `homing failed (actuators ...)` with the step and the reason left to its log line, a call on a
+  destroyed hand says `cannot use hand: hand is destroyed` whichever call it was, `destroy()` logs
+  the `cannot stop hand: ...` that `stop()` throws, and a refused call says `not connected`,
+  `already connected`, `not running`, `not faulted` or `not homed`. A call refused after a fault
+  names the fault, as in `hand faulted (E404 communication lost)`, and the errno or the receive
+  error stays on its log line. The `[cycle N]` tags are gone: the logger stamps every line with the
+  time, and the cycle count restarted at every `connect()`.
+
+- **Every log line and every exception about one hand starts with `[left]` or `[right]`.** A program
+  that prints `what()` with two hands tells them apart, and the new
+  `Exception(HandSide, code, message)` constructor builds that `what()`. The `disabled_actuators`
+  warning and the debug lines of the CAN socket had no side either. `Hand` keeps its side for this,
+  which changes its size.
+
+- **After a communication fault the SDK sends nothing, not even a quick stop.** With no node to
+  acknowledge them, frames sent then wait in the CAN adapter's queue and reach the robot hand when
+  its bus comes back; after one fault about 85 ms of commands were found still queued on a
+  PCAN-USB FD. A control loop failure still sends the quick stop, since the link is up then.
+
+### Removed
+
+- **Hand type C.** Its kinematics archive and its 0.7.0 workspace clamp tables are no longer in the
+  SDK, and `HandModel` has no value for it. 0.8.0 is the last release for a type C hand.
+
+- **Breaking: `HandConfig::control_rate`.** The control loop runs at a fixed 500 Hz, the rate the
+  robot hand sends its state at; any other rate only made the loop read the same frame twice or
+  skip one. Remove the field from your config. The `create()` check that rejected a rate of 0 or
+  less goes with it, so the max effort check that followed it is now E104.
+
+- **The SDK no longer brings a down CAN interface up.** `connect()` on a down interface fails with
+  E305, `CAN interface '<name>' is down`. The SDK configured the interface
+  only when the process held `CAP_NET_ADMIN`, so the same program behaved differently with and
+  without root. Bring the interface up as [CAN-FD setup](docs/en/05_can_fd_setup.md) shows before
+  `connect()`; the bitrates there are the ones the SDK used to set.
+
+- **The receive error after `no RX`, except `conflicting command`.** `bus off`, `bus error (no ACK)`,
+  `bus error`, `malformed data` and `unknown data` named the last receive error since `connect()`,
+  which was often not why the frames stopped, and an adapter without bus error reporting never
+  reported `no ACK` at all. `conflicting command` stays on the log line of the fault.
+
+### Fixed
+
+- **`run()` reports a fault during its enable wait as that fault.** A control loop that terminated
+  was reported as `drives did not reach operation enabled within 4000 ms`, a HardwareFault, and a
+  failing CAN TX as no RX.
+
+- **`stop()` and `disconnect()` no longer blame RX for a failing TX.** A lost RX faults the hand
+  within their 500 ms wait, so the old `cannot confirm quick stop — no RX` could only come from a
+  failing TX. The message is now `quick stop not confirmed (CAN communication failed)`.
+
+- **The log no longer reports quick stop retries and confirmations that never happen.** The control
+  loop ends as soon as the hand faults, so `awaiting confirmation`, `retrying`, `quick stop attained`,
+  `quick stop NOT confirmed` and `communication restored` were wrong or never written, and destroying
+  a faulted hand logged a 500 ms wait it did not make.
+
+- **A refused `home()` leaves `homing_state` as it was.** When `home()` could not request control,
+  for example with communication lost, `homing_state` stayed `InProgress` until the next
+  `reconnect()`.
+
+- **`home()` no longer reports a failure while homing goes on.** The control loop cleared the homing
+  request before it marked homing active, so a `home()` that looked in between returned
+  `homing did not complete (actuators none)` while the robot hand kept homing. The loop now marks
+  homing active first, and at the end it writes the result and the hold command before `home()` can
+  return, so a command sent right after `home()` is not replaced by the hold.
+
+- **The control loop locks only its own memory.** `mlockall(MCL_CURRENT | MCL_FUTURE)` locked every
+  later allocation of the process the SDK ran in, and under a memlock limit an application aborted
+  with `bad_alloc` once a hand had connected. The control thread now locks its own stack, its state
+  and the SDK's code, and the `realtime` row of Connection Info shows whether it could. An application that wants the whole
+  process locked calls `mlockall()` itself.
+
 ## [0.8.0] - 2026-10-07
 
 Tactile readings are `int32`, and the SDK takes a tactile bias, so the difference from the

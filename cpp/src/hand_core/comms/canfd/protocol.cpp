@@ -161,10 +161,6 @@ DecodeResult Protocol::decode(const canfd_frame& rx, StateFrames& frames) const
   if (id == ids_.state_position) {
     if (rx.len < kLenPosition) return DecodeResult::LengthError;
     read_int32_array(frames.actual_position, rx.data);
-    for (std::size_t i = 0; i < kActuatorCount; ++i) {
-      // Drive origin to SDK origin
-      frames.actual_position[i] -= kHomeOffsetCount;
-    }
   } else if (id == ids_.state_velocity) {
     if (rx.len < kLenVelocity) return DecodeResult::LengthError;
     read_int32_array(frames.actual_velocity, rx.data);
@@ -214,12 +210,7 @@ DecodeResult Protocol::decode(const canfd_frame& rx, StateFrames& frames) const
 void Protocol::encode(const CommandFrames& frames, TxFrames& tx) const
 {
   // Serialises SDK actuator i into wire slot i, mirroring decode
-  std::array<std::int32_t, kActuatorCount> wire_target{};
-  for (std::size_t i = 0; i < kActuatorCount; ++i) {
-    // SDK origin to drive origin
-    wire_target[i] = frames.target_position[i] + kHomeOffsetCount;
-  }
-  write_int32_array(tx.target_position.data, wire_target);
+  write_int32_array(tx.target_position.data, frames.target_position);
   // effort frame: target(0~31B) + max(32~63B). (firmware: TargetTorque)
   write_int16_array(tx.target_effort.data,      frames.target_effort);
   write_int16_array(tx.target_effort.data + 32, frames.max_effort);

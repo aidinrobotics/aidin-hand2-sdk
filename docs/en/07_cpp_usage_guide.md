@@ -13,11 +13,11 @@ alias. For the list of symbols and fields, see the [API reference](08_cpp_api_re
 
 Each chapter ends with the examples that run what the chapter describes. The examples are in
 [`cpp/examples/`](../../cpp/examples) and the SDK build produces them, so run the executable of the
-same name under `cpp/build/`. Each takes two arguments, the side and the interface, and the defaults
-are `right` and `can0`.
+same name under `cpp/build/`. Each takes three arguments, the side, the interface and the hand model,
+and the defaults are `right`, `can0` and `gen2`.
 
 ```bash
-./cpp/build/04_homing left can0      # [right|left] [interface]
+./cpp/build/04_homing left can0 gen2b      # [right|left] [interface] [gen2|gen2b]
 ```
 
 Every example prints its results to the terminal, and on `Ctrl-C` it leaves the loop it is running,
@@ -87,15 +87,14 @@ do not define it, so you cannot create or reference it directly. `HandManager` o
 
 ### 1.2 HandConfig
 
-[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig) configures how a `Hand` behaves. The `interface_name` and `hand_side` fields are
-constructor arguments, and the remaining fields have defaults.
+[`HandConfig`](08_cpp_api_reference/types_config.md#handconfig) configures how a `Hand` behaves. The `interface_name`, `hand_side` and
+`hand_model` fields are constructor arguments, and the remaining fields have defaults.
 
 The following example builds a config with every field written out.
 
 ```cpp
 // These values are an example, not the defaults. The table below lists the defaults.
-ah2::HandConfig config{"can0", ah2::HandSide::Left};   // the 2 constructor arguments are required
-config.control_rate              = 500;                // Hz
+ah2::HandConfig config{"can0", ah2::HandSide::Left, ah2::HandModel::Gen2};  // the 3 constructor arguments are required
 config.auto_home                 = false;
 config.rt_cpu_affinity           = -1;
 config.auto_reconnect            = true;
@@ -108,7 +107,7 @@ config.disabled_actuators        = {};                 // for example, {3, 7}
 |---|---|---|---|
 | `interface_name` | `std::string` | required | The name of the CAN interface |
 | `hand_side` | [`HandSide`](08_cpp_api_reference/types_description.md#enum-handside) | required | Which side the robot hand is, left or right |
-| `control_rate` | `int` | `500` | The control rate [Hz] |
+| `hand_model` | [`HandModel`](08_cpp_api_reference/types_description.md#enum-handmodel) | required | The robot hand's model (`Gen2` or `Gen2B`) |
 | `auto_home` | `bool` | `true` | Whether [`run()`](08_cpp_api_reference/hand.md#handrun) also homes.</br> It homes only when the `homing_state` value is not `Succeeded` |
 | `rt_cpu_affinity` | `int` | `-1` | The CPU that the SDK pins the thread of the control and communication loop to.</br> `-1` pins nothing.|
 | `auto_reconnect` | `bool` | `false` | Whether the SDK reconnects on its own after a communication error |
@@ -116,15 +115,15 @@ config.disabled_actuators        = {};                 // for example, {3, 7}
 | `auto_reconnect_home` | `bool` | `false` | Whether automatic reconnection also homes. </br> It does not apply to a manual [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) |
 | `disabled_actuators` | `std::vector<int>` | `{}` | The [actuator index](08_cpp_api_reference/types_description.md#array-conventions) values that the SDK leaves out of operation |
 
-The constructor and `create()` reject the following two cases.
-
-- If the `interface_name` field is empty, or if the `hand_side` field holds a value that the enum
-  does not define, the constructor throws an exception.
-- If the `control_rate` value is `0` or less, `create()` throws `InvalidArgument`.
+If the `interface_name` field is empty, or if the `hand_side` or `hand_model` field holds a value that
+the enum does not define, the constructor throws an exception. The control and communication loop
+runs at a fixed 500 Hz.
 
 The `disabled_actuators` field names the actuators that the SDK leaves unpowered. Use it when you
 run the robot hand while excluding an actuator that is physically absent, or one that you do not
-use for now because it has failed. List the actuators **by finger** whenever you can.
+use for now because it has failed. List the actuators **by finger** whenever you can. `create()`
+ignores an index outside `0` to `15` and writes the warning
+`disabled_actuators: ignoring out-of-range index <index>`.
 
 ### 1.3 Create and destroy
 
@@ -149,8 +148,7 @@ manager.destroy(hand);       // copy becomes invalid as well
   exception.
 - If the hand is connected, `destroy()` confirms the actuator quick stop, closes the connection, and
   then destroys the `HandCore`, so you can omit the [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect) call before it.
-- `Hand` is not thread-safe. If several threads call the same `Hand`, the application owns the
-  synchronization.
+- Call a `Hand` and its copies from one thread only.
 
 One `HandManager` can own several `HandCore` instances. To use two robot hands together, call
 `create()` twice with configs that differ in the `interface_name` and `hand_side` fields. Each hand
@@ -186,8 +184,9 @@ Read the current lifecycle with `get_diagnostics()`.</br></br>
 ### 2.2 State transition calls
 
 You can call a state transition function from the lifecycle that the precondition column names
-below. A call from a state that the table does not allow raises `WrongCallOrder`. For the wording
-of each message, see [Error messages](15_error_messages.md#4-wrongcallorder).
+below. A call from a state that the table does not allow raises `WrongCallOrder`, and a call other
+than `reconnect()` in `Faulted` raises `HandFaulted`. For each error code, see
+[Error messages](15_error_messages.md#3-e2xx-wrongcallorder).
 
 None of these functions return as soon as they send the request. Each one waits until it confirms
 the condition in the confirmation column, and it throws an exception when it cannot confirm the
@@ -198,16 +197,12 @@ condition within the time limit.
 | [`connect()`](08_cpp_api_reference/hand.md#handconnect) | `Disconnected` | `Connected` | The first state arrives | 300 ms |
 | [`disconnect()`](08_cpp_api_reference/hand.md#handdisconnect) | `Connected` · `Running` · `Stopped` | `Disconnected` | Actuator quick stop | 500 ms |
 | [`run()`](08_cpp_api_reference/hand.md#handrun) | `Connected` · `Stopped` | `Running` | Actuator enable | 4000 ms |
-| [`home()`](08_cpp_api_reference/hand.md#handhome) | `Connected` · `Running` · `Stopped` | `Running` | Actuator enable and homing completion | Up to 22 s at 500 Hz |
+| [`home()`](08_cpp_api_reference/hand.md#handhome) | `Connected` · `Running` · `Stopped` | `Running` | Actuator enable and homing completion | Per step ([E502](15_error_messages.md#6-e5xx-hardwarefault)) |
 | [`stop()`](08_cpp_api_reference/hand.md#handstop) | `Running` | `Stopped` | Actuator quick stop | 500 ms |
 | [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) | `Faulted` | `Connected` | The first state arrives | 300 ms |
 
 If `auto_home=true` and the `homing_state` value is not `Succeeded`, `run()` also homes. In that
 case `run()` takes the same time limit as `home()`.
-
-The time limit of `home()` is the sum of the cycle budgets of the homing stages, so it depends on
-the `control_rate` value. The time limits of the other state transition functions do not depend on
-`control_rate`.
 
 When you call a function from a state that already satisfies its postcondition, the call succeeds
 without further action and only writes a log entry.
@@ -325,8 +320,7 @@ try {
   call [`run()`](08_cpp_api_reference/hand.md#handrun) first.
 - If `auto_home=true`, `run()` homes on its own. When the `homing_state` value is not `Succeeded`,
   even a `run()` call from `Running` starts homing, so the fingers move to their hard stops.
-- On success, the SDK applies a command that holds the origin posture. Send the command that you
-  need next. [5.3 Command lifetime](#53-command-lifetime) covers this in detail.
+- On success, the SDK applies a command that holds the robot hand 1000 counts off the hard stop.
 - On failure, `home()` throws `HardwareFault`, and the message names the actuator index values that
   failed.
 - [`reconnect()`](08_cpp_api_reference/hand.md#handreconnect) returns the `homing_state` value to `NotRun`, so you must home again.
@@ -349,7 +343,7 @@ try {
 The control settings are the max effort and the controller configuration, and together they decide
 how the SDK turns a command into the value that it sends to the drive. Every cycle the SDK sends
 each actuator either a position (in encoder counts) or an effort (in units of 0.1% of the rated
-current, where the sign carries the direction). The rated current is 400 mA on every motor, so
+current, where the sign carries the direction). The rated current is 400 mA on every actuator, so
 `1000` (100%) means 400 mA.
 
 You can call both settings at any time, whatever the lifecycle is, and they survive a
@@ -391,27 +385,14 @@ gains that the conversion uses live in [`ControllerConfig`](08_cpp_api_reference
 both controllers together. You can call it at any time, and it takes effect from the next cycle. If
 you never call it, every field keeps its default.
 
-If a value is non-finite or negative, `set_controller_config()` throws `InvalidArgument` and keeps
-the existing settings.
+If a value is non-finite or outside its allowed range, `set_controller_config()` throws
+`InvalidArgument` and keeps the existing settings. The allowed ranges are in the table of each
+controller's section.
 
 #### 4.2.1 Joint position controller
 
-The joint position controller turns a joint angle command into an actuator position. Every cycle,
-the command that arrives passes through the following 3 stages.
-
-1. The controller ignores an input that moves within the deadband of the command that passed through
-   last.
-2. A third-order low-pass filter runs. It reduces the changes that are faster than the `cutoff_freq`
-   value.
-3. [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) converts the command into an actuator position.
-
-The deadband suppresses the noise in the input. The low-pass filter spreads a discontinuous input
-across several cycles, which matters when the input arrives at a lower rate than the SDK control
-rate. If you set the `deadband` or the `cutoff_freq` value to `0`, the controller skips only that
-stage.
-
-The following example sets the 3 items of the `joint_position_controller` field to the same values
-as the defaults.
+The joint position controller turns a joint angle command into an actuator position. A deadband and
+a low-pass filter on the input remove noise and discontinuous changes.
 
 ```cpp
 ah2::ControllerConfig controller;
@@ -423,59 +404,37 @@ hand.set_controller_config(controller);
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `filter_enabled` | `bool` | `true` | Whether the filter runs. `false` skips both stages |
-| `cutoff_freq` | `double` | `10.0` | The cutoff frequency [Hz]. `0` skips this stage |
-| `deadband` | `double` | `0.000873` | The size of the change to ignore [rad]. `0` skips this stage |
+| `filter_enabled` | `bool` | `true` | Whether the filter runs. `false` skips both the deadband and the low-pass filter |
+| `cutoff_freq` | `double` | `10.0` | The cutoff frequency [Hz]. `0` skips it |
+| `deadband` | `double` | `0.000873` | The size of the change to ignore [rad]. `0` skips it |
 
-Decide the `cutoff_freq` value from the rate at which the input actually changes. The rate at which
-you call `set_command()` is not the basis. Start from a low value and raise it. A lower value adds
-delay, and a higher value weakens the filter. No value produces overshoot.
-
-The `deadband` field exists because the gear ratio is large. Even a small fluctuation at the joint
-becomes a large reversal at the motor shaft, and it crosses the backlash band again and again.
-Adjust the value while you check the size of the fluctuation in the input.
+Match the `cutoff_freq` value to the rate at which the input actually changes. A lower value adds
+delay, and a higher value weakens the filter.
 
 #### 4.2.2 Joint impedance controller
 
-The joint impedance controller turns a joint angle command into an actuator effort. It converts the
-command into a target actuator position with `ik_joint_to_actuator()`, and then it computes the
-effort in encoder space with the following equation.
+The joint impedance controller turns a joint angle command into an actuator effort. Because the
+effort is proportional to the displacement from the target, use this controller when you let a
+finger yield to an external force or control the grasping force. `stiffness` is 0 to 1 per joint,
+and the SDK sets the damping.
 
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-Because the contact force is proportional to the displacement, use this controller when you control
-the grasping force. Both gains have the length `kActuatorCount`, and their values live in
-**actuator space**, not in joint space.
-
-The following example sets the 2 gains of the `joint_impedance_controller` field to the same values
-as the defaults.
+The following example sets the j2 of the index finger to `0.5` and the other joints to the default
+`0.8`.
 
 ```cpp
 ah2::ControllerConfig controller;
-controller.joint_impedance_controller.stiffness = {
-    0.02, 0.02, 0.02, 0.02,   // thumb   a0 a1 a2 a3
-    0.01, 0.01, 0.02,         // index   a1 a2 a3
-    0.01, 0.01, 0.02,         // middle
-    0.01, 0.01, 0.02,         // ring
-    0.01, 0.01, 0.02};        // baby
-controller.joint_impedance_controller.damping = {
-    1e-5, 1e-5, 1e-5, 1e-5,   // thumb
-    1e-5, 1e-5, 1e-5,         // index
-    1e-5, 1e-5, 1e-5,         // middle
-    1e-5, 1e-5, 1e-5,         // ring
-    1e-5, 1e-5, 1e-5};        // baby
+controller.joint_impedance_controller.stiffness[5] = 0.5;   // index j2
 hand.set_controller_config(controller);
 ```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | thumb `0.02`, and `0.01`·`0.01`·`0.02` on the other fingers | The gain that multiplies the position error |
-| `damping` | `std::array<double, kActuatorCount>` | `1e-5` × 16 | The gain that multiplies the velocity |
+| `stiffness` | `std::array<double, kActiveJointCount>` | all `0.8` | Stiffness per joint, 0 to 1 |
+| `filter_enabled` | `bool` | `true` | Whether the target passes the low-pass filter |
+| `cutoff_freq` | `double` | `10.0` | Cutoff frequency of the low-pass filter [Hz], 0 or more |
 
 > [!NOTE]
-> The joint impedance controller is still under development, so do not use it. It works, but its
+> The SDK does not yet reduce the error at which friction stops a joint short of its target. The
 > behavior may change in a later version.
 
 > [!TIP]
@@ -488,8 +447,9 @@ hand.set_controller_config(controller);
 >   input with the filter off and at two cutoff frequencies and prints the setpoint side by side,
 >   then shows a change smaller than the `deadband` value being ignored.
 > - [`07_impedance_controller.cpp`](../../cpp/examples/07_impedance_controller.cpp) — raises the
->   `stiffness` value while holding the same target and prints the effort setpoint rising. Holding a
->   finger back creates the displacement that changes the value.
+>   `stiffness` value of the index finger's j2 through 0.2, 0.5 and 1 while holding the same target
+>   and prints the effort setpoint rising. Holding a finger back creates the displacement that
+>   changes the value.
 
 ## 5. Command
 
@@ -672,19 +632,20 @@ or to convert recorded encoder values into joint angles later.
 ### 6.1 Conversion functions
 
 There are two conversion functions, one for forward kinematics and one for inverse kinematics, and
-their input and output units are the reverse of each other.
+their input and output units are the reverse of each other. Both take the hand model you put into
+`HandConfig` as their first argument.
 
 | Function | Input | Output |
 |---|---|---|
-| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `std::array<int, kActuatorCount>`, encoder count | `std::array<double, kJointCount>`, rad |
-| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `std::array<double, kActiveJointCount>`, rad | `std::array<int, kActuatorCount>`, encoder count |
+| [`fk_actuator_to_joint()`](08_cpp_api_reference/hand_kinematics.md#fk_actuator_to_joint) | `HandModel`, `std::array<int, kActuatorCount>` encoder count | `std::array<double, kJointCount>`, rad |
+| [`ik_joint_to_actuator()`](08_cpp_api_reference/hand_kinematics.md#ik_joint_to_actuator) | `HandModel`, `std::array<double, kActiveJointCount>` rad | `std::array<int, kActuatorCount>`, encoder count |
 
 The following example converts a target into an actuator position and then converts it back into
 joint angles.
 
 ```cpp
-const auto encoder = ah2::ik_joint_to_actuator(command.target);
-const auto joints  = ah2::fk_actuator_to_joint(encoder);
+const auto encoder = ah2::ik_joint_to_actuator(config.hand_model, command.target);
+const auto joints  = ah2::fk_actuator_to_joint(config.hand_model, encoder);
 ```
 
 The SDK fills `get_state().joints.position_rad` with `fk_actuator_to_joint()`. If you pass the same
@@ -721,24 +682,23 @@ const ah2::HandState state = hand.get_state();
 
 | Field | Type | Description |
 |---|---|---|
-| `timestamp` | `std::int64_t` | The `CLOCK_REALTIME` epoch of that cycle in ns. `0` means that no value has arrived yet |
-| `actuators` | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | The actuator observations |
-| `joints` | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | The forward kinematics result |
-| `tactile` | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | The tactile readings |
-| `commanded` | [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | The command input and output of this cycle |
+| `timestamp` | `std::int64_t` | The time of that cycle |
+| `actuators` | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | Position, velocity and current of the 16 actuators |
+| `joints` | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | Angle, velocity and estimated torque of the 21 joints |
+| `tactile` | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | Tactile sensor values |
+| `commanded` | [`CommandedState`](08_cpp_api_reference/types_state.md#commandedstate) | Command input and output of this cycle |
+
+`timestamp` is in `CLOCK_REALTIME` epoch ns, and `0` means there is no value yet. It is for lining
+up with a rosbag. To measure the period, use the `last_period_ms` field. To judge how old a
+snapshot is, the application must record the monotonic time at which it called `get_state()`.
 
 `get_state()` and [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics) each read the latest buffer separately. One cycle can pass
 between the two calls, so reuse the result of a single read when you compare values from both.
 
-The SDK does not provide a boolean that tells you whether a snapshot is current. The application
-must record the monotonic time at which it read the snapshot to judge how much time has passed. The
-`timestamp` field holds the `CLOCK_REALTIME` of that cycle, so it serves to align times with a
-rosbag. To measure the period, use the `last_period_ms` field.
-
 ### 7.1 Actuators and joints
 
 The `actuators` field holds the values that the drive reports, and the `joints` field holds the
-result of converting the actuator values through forward kinematics.
+actuator values carried to the joints through the kinematics.
 
 | Field | Type | Unit |
 |---|---|---|
@@ -746,9 +706,13 @@ result of converting the actuator values through forward kinematics.
 | `actuators.velocity_rpm` | `std::array<std::int32_t, kActuatorCount>` | rpm |
 | `actuators.current_mA` | `std::array<std::int16_t, kActuatorCount>` | mA |
 | `joints.position_rad` | `std::array<double, kJointCount>` | rad |
+| `joints.velocity_rad_s` | `std::array<double, kJointCount>` | rad/s |
+| `joints.effort_Nm` | `std::array<double, kJointCount>` | N·m |
 
 The `joints` field holds 21 entries including the passive joints, and the `actuators` field holds
-16. [6. Kinematics](#6-kinematics) covers the conversion between the two spaces.
+16. [6. Kinematics](#6-kinematics) covers the conversion between the two spaces. `joints.effort_Nm`
+is the joint torque estimated with the motor torque constant, and it is NaN on the passive joint4
+([`JointState`](08_cpp_api_reference/types_state.md#jointstate)).
 
 ### 7.2 Applied command
 
@@ -820,7 +784,7 @@ const TactileState bias = hand.get_tactile_bias();   // the values being subtrac
 | [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | Returns the values being subtracted. All `0` when no bias is set |
 
 From the cycle the bias applies, the `state.tactile` field holds each taxel as its raw value minus
-the bias, and the result can be negative. The log records that cycle as a `[cycle N] tactile bias set` line.
+the bias, and the result can be negative. When the bias applies, the log records a `tactile bias set` line.
 The bias stays until you call `reset_tactile_bias()`, and it remains after `reconnect()` and
 `disconnect()`.
 
@@ -836,8 +800,8 @@ You can call both functions in `Connected`, `Running` and `Stopped`, and neither
 > The following examples run what this chapter describes.
 >
 > - [`14_read_state.cpp`](../../cpp/examples/14_read_state.cpp) — prints the fields in turn to show
->   the two placeholders reading `0`, the `controller_output` value holding `std::monostate` outside
->   a control session, and the two calls reading their buffers separately.
+>   the `controller_output` value holding `std::monostate` outside a control session and the two
+>   calls reading their buffers separately.
 > - [`15_tactile.cpp`](../../cpp/examples/15_tactile.cpp) — takes the bias with `set_tactile_bias()`
 >   while nothing is in contact, then prints the difference from it per finger and palm region. It
 >   applies no torque.
@@ -851,19 +815,17 @@ struct, and [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnosti
 const ah2::Diagnostics diag = hand.get_diagnostics();
 ```
 
-During normal operation the conditions in the Normal column hold. If a value differs, see the
-section that the Check column names.
+While the control loop runs normally, each field holds the value in the Expected column. If a value
+differs, see the section in the If not column.
 
-| Field | Normal | Check |
+| Field | Expected | If not |
 |---|---|---|
 | `lifecycle` | `Running` | [9.4 Recovering from Faulted](#94-recovering-from-faulted) |
 | `homing_state` | `Succeeded` | [3. Homing](#3-homing) |
 | `nan_command_count` | Does not grow | [5.2 Validation and clamp](#52-validation-and-clamp) |
 | `actuator_health` | No faults | [8.1 Actuator faults](#81-actuator-faults) |
 
-Check the state of the control and communication loop through the following 4 fields. The judgment
-comes from the combination of the 4 values rather than from any one of them, so this table has no
-Normal column.
+Check the state of the control and communication loop through the following 4 fields.
 
 | Field | Description |
 |---|---|
@@ -915,7 +877,8 @@ setpoint to `0` would move the robot hand abruptly.
 
 The SDK does not stop on its own when a fault occurs. The application decides the response. The
 [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) enum lists the kinds of values, and
-[Error messages](15_error_messages.md#11-actuator-faults) lists what to check for each value.
+[E504 in Error messages](15_error_messages.md#6-e5xx-hardwarefault) covers the log line and what to do
+when a fault is reported.
 
 The SDK does not report at all on the index values that the `disabled_actuators` field names, so
 record that list alongside the diagnostics. Only then can you tell an actuator that has no fault
@@ -938,8 +901,7 @@ the monotonic time rather than with the cycle number.
 The `controller_output` field is a [`ControllerOutput`](08_cpp_api_reference/types_command.md#type-aliases) variant, so the value that it holds depends
 on the kind of setpoint. `std::monostate` means that the hand is outside a control session and that
 no setpoint exists. If you record `std::monostate` as `0`, you cannot tell it from a zero-torque
-command. For the velocity and the effort of the `joints` field being placeholders, see
-[7.1 Actuators and joints](#71-actuators-and-joints).
+command.
 
 > [!TIP]
 > The following example runs what this chapter describes.
@@ -951,55 +913,57 @@ command. For the velocity and the effort of the `joints` field being placeholder
 
 ## 9. Error handling
 
-An exception is the only way that the SDK reports a failure. A failure means that a public call
-could not complete the action that it requested. This chapter covers how you detect a failure and
-how you resume control after that.
+This chapter covers how you notice that an SDK call failed and how you resume control after that.
+A call failure here means that a call such as `connect()`, `run()` or `home()` could not finish the
+action that it requested, and the SDK always reports it with an exception.
 
-The following two conditions are not call failures, so you observe them through the diagnostics
-rather than through an exception, and this chapter does not cover them.
+Tell apart these three, which have similar names.
 
-| Condition | Observed by |
-|---|---|
-| An actuator fault | `actuator_health`. It does not change the lifecycle ([8.1 Actuator faults](#81-actuator-faults)) |
-| A command that the SDK did not apply because its values were invalid | The `nan_command_count` value grows and the SDK writes a warning log entry ([5.2 Validation and clamp](#52-validation-and-clamp)) |
+| Kind | What it is | Observed by | Section |
+|---|---|---|---|
+| Call failure | A call could not finish the action that it requested | An exception | 9.1 to 9.3 |
+| `Faulted` | The hand state in which communication and control have stopped | The `lifecycle` value | [9.4 Recovering from Faulted](#94-recovering-from-faulted) |
+| Actuator fault | An error that the drive reports for one actuator. The lifecycle stays as it is | `actuator_health` | [8.1 Actuator faults](#81-actuator-faults) |
+
+A command that the SDK did not apply because its values were invalid is not an exception either. You
+see it through the `nan_command_count` value and a warning log entry
+([5.2 Validation and clamp](#52-validation-and-clamp)).
 
 ### 9.1 Exception
 
-[`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error) inherits from `std::runtime_error` and carries an [`ErrorCode`](08_cpp_api_reference/types_error.md#enum-errorcode) enum value alongside.
+[`Exception`](08_cpp_api_reference/types_error.md#exception--stdruntime_error) inherits from
+`std::runtime_error` and carries a failure classification, an
+[`ErrorKind`](08_cpp_api_reference/types_error.md#enum-errorkind) enum value, and an error code alongside.
+Its `what()` is the message with the error code in front.
 
-Before it throws, the SDK writes `[exception] <ErrorCode>: <message>` to the log at the error level.
-Because of that, you do not need to print the same content again in your catch block.
+The SDK does not write a thrown exception to the log. To record a failure, write `what()` one time in
+your catch block. In a loop where the same failure comes back every cycle, the application also decides
+how much of the repetition to record.
 
-The following example reads the code and the reason from an exception.
+The following example reads the classification, the code and the reason from an exception.
 
 ```cpp
 try {
   hand.run();
 } catch (const ah2::Exception& error) {
-  const ah2::ErrorCode code = error.code();   // what went wrong
-  const char* reason        = error.what();   // the human-readable reason. it excludes the code
+  const ah2::ErrorKind kind = error.kind();   // what to check
+  const std::uint16_t code  = error.code();   // the error code, 202 for E202
+  const char* reason        = error.what();   // "[right] [E202] cannot run hand: not connected"
 
-  // the application decides what to do with the two values. 9.3 Recovery patterns has the structures
+  // the application decides what to do with the three values. 9.3 Recovery patterns has the structures
 }
 ```
 
-Because `what()` does not include the code, convert the code to a string with [`to_string()`](08_cpp_api_reference/types_error.md#enum-errorcode) and
-prepend it when you pass the code and the reason together.
-[9.3 Recovery patterns](#93-recovery-patterns) covers how you resume control from the values that
-you received, and 9.3.2 shows an example that returns the reason to the caller above.
+Because `what()` carries the error code, passing `what()` alone is enough when you hand the reason to
+the caller above. [9.3 Recovery patterns](#93-recovery-patterns) covers how you resume control from
+the values that you received, and 9.3.2 shows an example that returns the reason to the caller above.
 
-`ErrorCode` falls into 3 groups according to what you need to check.
-
-| `ErrorCode` | Check | Retryable |
-|---|---|---|
-| `InvalidArgument` · `WrongCallOrder` | The code that made the call | No. You must fix the call |
-| `InterfaceUnavailable` · `CommunicationLost` · `HardwareFault` | The equipment and the environment | Yes, once the cause is gone |
-| `ControlLoopFault` · `UnexpectedError` | Report it to the SDK team | No |
-
-The code is a value that you write to the log and that a person uses to pin down a cause. Do not
-branch your recovery procedure on the code. The same code arises from different lifecycles, and the
-lifecycle decides the recovery. [Error messages](15_error_messages.md) collects the wording of each
-message.
+Look up the cause and remedy of each code in [Error messages](15_error_messages.md); the code ranges
+and their classifications are in [1.2 Code ranges](15_error_messages.md#12-code-ranges). Write the
+classification and the code to the log and use them to find the cause. Decide the recovery procedure
+by the lifecycle, not by the classification or the code, because the same code arises from different
+lifecycles. `HandFaulted` is the exception: it means the hand was `Faulted` at the moment of the call,
+so on this classification you can follow [9.4 Recovering from Faulted](#94-recovering-from-faulted).
 
 ### 9.2 Detecting a failure
 
@@ -1043,8 +1007,8 @@ the actuators hold the last command, so nothing dangerous happens, but the calli
 for as long as the confirmation takes.
 [2.2 State transition calls](#22-state-transition-calls) lists the time of each call.
 
-The structures differ by **who decides the lifecycle**. Where the command comes from is not the
-basis. In any of them, one catch site is enough.
+Applications fall into three structures by who decides the lifecycle. In each of them, you catch
+exceptions in one place.
 
 | Pattern | Lifecycle owner | catch |
 |---|---|---|
@@ -1052,9 +1016,9 @@ basis. In any of them, one catch site is enough.
 | [Externally managed](#932-externally-managed-lifecycle) | An outside caller decides. It receives `run`, `stop`, and `disconnect` requests | One in the request handler |
 | [Exit on failure](#933-exit-on-failure) | Nobody decides. It calls in order and exits on failure | One that wraps the whole |
 
-The config does not change the structure. Whatever you set the `auto_reconnect` and `auto_home`
-values to, you use the 3 structures below as they are, and the examples set different values only to
-show several cases together. 9.4 covers how the two settings affect the recovery procedure.
+You can use the three structures as they are, whatever the `auto_reconnect` and `auto_home` values
+are. The examples set the two values differently to show several cases, and 9.4 covers how the two
+values affect the recovery.
 
 In the 3 examples, a name without the `ah2::` prefix marks a place that the application fills in,
 and the declarations at the top of each example name the items that you need.
@@ -1074,6 +1038,8 @@ recovers. If the higher level cannot tolerate that stop, the structure in 9.3.2 
 The following example puts the lifecycle check and the command send in one loop.
 
 ```cpp
+#include <cstdio>
+#include <string>
 #include <aidin_hand2/aidin_hand2.hpp>
 
 namespace ah2 = aidin_hand2;
@@ -1110,7 +1076,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     config.auto_home           = true;   // run() also handles homing
     config.auto_reconnect      = true;   // the control and communication loop recovers from errors
     config.auto_reconnect_home = true;
@@ -1120,6 +1086,9 @@ int main()
     ah2::HandManager manager;
     ah2::Hand hand = manager.create(config);
     hand.set_max_effort(1000.0);         // this call ignores the lifecycle, so set it here
+
+    // the last reason printed, so a failure that repeats every cycle prints one time
+    std::string last_error;
 
     while (!shutdown_requested()) {
       try {
@@ -1131,14 +1100,17 @@ int main()
           case ah2::HandLifecycle::Running:      break;
         }
         hand.set_command(next_command());
-      } catch (const ah2::Exception&) {
-        // the SDK already wrote the reason to the log. if you skip this cycle,
-        // the switch on the next cycle performs the remaining stages
+        last_error.clear();
+      } catch (const ah2::Exception& error) {
+        // if you skip this cycle, the switch on the next cycle performs the remaining stages
+        if (last_error != error.what()) std::fprintf(stderr, "%s\n", error.what());
+        last_error = error.what();
       }
       wait_next_period();
     }
-  } catch (const ah2::Exception&) {
+  } catch (const ah2::Exception& error) {
     // the program could not start. either the config was rejected or create() failed
+    std::fprintf(stderr, "%s\n", error.what());
     return 1;
   }
   return 0;
@@ -1146,7 +1118,9 @@ int main()
 ```
 
 There are two try blocks, and they play different roles. The outer one covers a failure to start,
-so it exits. The inner one covers a failure during operation, so it continues to the next cycle.
+so it exits. The inner one covers a failure during operation, so it continues to the next cycle. An
+inner failure comes back with the same reason every cycle until the hand recovers, so the loop prints
+it only when the reason changes.
 
 The switch sits inside the try rather than in the catch for 3 reasons. A recovery call such as
 `reconnect()` can fail too, so the same catch must catch a failed recovery. The first cycle is
@@ -1167,6 +1141,7 @@ you want the SDK to handle communication errors alone, and leaving it on reduces
 has to issue a `Reconnect`.
 
 ```cpp
+#include <cstdio>
 #include <optional>
 #include <string>
 #include <aidin_hand2/aidin_hand2.hpp>
@@ -1215,7 +1190,7 @@ void wait_next_period()
 int main()
 {
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     config.auto_home      = false;   // let the user decide when homing runs
     config.auto_reconnect = false;   // let the user issue the recovery as well
 
@@ -1243,14 +1218,14 @@ int main()
           send_response(*request, true, "");
         } catch (const ah2::Exception& error) {
           // return the reason without retrying. the user decides whether to try again
-          send_response(*request, false,
-                        std::string(ah2::to_string(error.code())) + ": " + error.what());
+          send_response(*request, false, error.what());
         }
       }
       wait_next_period();
     }
-  } catch (const ah2::Exception&) {
-    return 1;   // the SDK wrote the reason to the log
+  } catch (const ah2::Exception& error) {
+    std::fprintf(stderr, "%s\n", error.what());
+    return 1;
   }
   return 0;
 }
@@ -1261,7 +1236,7 @@ int main()
 The exit on failure structure wraps the whole program in one try, and it suits a program that runs
 once and exits. It has no reason to recover, so it exits on failure. A calibration that only homes,
 a diagnostic tool that reads the state once, and a test that replays a fixed posture all fit here.
-On failure a person fixes the cause and runs the program again.
+On failure, fix the cause and run the program again.
 
 The following example calls everything in order, from the logging setup to the shutdown. The AIDIN
 Hand Gen2 actually moves, so change the target and the effort bound to match your environment.
@@ -1269,6 +1244,7 @@ Hand Gen2 actually moves, so change the target and the effort bound to match you
 
 ```cpp
 #include <chrono>
+#include <cstdio>
 #include <thread>
 #include <aidin_hand2/aidin_hand2.hpp>
 
@@ -1286,7 +1262,7 @@ int main()
   int exit_code = 0;
 
   try {
-    ah2::HandConfig config{"can0", ah2::HandSide::Right};
+    ah2::HandConfig config{"can0", ah2::HandSide::Right, ah2::HandModel::Gen2};
     config.auto_home = true;
 
     ah2::Hand hand = manager.create(config);
@@ -1303,8 +1279,9 @@ int main()
        -0.08,  0.75,  0.60};        // baby
     hand.set_command(command);
     std::this_thread::sleep_for(std::chrono::seconds(1));
-  } catch (const ah2::Exception&) {
-    exit_code = 1;   // the SDK wrote the reason to the log
+  } catch (const ah2::Exception& error) {
+    std::fprintf(stderr, "%s\n", error.what());   // the SDK does not log a thrown exception
+    exit_code = 1;
   }
 
   ah2::flush_log();
@@ -1353,9 +1330,11 @@ depends on what stopped it.
 - A communication error → it retries until the connection comes back
 - An exception in the control and communication loop → it does nothing. Call `reconnect()` yourself
 
-The [`code()`](08_cpp_api_reference/types_error.md#exceptioncode) of the exception tells the two apart. `CommunicationLost` means a communication
-error, and `ControlLoopFault` means an exception in the loop.
-[Error messages](15_error_messages.md#10-faulted-cause-phrases) separates them by wording.
+The `fault_code` field of [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics) tells
+the two apart. `404` or `405` means a communication error, and `702` means an exception in the loop. A
+call rejected in `Faulted` throws `HandFaulted` (E601) whatever the cause, and gives the same cause
+code in the parentheses of its message
+([E6xx `HandFaulted`](15_error_messages.md#7-e6xx-handfaulted)).
 
 An automatic recovery **behaves differently** from the manual procedure in
 [9.4.1](#941-manual-recovery). It asks for control again on its own, so the hand returns to
@@ -1377,7 +1356,7 @@ deadline passes, the SDK gives up the automatic recovery and stays in `Faulted`,
 > structure of 9.3.
 >
 > - [`17_fault_recovery.cpp`](../../cpp/examples/17_fault_recovery.cpp) — catches the exception,
->   groups what to check by `code()`, then recovers from `Faulted` and sends the command again. It
+>   groups what to check by `kind()`, then recovers from `Faulted` and sends the command again. It
 >   caps the number of recovery attempts.
 > - [`18_self_managed.cpp`](../../cpp/examples/18_self_managed.cpp) — the structure of 9.3.1. It
 >   reads the lifecycle every cycle and fills in the missing step, so the first cycle performs the

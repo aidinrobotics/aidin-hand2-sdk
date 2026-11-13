@@ -6,7 +6,7 @@
 
 촉각 센서가 통합된 로봇 핸드 AIDIN Hand Gen2용 SDK입니다. C++와 Python API를 제공합니다.
 
-[![version](https://img.shields.io/badge/version-0.8.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.9.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
 
 [Build](#build-from-source) | [Documentation](#documentation) | [Changelog](CHANGELOG.md) | [Official Site](https://www.aidinrobotics.co.kr/) | [English](README.md) | 한국어
 
@@ -14,11 +14,16 @@
 
 ## Latest release
 
+- [0.9.0](CHANGELOG.md#unreleased)
+  - `HandConfig`가 hand model(`HandModel::Gen2`·`Gen2B`)을 받고, 빌드 옵션 `AIDIN_HAND2_HAND_TYPE`과 hand type C는 없어졌습니다.
+  - `HandConfig::control_rate`가 없어졌습니다. 제어 주기는 500 Hz로 고정입니다.
+  - joint impedance controller의 stiffness가 active joint별 0~1 값이 되었습니다.
+  - encoder count 0이 hard stop이 되어, 같은 자세의 actuator 위치가 0.8보다 1000 큽니다.
+  - 오류에 번호(`[E401]` 등)가 붙고 `ErrorCode`가 `ErrorKind`로 바뀌었습니다. `Faulted`에서 거부된 호출은 `HandFaulted`이고, 원인은 `Diagnostics::fault_code`에 있습니다.
+  - SDK가 던진 예외를 log에 남기지 않습니다. 실패는 application이 `what()`으로 남기십시오.
 - [0.8.0](CHANGELOG.md#080---2026-10-07)
   - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 바뀌었습니다.
   - tactile bias 기능(`Hand::set_tactile_bias()` 등)이 추가되었습니다.
-- [0.7.1](CHANGELOG.md#071---2026-10-06)
-  - hand type A·B의 workspace clamp 범위가 바뀌었습니다.
 
 전체 변경은 [CHANGELOG](CHANGELOG.md)에 있습니다.
 
@@ -131,7 +136,7 @@ sudo ldconfig
 ### Operations
 
 - [Workspace limits](docs/ko/14_workspace_limits.md) — 명령이 clamp 되는 범위
-- [Error messages](docs/ko/15_error_messages.md) — 오류 문구별 원인과 조치
+- [Error messages](docs/ko/15_error_messages.md) — 오류 번호별 원인과 조치
 
 ## Related repositories
 

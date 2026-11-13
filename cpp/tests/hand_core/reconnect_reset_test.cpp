@@ -11,8 +11,9 @@
 //       마지막 ControllerConfig 를 다시 싣지 않으면 재연결 뒤 기본값으로 돌아간다.
 //   (d) 멈춘 원인 보존: reset_fault_state() 가 last_stop_cause_ 를 비운 뒤 connect() 가 실패하면
 //       lifecycle 은 Faulted 로 돌아간다. RealtimeEventKind 의 첫 값이 ReceiveSilence 이므로
-//       기본값 StopCause 는 "cause not recorded" 가 아니라 "no RX since cycle 0" 으로 렌더된다 —
+//       기본값 StopCause 는 빈 원인이 아니라 "E404 communication lost" 로 렌더된다 —
 //       일어나지 않은 사건이 보고된다. 실패 시 초기화 전 값을 되돌려야 한다.
+//   (e) Diagnostics::fault_code: Faulted 인 동안 원인 번호, Faulted 를 벗어나면 0.
 //
 // 소켓을 열지 않는다. 존재하지 않는 interface 이름을 써서 connect() 가 반드시 실패하게 하고,
 // lifecycle 과 원인은 test peer 로 직접 세운다.
@@ -58,6 +59,7 @@ struct HandCoreTestPeer {
   }
   static StopCause stop_cause(HandCore& core) { return core.last_stop_cause_; }
   static HandLifecycle lifecycle(HandCore& core) { return core.lifecycle_.load(); }
+  static void set_lifecycle(HandCore& core, HandLifecycle observed) { core.lifecycle_.store(observed); }
 };
 }  // namespace aidin_hand2::test
 
@@ -75,8 +77,7 @@ void check(bool ok, const char* what)
 // 열리지 않는 이름이어야 한다 — connect() 가 성공하면 이 테스트의 전제가 무너진다.
 HandConfig make_config()
 {
-  HandConfig config{"ah2_no_such_iface", HandSide::Right};
-  config.control_rate = 500;
+  HandConfig config{"ah2_no_such_iface", HandSide::Right, HandModel::Gen2};
   config.auto_reconnect = false;
   return config;
 }
@@ -89,7 +90,7 @@ void test_reconnect_clears_staged_command()
   check(std::holds_alternative<ActuatorPositionCommand>(HandCoreTestPeer::staged(core).controller),
         "전제: position command 가 저장돼 있다");
 
-  HandCoreTestPeer::force_faulted(core, StopCause{RealtimeEventKind::ReceiveSilence, 4210, 0, 0});
+  HandCoreTestPeer::force_faulted(core, StopCause{RealtimeEventKind::ReceiveSilence, 4210, 0});
   const Status result = core.reconnect();
 
   check(!result.ok(), "전제: 없는 interface 라 reconnect() 는 실패한다");
@@ -138,7 +139,7 @@ void test_connect_republishes_staged_config()
 void test_failed_reconnect_keeps_stop_cause()
 {
   HandCore core{make_config()};
-  const StopCause original{RealtimeEventKind::TransmitFailure, 777, 32, 0};
+  const StopCause original{RealtimeEventKind::TransmitFailure, 777, 32};
   HandCoreTestPeer::force_faulted(core, original);
 
   const Status result = core.reconnect();
@@ -151,10 +152,28 @@ void test_failed_reconnect_keeps_stop_cause()
         "실패해도 초기화 전 원인이 남는다");
 
   const std::string phrase = stop_cause_phrase(kept);
-  check(phrase.find("CAN TX failed at cycle 777") != std::string::npos,
-        "원인 문구가 실제 사건을 가리킨다");
-  check(phrase.find("no RX since cycle 0") == std::string::npos,
+  check(phrase == "E405 CAN TX failed", "원인 문구가 실제 사건을 가리킨다");
+  check(phrase.find("communication lost") == std::string::npos,
         "기본값이 렌더돼 일어나지 않은 사건을 보고하지 않는다");
+  check(core.diagnostics().fault_code == 405, "실패한 reconnect() 뒤에도 fault_code 가 남는다");
+}
+
+// (e) fault_code 는 Faulted 인 동안만 원인 번호를 담는다.
+void test_fault_code_follows_lifecycle()
+{
+  HandCore core{make_config()};
+  check(core.diagnostics().fault_code == 0, "고장 전에는 0");
+
+  HandCoreTestPeer::force_faulted(core, StopCause{RealtimeEventKind::ReceiveSilence, 12, 0});
+  check(core.diagnostics().fault_code == 404, "수신 끊김 → 404");
+
+  HandCoreTestPeer::force_faulted(core, StopCause{RealtimeEventKind::ControlLoopFailure, 12, 0});
+  check(core.diagnostics().fault_code == 702, "루프 종료 → 702");
+
+  // 성공한 reconnect() 는 Connected 로 끝난다
+  HandCoreTestPeer::set_lifecycle(core, HandLifecycle::Connected);
+  check(core.diagnostics().fault_code == 0, "Faulted 를 벗어나면 0");
+  HandCoreTestPeer::set_lifecycle(core, HandLifecycle::Disconnected);
 }
 
 }  // namespace
@@ -166,6 +185,7 @@ int main()
   test_disconnect_clears_staged_command();
   test_connect_republishes_staged_config();
   test_failed_reconnect_keeps_stop_cause();
+  test_fault_code_follows_lifecycle();
   if (g_failures != 0) {
     std::printf("  %d 건 실패\n", g_failures);
     return 1;

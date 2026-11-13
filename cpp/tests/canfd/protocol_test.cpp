@@ -319,8 +319,7 @@ void test_right_side_ids()
     put_le32(rx.data + 0, 0x0A0B0C0D);
     StateFrames v{};
     check(right.decode(rx, v) == DecodeResult::Decoded, "right protocol: right id 0x121 -> Decoded");
-    check(v.actual_position[0] == 0x0A0B0C0D - canfd::kHomeOffsetCount,
-          "right protocol: decoded LE int32 minus home offset");
+    check(v.actual_position[0] == 0x0A0B0C0D, "right protocol: decoded LE int32");
   }
   // 오른손 command id (0x111) 는 ConflictingCommand.
   {

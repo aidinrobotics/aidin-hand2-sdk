@@ -14,11 +14,11 @@
 ### `HandConfig::HandConfig()`
 
 ```cpp
-HandConfig(std::string interface_name, HandSide hand_side);
+HandConfig(std::string interface_name, HandSide hand_side, HandModel hand_model);
 ```
 
-**Parameters**     ｜ `interface_name` — CAN interface 이름 · `hand_side` — `Left` 또는 `Right`<br>
-**Throws**         ｜ `InvalidArgument` — `interface_name` 필드가 비었거나 `hand_side` 필드가 범위 밖일 때
+**Parameters**     ｜ `interface_name` — CAN interface 이름 · `hand_side` — `Left` 또는 `Right` · `hand_model` — `Gen2` 또는 `Gen2B`<br>
+**Throws**         ｜ `InvalidArgument` — `interface_name` 필드가 비었거나 `hand_side`·`hand_model` 필드가 범위 밖일 때
 
 ---
 
@@ -28,7 +28,7 @@ HandConfig(std::string interface_name, HandSide hand_side);
 |---|---|---|---|
 | `interface_name` | `std::string` | 필수 | CAN interface 이름 |
 | `hand_side` | [`HandSide`](types_description.md#enum-handside) | 필수 | 로봇 핸드 좌우 구분 |
-| `control_rate` | `int` | `500` | 제어 주기 [Hz]. `0` 이하면 [`create()`](hand_manager.md#handmanagercreate)가 `InvalidArgument` |
+| `hand_model` | [`HandModel`](types_description.md#enum-handmodel) | 필수 | 로봇 핸드 모델. kinematics와 joint impedance의 hard stiffness가 이 값을 따릅니다 |
 | `auto_home` | `bool` | `true` | [`run()`](hand.md#handrun)의 자동 homing 여부. `homing_state` 값이 `Succeeded`가 아닐 때만 수행 |
 | `rt_cpu_affinity` | `int` | `-1` | 제어·통신 루프를 실행하는 thread를 고정할 CPU 번호. `-1`은 고정 안 함. 고정 실패는 알리지 않음 |
 | `auto_reconnect` | `bool` | `false` | 통신 오류 후 자동 재연결 여부 |
@@ -76,20 +76,10 @@ non-finite이거나 음수면 [`set_controller_config()`](hand.md#handset_contro
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `stiffness` | `std::array<double, kActuatorCount>` | 아래 표 | 위치 오차에 곱하는 gain |
-| `damping` | `std::array<double, kActuatorCount>` | 모든 actuator `1e-5` | 속도에 곱하는 gain |
+| `stiffness` | `std::array<double, kActiveJointCount>` | 모두 `0.8` | active joint별 stiffness, 0~1. 1 = joint의 hard stiffness |
+| `filter_enabled` | `bool` | `true` | 목표 low-pass filter 사용 여부 |
+| `cutoff_freq` | `double` | `10.0` | 목표 low-pass filter의 차단 주파수 [Hz] |
 
-encoder 공간에서 다음과 같이 계산합니다.
-
-```text
-effort = stiffness × position_error − damping × velocity
-```
-
-| Actuator index | stiffness | damping |
-|---|---:|---:|
-| 0 – 3 (thumb) | `0.02` | `1e-5` |
-| 4, 5 / 7, 8 / 10, 11 / 13, 14 (long finger a1·a2) | `0.01` | `1e-5` |
-| 6 / 9 / 12 / 15 (long finger a3) | `0.02` | `1e-5` |
-
-어느 actuator라도 non-finite이거나 음수면 [`set_controller_config()`](hand.md#handset_controller_config)가 `InvalidArgument` 예외를
-던집니다. 값을 고르는 기준은 [C++ guide](../07_cpp_usage_guide.md#422-joint-impedance-controller)에 있습니다.
+`stiffness`의 순서는 [`JointImpedanceCommand::target`](types_command.md#jointimpedancecommand)과 같습니다.
+`stiffness`가 non-finite이거나 0~1 밖이거나 `cutoff_freq`가 non-finite이거나 음수면
+[`set_controller_config()`](hand.md#handset_controller_config)가 `InvalidArgument` 예외를 던집니다.

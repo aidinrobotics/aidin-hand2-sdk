@@ -4,10 +4,10 @@
 // AIDIN Hand Gen2 SDK, catching an Exception and getting back out of Faulted
 //
 // create -> connect -> run -> home -> watch the lifecycle -> reconnect -> run -> home -> resend
-// Every failure arrives as one type, Exception, and its code() says what to check;
+// Every failure arrives as one type, Exception, and its kind() says what to check;
 // reconnect() is the only public way out of Faulted, and it costs the homing and the command
 //
-// Run as: 17_fault_recovery [right|left] [interface=can0]
+// Run as: 17_fault_recovery [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand, and home() drives every finger into its hard stop, so clear the space
 // around the hand before running. Nothing here provokes a fault on purpose: to watch the
 // recovery path, unplug the CAN cable or switch the hand power off while the loop is running,
@@ -33,27 +33,31 @@ namespace
 std::atomic<bool> g_shutdown{false};
 }  // namespace
 
-// The three ErrorCode groups of error.hpp, so a caught code says where to look first
-const char* what_to_check(ErrorCode code)
+// The four ErrorKind groups of error.hpp, so a caught error says where to look first
+const char* what_to_check(ErrorKind kind)
 {
-  switch (code) {
-    case ErrorCode::None:
+  switch (kind) {
+    case ErrorKind::None:
       return "nothing, no failure";
 
     // Fix the call sequence or the arguments: the calling code is wrong
-    case ErrorCode::InvalidArgument:
-    case ErrorCode::WrongCallOrder:
+    case ErrorKind::InvalidArgument:
+    case ErrorKind::WrongCallOrder:
       return "this program: fix the argument or the call order";
 
     // Check the environment or the device: the cable, the power, the drives
-    case ErrorCode::InterfaceUnavailable:
-    case ErrorCode::CommunicationLost:
-    case ErrorCode::HardwareFault:
+    case ErrorKind::InterfaceUnavailable:
+    case ErrorKind::CommunicationLost:
+    case ErrorKind::HardwareFault:
       return "the hardware: CAN interface, cable, hand power, drive faults";
 
-    // Report the SDK: the loop or an unforeseen path failed, not the caller
-    case ErrorCode::ControlLoopFault:
-    case ErrorCode::UnexpectedError:
+    // The hand stopped earlier, and the call was refused until reconnect()
+    case ErrorKind::HandFaulted:
+      return "the cause in diagnostics fault_code, then reconnect()";
+
+    // A fault in the SDK itself: the loop or an unforeseen path failed, not the caller
+    case ErrorKind::ControlLoopFault:
+    case ErrorKind::UnexpectedError:
       return "the SDK: report it with the log";
   }
   return "the SDK: report it with the log";
@@ -64,8 +68,12 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  HandConfig config{argc > 2 ? argv[2] : "can0", side};
-  config.control_rate = 500;  // Hz
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
+  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
 
   // Off, because home() is called explicitly below; with true it is run() that homes
   config.auto_home    = false;
@@ -119,11 +127,10 @@ int main(int argc, char** argv)
       const Diagnostics diag = hand.get_diagnostics();
 
       if (diag.lifecycle == HandLifecycle::Faulted) {
-        // From here on run(), home() and set_command() all refuse, and the refusal does
-        // not come back as WrongCallOrder: it carries the cause that stopped the hand,
-        // CommunicationLost for a dead link or ControlLoopFault for a dead loop
-        std::printf("[%3d] [example] Faulted, homing_state=%s, recovering\n", tick,
-                    to_string(diag.homing_state));
+        // From here on run(), home() and set_command() all refuse with HandFaulted, and
+        // fault_code says what stopped the hand: E404 or E405 for a dead link, E702 for a dead loop
+        std::printf("[%3d] [example] Faulted by E%u, homing_state=%s, recovering\n", tick,
+                    static_cast<unsigned>(diag.fault_code), to_string(diag.homing_state));
 
         if (++attempts > kMaxRecoveryAttempts) {
           std::printf("[example] giving up after %d recovery attempts, the hand stays Faulted\n",
@@ -159,9 +166,9 @@ int main(int argc, char** argv)
           std::printf("      [example] recovered on attempt %d of %d\n", attempts, kMaxRecoveryAttempts);
         } catch (const Exception& error) {
           // A failed recovery stays Faulted, so the next tick tries reconnect() again
-          std::printf("      [example] attempt %d failed, %s: %s\n", attempts, to_string(error.code()),
+          std::printf("      [example] attempt %d failed, %s: %s\n", attempts, to_string(error.kind()),
                       error.what());
-          std::printf("      [example] check %s\n", what_to_check(error.code()));
+          std::printf("      [example] check %s\n", what_to_check(error.kind()));
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -190,10 +197,10 @@ int main(int argc, char** argv)
 
     return 0;
   } catch (const Exception& error) {
-    // Whatever failed, it arrives here as one type, and code() picks the group to check;
+    // Whatever failed, it arrives here as one type, and kind() picks the group to check;
     // a failure this far out is either before the loop or a recovery that ran out of budget
-    std::printf("[example] %s: %s\n", to_string(error.code()), error.what());
-    std::printf("[example] check %s\n", what_to_check(error.code()));
+    std::printf("[example] %s: %s\n", to_string(error.kind()), error.what());
+    std::printf("[example] check %s\n", what_to_check(error.kind()));
     flush_log();
     return 1;
   }

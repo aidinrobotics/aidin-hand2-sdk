@@ -13,7 +13,7 @@
 // nothing is typed. Pull the CAN cable out and it turns to Faulted on its own about 100 ms after
 // RX stops, and from there reconnect() is the only call that gets you out.
 //
-// Run as: 03_lifecycle_walkthrough [right|left] [interface=can0]
+// Run as: 03_lifecycle_walkthrough [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. run() and home() enable the drives — keep the surroundings clear, and
 // remember that home() drives every finger into its hard stop. Keys 8 and 9 move the fingers.
 
@@ -249,6 +249,11 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   try {
     // Both halves matter: the console sink has to go, or it writes to stderr from the control
@@ -260,8 +265,7 @@ int main(int argc, char** argv)
       if (level >= LogLevel::Info) queue_log_line(level, message);
     });
 
-    HandConfig config{argc > 2 ? argv[2] : "can0", side};
-    config.control_rate   = 500;    // Hz
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
     config.auto_home      = false;  // home() is on the menu, so run() should not do it for you
     config.auto_reconnect = false;  // recovery stays manual here, or Faulted would clear itself
 
@@ -405,11 +409,9 @@ int main(int argc, char** argv)
             break;
         }
       } catch (const Exception& error) {
-        // This is the interesting half. The code says what kind of failure it is and the
-        // message says why, and the SDK has already logged both at error level — which is why
-        // the same text comes out just above this line, tagged [aidin_hand2] [error], from the
-        // callback.
-        outcome = std::string("refused — ") + to_string(error.code()) + ": " + error.what();
+        // This is the interesting half. The kind says what to check and the message says why.
+        // The SDK does not log a failure it throws, so this line is the only place it shows.
+        outcome = std::string("refused — ") + to_string(error.kind()) + ": " + error.what();
       }
 
       flush_queued_logs(status_drawn);  // whatever the SDK logged while the call was running
@@ -430,7 +432,7 @@ int main(int argc, char** argv)
   } catch (const Exception& error) {
     // Only create() throws out here. Everything inside the loop is caught above so that a
     // refusal does not end the session.
-    std::printf("\n[example] failed to start: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed to start: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 
