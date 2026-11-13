@@ -24,7 +24,7 @@ The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. I
   - Control
     - The `HandConfig::control_rate` field is removed.
     - The per-actuator gain fields `stiffness` and `damping` of the `ControllerConfig::JointImpedanceController` struct are removed.
-    - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a level from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
+    - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a value from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
   - State
     - The `velocity_rad_s` and `effort_Nm` fields are added to each joint of the `HandState::joints` field.
   - Errors and log

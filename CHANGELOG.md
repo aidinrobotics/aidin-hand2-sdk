@@ -24,7 +24,7 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   - The per-actuator gain fields `stiffness` and `damping` of the
     `ControllerConfig::JointImpedanceController` struct are removed.
   - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a
-    level from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
+    value from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
 - State
   - The `velocity_rad_s` and `effort_Nm` fields are added to each joint of the `HandState::joints`
     field.
@@ -72,7 +72,7 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   `-DAIDIN_HAND2_HAND_TYPE` from your build: one build carries both models, and a build directory
   that still holds the option configures with a warning.
 
-- **Breaking: the joint impedance controller takes a stiffness level per active joint, and
+- **Breaking: the joint impedance controller takes a stiffness from 0 to 1 per active joint, and
   `ControllerConfig::JointImpedanceController` changed shape.** The per-actuator `stiffness` and
   `damping` gains are removed. `stiffness` is now 16 values from 0 to 1, one per active joint in the
   order of `JointImpedanceCommand::target`, where 1 is the joint's measured hard stiffness and the

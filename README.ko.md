@@ -24,7 +24,7 @@
   - Control
     - `HandConfig::control_rate` 필드는 제거되었습니다.
     - `ControllerConfig::JointImpedanceController` 구조체에서 actuator별 gain인 `stiffness`·`damping` 필드는 제거되었습니다.
-    - `ControllerConfig::JointImpedanceController` 구조체에는 active joint별 0~1 수준을 담는 `stiffness` 필드와, 목표에 쓰는 `filter_enabled`·`cutoff_freq` 필드가 있습니다.
+    - `ControllerConfig::JointImpedanceController` 구조체에는 active joint별 0~1 값을 담는 `stiffness` 필드와, 목표에 쓰는 `filter_enabled`·`cutoff_freq` 필드가 있습니다.
   - State
     - `HandState::joints` 필드의 각 joint에 `velocity_rad_s`·`effort_Nm` 필드가 추가되었습니다.
   - Errors and log
