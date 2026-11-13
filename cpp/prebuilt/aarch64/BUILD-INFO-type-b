@@ -1,9 +1,9 @@
-sdk_version:        0.8.0
+sdk_version:        0.9.0
 hand_type:          b
 archive:            libaidin_hand2_kinematics_type_b.a
-built:              2026-11-10T10:03:17Z
+built:              2026-11-13T05:35:21Z
 arch:               aarch64
 compiler:           aarch64-linux-gnu-g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
 cross_built_on:     x86_64
-kinematics_commit:  4406166404f10d3e3655761eda7e0b983f358564
+kinematics_commit:  0917b59f2fd3e5240b240d82aec4f94616e3d6b8
 source_dirty:       no
