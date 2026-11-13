@@ -363,7 +363,7 @@ void HandCore::apply_realtime_scheduling(std::uintptr_t stack_floor, std::uintpt
     (void)pthread_setaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
   }
 
-  // The realtime row of Connection Info reports these, since they describe the setup, not a failure
+  // The scheduler and memory rows of Connection Info report these, since they describe the setup, not a failure
   realtime_report_.fifo_priority = fifo_applied ? kThreadPriority : 0;
   realtime_report_.running_cpu   = sched_getcpu();
   realtime_report_.memory_locked = lock_error == 0;
