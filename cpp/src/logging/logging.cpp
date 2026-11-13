@@ -77,31 +77,14 @@ void flush_log()
 
 // ------------------------------- Internal API -------------------------------
 
-void log_debug(const std::string& message) { logger_state().logger->debug(message); }
-void log_debug(HandSide side, const std::string& message) { logger_state().logger->debug("{}{}", hand_prefix(side), message); }
+void log_debug(HandSide side, const std::string& message) { logger_state().logger->debug("{}{}", detail::hand_prefix(side), message); }
 
-void log_info(const std::string& message) { logger_state().logger->info(message); }
-void log_info(HandSide side, const std::string& message) { logger_state().logger->info("{}{}", hand_prefix(side), message); }
+void log_info(HandSide side, const std::string& message) { logger_state().logger->info("{}{}", detail::hand_prefix(side), message); }
 
-void log_warn(const std::string& message) { logger_state().logger->warn(message); }
-void log_warn(HandSide side, const std::string& message) { logger_state().logger->warn("{}{}", hand_prefix(side), message); }
+void log_warn(HandSide side, const std::string& message) { logger_state().logger->warn("{}{}", detail::hand_prefix(side), message); }
+void log_warn(HandSide side, std::uint16_t code, const std::string& message) { log_warn(side, detail::coded_message(code, message)); }
 
-void log_critical(const std::string& message) { logger_state().logger->critical(message); }
-void log_critical(HandSide side, const std::string& message) { logger_state().logger->critical("{}{}", hand_prefix(side), message); }
-
-void log_exception(ErrorCode code, const std::string& message)
-{
-  logger_state().logger->error("[exception] {}: {}", to_string(code), message);
-}
-
-void log_exception(HandSide side, ErrorCode code, const std::string& message)
-{
-  logger_state().logger->error("{}[exception] {}: {}", hand_prefix(side), to_string(code), message);
-}
-
-void log_warn_status(ErrorCode code, const std::string& message)
-{
-  logger_state().logger->warn("{}: {}", to_string(code), message);
-}
+void log_critical(HandSide side, const std::string& message) { logger_state().logger->critical("{}{}", detail::hand_prefix(side), message); }
+void log_critical(HandSide side, std::uint16_t code, const std::string& message) { log_critical(side, detail::coded_message(code, message)); }
 
 }  // namespace aidin_hand2

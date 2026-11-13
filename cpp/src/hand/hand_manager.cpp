@@ -27,20 +27,17 @@ HandManager& HandManager::operator=(HandManager&& other) noexcept = default;
 
 Hand HandManager::create(const HandConfig& config)
 {
-  return guard_boundary("create()", [&] {
-    // interface_name, hand_side and hand_type are already checked by the HandConfig constructor
-    if (config.control_rate <= 0) {
-      throw_error(ErrorCode::InvalidArgument, "Cannot create hand: control_rate must be positive");
-    }
+  return guard_boundary(config.hand_side, "create hand", [&] {
+    // interface_name, hand_side and hand_model are already checked by the HandConfig constructor
     auto core = std::make_shared<HandCore>(config);
     cores_.push_back(core);
-    return Hand(core);
+    return Hand(core, config.hand_side);
   });
 }
 
 void HandManager::destroy(Hand& hand)
 {
-  guard_boundary("destroy()", [&] {
+  guard_boundary(hand.side_, "destroy hand", [&] {
     auto core = hand.core_.lock();
     if (!core) {
       return;
@@ -52,7 +49,7 @@ void HandManager::destroy(Hand& hand)
 
 void HandManager::destroy_all()
 {
-  guard_boundary("destroy_all()", [&] {
+  guard_boundary("destroy hands", [&] {
     for (auto& core : cores_) {
       if (core) core->close();
     }

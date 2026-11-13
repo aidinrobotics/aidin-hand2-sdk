@@ -3,145 +3,83 @@
 #include <array>
 
 #include <aidin_hand2/types/description.hpp>
+#include <aidin_hand2/types/state.hpp>
 
-// Declaration-only on purpose. The equations live in the private aidin-hand2-kinematics
-// repository and reach this tree as prebuilt/<arch>/libaidin_hand2_kinematics_type_<t>.a, one
-// archive per hand type, which the build absorbs into libaidin_hand2.so.
-//
-// The archives are linked by whatever compiler builds this SDK, so their boundary is C, and each
-// hand type's entry points carry its letter so that both archives link at once. Boundary gathers
-// one type's six, boundary_of picks it from the HandType, and the inline adapters below restore
-// the array-taking signatures the rest of the tree calls — each one forwards a pointer.
+#include "types/actuator_constants.hpp"
 
-// Flat-array gen2 kinematics core
-// The long fingers use the hand1 equations, and the thumb is a separate 4-actuator,
-// 5-joint block at the front of the array
+// Solver: one hand model's kinematics as a table of functions, filled in kinematics/<model>/
+// model/ picks the Solver at run time, and the rest of the tree calls through it
 
 namespace aidin_hand2::kinematics
 {
 
-// ---- Layout ----
+// ---------------------------------- Layout ----------------------------------
 
-// ===== THUMB block, at the front of the array =====
+// Thumb, at the front of the arrays
 constexpr int THUMB_ACTUATOR_COUNT       = 4;   // d0..d3
 constexpr int THUMB_JOINT_COUNT          = 5;   // q0..q4
 constexpr int THUMB_ACTIVE_JOINT_COUNT   = 4;   // q0..q3
 constexpr int THUMB_TASK_COUNT           = 3;   // xyz
-constexpr int THUMB_ORIENTED_TASK_COUNT  = 6;   // xyz + dir (orient mode)
+constexpr int THUMB_ORIENTED_TASK_COUNT  = 6;   // xyz + direction
 
-// ===== LONG_FINGER block, the counts being per finger =====
+// Each long finger
 constexpr int LONG_FINGER_COUNT              = 4;   // index, middle, ring, baby
 constexpr int LONG_FINGER_ACTUATOR_COUNT     = 3;   // d1..d3
 constexpr int LONG_FINGER_JOINT_COUNT        = 4;   // q1..q4
 constexpr int LONG_FINGER_ACTIVE_JOINT_COUNT = 3;   // q1..q3
 constexpr int LONG_FINGER_TASK_COUNT         = 3;   // xyz
 
-// ===== totals =====
+// Whole hand
 constexpr int ACTUATOR_NUM      = 16;
 constexpr int JOINT_NUM         = 21;
 constexpr int ACTIVE_JOINT_NUM  = 16;
-constexpr int PASSIVE_JOINT_NUM = 5;   // the 4-bar coupled q4 of each digit, solved by FK
+constexpr int PASSIVE_JOINT_NUM = 5;   // q4 of each finger
 constexpr int TASK_NUM          = 15;
 constexpr int ORIENTED_TASK_NUM = 18;
 
+// ---------------------------------- Solver ----------------------------------
 
-}  // namespace aidin_hand2::kinematics
+// Angles in rad, actuators in encoder count
+struct Solver {
+  // Encoder to joint angles and fingertip task
+  void (*fk_actuator_to_joint)(const std::array<int, ACTUATOR_NUM>& encoder,
+                               std::array<double, JOINT_NUM>& joint, std::array<double, TASK_NUM>& task);
 
-// ---- The archives' C boundary ----
+  // Active joint angles to actuator encoders
+  void (*ik_joint_to_actuator)(const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
+                               std::array<int, ACTUATOR_NUM>& encoder);
 
-extern "C" {
+  // Fingertip xyz to active joint angles
+  void (*ik_task_to_joint)(const std::array<double, TASK_NUM>& task,
+                           std::array<double, ACTIVE_JOINT_NUM>& active_joint);
 
-// HandType::Gen2
-void aidin_hand2_kin_a_fk_actuator_to_joint(const int* encoder, double* joint, double* task);
-void aidin_hand2_kin_a_ik_joint_to_actuator(const double* active_joint, int* encoder);
-void aidin_hand2_kin_a_ik_task_to_joint(const double* task, double* active_joint);
-void aidin_hand2_kin_a_ik_oriented_task_to_joint(const double* task, double* active_joint);
-void aidin_hand2_kin_a_jacobian_actuator_to_joint(const double* active_joint, double* jacobian);
-void aidin_hand2_kin_a_jacobian_joint_to_actuator(const double* active_joint, double* jacobian);
+  // Thumb xyz and direction, long finger xyz to active joint angles
+  void (*ik_oriented_task_to_joint)(const std::array<double, ORIENTED_TASK_NUM>& task,
+                                    std::array<double, ACTIVE_JOINT_NUM>& active_joint);
 
-// HandType::Gen2_B
-void aidin_hand2_kin_b_fk_actuator_to_joint(const int* encoder, double* joint, double* task);
-void aidin_hand2_kin_b_ik_joint_to_actuator(const double* active_joint, int* encoder);
-void aidin_hand2_kin_b_ik_task_to_joint(const double* task, double* active_joint);
-void aidin_hand2_kin_b_ik_oriented_task_to_joint(const double* task, double* active_joint);
-void aidin_hand2_kin_b_jacobian_actuator_to_joint(const double* active_joint, double* jacobian);
-void aidin_hand2_kin_b_jacobian_joint_to_actuator(const double* active_joint, double* jacobian);
+  // d(active joint)/d(encoder), rad per count, row-major 16 x 16
+  void (*jacobian_actuator_to_joint)(const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
+                                     std::array<double, ACTIVE_JOINT_NUM * ACTUATOR_NUM>& jacobian);
 
-}  // extern "C"
+  // d(encoder)/d(active joint), count per rad, row-major 16 x 16
+  void (*jacobian_joint_to_actuator)(const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
+                                     std::array<double, ACTUATOR_NUM * ACTIVE_JOINT_NUM>& jacobian);
 
-// ---- Internal interface, used by HandCore and never shipped in include/ ----
-
-namespace aidin_hand2::kinematics
-{
-
-// One hand type's six entry points
-struct Boundary
-{
-  void (*fk_actuator_to_joint)(const int* encoder, double* joint, double* task);
-  void (*ik_joint_to_actuator)(const double* active_joint, int* encoder);
-  void (*ik_task_to_joint)(const double* task, double* active_joint);
-  void (*ik_oriented_task_to_joint)(const double* task, double* active_joint);
-  void (*jacobian_actuator_to_joint)(const double* active_joint, double* jacobian);
-  void (*jacobian_joint_to_actuator)(const double* active_joint, double* jacobian);
+  // d(passive q4)/d(q3) of each digit, thumb first, rad per rad
+  // The q4 row of d(joint)/d(encoder) is this times the q3 row of the same digit
+  void (*passive_joint_slope)(const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
+                              std::array<double, PASSIVE_JOINT_NUM>& slope);
 };
 
-// The boundary of a hand type
-const Boundary& boundary_of(HandType type);
+// ------------------------- Joint velocity and effort ------------------------
 
-// Encoder to joint angles and fingertip task
-inline void fk_actuator_to_joint(
-  const Boundary& kin,
-  const std::array<int, ACTUATOR_NUM>& encoder,
-  std::array<double, JOINT_NUM>& joint,
-  std::array<double, TASK_NUM>& task)
-{
-  kin.fk_actuator_to_joint(encoder.data(), joint.data(), task.data());
-}
+// rad/s per joint, velocity_rpm through the Jacobian at the pose in state, the passive q4 included
+std::array<double, JOINT_NUM> fk_actuator_to_joint_velocity(
+    const Solver& solver, const ActuatorConstants& actuator, const HandState& state);
 
-// Active joint angles in rad to actuator encoders
-inline void ik_joint_to_actuator(
-  const Boundary& kin,
-  const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
-  std::array<int, ACTUATOR_NUM>& encoder)
-{
-  kin.ik_joint_to_actuator(active_joint.data(), encoder.data());
-}
-
-// task xyz → active joint (Newton-Raphson IK).
-inline void ik_task_to_joint(
-  const Boundary& kin,
-  const std::array<double, TASK_NUM>& task,
-  std::array<double, ACTIVE_JOINT_NUM>& active_joint)
-{
-  kin.ik_task_to_joint(task.data(), active_joint.data());
-}
-
-// Oriented form of ik_task_to_joint, taking a 6-D thumb pose and xyz for the long fingers
-inline void ik_oriented_task_to_joint(
-  const Boundary& kin,
-  const std::array<double, ORIENTED_TASK_NUM>& task,
-  std::array<double, ACTIVE_JOINT_NUM>& active_joint)
-{
-  kin.ik_oriented_task_to_joint(task.data(), active_joint.data());
-}
-
-// Row-major 16 x 16, block diagonal by digit
-// d(active joint)/d(encoder) in rad per count
-inline void jacobian_actuator_to_joint(
-  const Boundary& kin,
-  const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
-  std::array<double, ACTIVE_JOINT_NUM * ACTUATOR_NUM>& jacobian)
-{
-  kin.jacobian_actuator_to_joint(active_joint.data(), jacobian.data());
-}
-
-// d(encoder)/d(active joint) in count per rad
-inline void jacobian_joint_to_actuator(
-  const Boundary& kin,
-  const std::array<double, ACTIVE_JOINT_NUM>& active_joint,
-  std::array<double, ACTUATOR_NUM * ACTIVE_JOINT_NUM>& jacobian)
-{
-  kin.jacobian_joint_to_actuator(active_joint.data(), jacobian.data());
-}
+// Nm per active joint, current_mA through the transposed Jacobian at the pose in state
+// Effort leaves out gear losses
+std::array<double, ACTIVE_JOINT_NUM> fk_actuator_to_joint_effort(
+    const Solver& solver, const ActuatorConstants& actuator, const HandState& state);
 
 }  // namespace aidin_hand2::kinematics

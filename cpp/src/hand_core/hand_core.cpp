@@ -1,7 +1,5 @@
 #include "hand_core/hand_core.hpp"
 
-// if_nametoindex, used to tell a gone interface from a re-created one
-#include <net/if.h>
 #include <time.h>
 
 #include <algorithm>
@@ -12,7 +10,10 @@
 #include <string>
 #include <system_error>
 
+#include <aidin_hand2/version.hpp>
+
 #include "hand_core/lifecycle/action_check.hpp"
+#include "hand_core/model/model_composition.hpp"
 #include "hand_core/util/monotonic_clock.hpp"
 #include "logging/log.hpp"
 
@@ -34,8 +35,12 @@ constexpr double kMaxEffortLimit   = 2000.0;
 // count, where every actuator holds after homing, off the hard stop at 0
 constexpr double kHomeHoldCount = 1000.0;
 
+// Characters, the rules and the key column of the Connection Info block
+constexpr std::size_t kInfoRuleWidth = 68;
+constexpr std::size_t kInfoKeyWidth  = 12;
+
 // Off only under AIDIN_HAND2_WORKSPACE_CLAMP=0, for measuring the reachable limits
-bool workspace_clamp_enabled();
+bool workspace_clamp_enabled(HandSide side);
 
 // A non-finite target would reach a static_cast below, which is undefined behaviour
 template <std::size_t Size>
@@ -43,7 +48,6 @@ bool all_finite(const std::array<double, Size>& values);
 
 // Joint stiffness in [0, 1] and cutoff_freq >= 0, all finite
 Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config);
-
 
 bool is_command_valid(const JointPositionCommand& command);
 bool is_command_valid(const JointImpedanceCommand& command);
@@ -69,19 +73,26 @@ std::string homing_debug_detail(const char* stage,
 // ------------------------------- Construction -------------------------------
 
 HandCore::HandCore(const HandConfig& config)
+: HandCore(config, composition_of(config.hand_model))
+{
+}
+
+HandCore::HandCore(const HandConfig& config, const ModelComposition& composition)
 : comms_(config),
-  period_nanoseconds_(1000000000L / config.control_rate),
   rt_cpu_affinity_(config.rt_cpu_affinity),
   auto_reconnect_(config.auto_reconnect),
   auto_reconnect_timeout_ms_(config.auto_reconnect_timeout_ms),
   auto_reconnect_home_(config.auto_reconnect_home),
   auto_home_(config.auto_home),
-  workspace_clamp_(workspace_clamp_enabled()),
+  workspace_clamp_(workspace_clamp_enabled(config.hand_side)),
   interface_name_(config.interface_name),
   hand_side_(config.hand_side),
-  model_(hand_model_of(config.hand_type)),
-  joint_position_controller_(period_nanoseconds_, model_),
-  joint_impedance_controller_(period_nanoseconds_, model_)
+  hand_model_(config.hand_model),
+  solver_(composition.solver),
+  actuator_(composition.actuator),
+  joint_position_controller_(kPeriodNanoseconds, composition.solver),
+  joint_impedance_controller_(kPeriodNanoseconds, composition.solver, composition.hard_stiffness,
+                              composition.actuator)
 {
   // Seed the buffer so the RT first cycle reads Idle at the default effort
   staging_command_.max_effort_pct.fill(kDefaultMaxEffort);
@@ -106,19 +117,15 @@ Status HandCore::connect()
     log_info(hand_side_, "connect() ignored — already connected");
     return {};
   }
-  const Status connected = comms_.connect();
-  if (!connected.ok()) {
-    return connected;
+  // The CAN layer names the interface and the failure, so the call goes in front here
+  const Status activated = comms_.activate();
+  if (!activated.ok()) {
+    return {activated.code, "cannot connect hand: " + activated.message};
   }
 
   // "auto" may have resolved to a real channel
   interface_name_ = comms_.interface_name();
 
-  const Status session = comms_.run();
-  if (!session.ok()) {
-    comms_.disconnect();
-    return session;
-  }
   check_first_frame_.store(false);
   check_communication_.store(false);
 
@@ -140,15 +147,15 @@ Status HandCore::connect()
     lifecycle_.store(HandLifecycle::Disconnected);
     event_logging_running_.store(false);
     if (event_logging_thread_.joinable()) event_logging_thread_.join();
-    comms_.disconnect();
-    return {ErrorCode::ControlLoopFault,
-            std::string("Cannot connect hand: failed to start SDK threads (") + thread_failure.what() + ")"};
+    comms_.deactivate();
+    return {error_code::kThreadStartFailed,
+            std::string("cannot connect hand: failed to start SDK threads (") + thread_failure.what() + ")"};
   }
 
   // Succeed only once observation has started, so state() never returns a blank snapshot
   if (const Status observed = wait_first_frame("connect hand"); !observed.ok()) {
     stop_control_loop();
-    comms_.disconnect();
+    comms_.deactivate();
     return observed;
   }
   transition_to(HandLifecycle::Connected);
@@ -182,18 +189,15 @@ Status HandCore::disconnect()
         if (Status faulted = check_allowed(HandAction::Disconnect); !faulted.ok()) return faulted;
       }
       if (!check_communication_.load()) {
-        return {ErrorCode::CommunicationLost,
-                "Cannot disconnect hand: cannot confirm stop — no RX on " + interface_name_ +
-                    "; drives may hold last command. Use reconnect() or destroy"};
+        return {error_code::kQuickStopUnconfirmed,
+                "cannot disconnect hand: quick stop not confirmed (CAN communication failed)"};
       }
-      return {ErrorCode::HardwareFault,
-              "Cannot disconnect hand: drives did not reach quick stop within 500 ms — power off the "
-              "hand, or destroy the hand to disconnect anyway"};
+      return {error_code::kQuickStopTimeout,
+              "cannot disconnect hand: drives did not reach quick stop within 500 ms"};
     }
   }
   stop_control_loop();
-  (void)comms_.stop();
-  comms_.disconnect();
+  comms_.deactivate();
   check_first_frame_.store(false);
   check_communication_.store(false);
   transition_to(HandLifecycle::Disconnected);
@@ -206,8 +210,7 @@ Status HandCore::reconnect()
     return allowed;
   }
   stop_control_loop();
-  (void)comms_.stop();
-  comms_.disconnect();
+  comms_.deactivate();
 
   // connect() does not touch the stop verdict or the homing channels
   const StopCause stop_cause_before_reset = last_stop_cause_;
@@ -220,7 +223,7 @@ Status HandCore::reconnect()
   const Status connected = connect();
   if (!connected.ok()) {
     // Stay Faulted so the retry is again reconnect(), and keep the cause that put it there:
-    // a default StopCause renders as "no RX since cycle 0", which never happened
+    // a default StopCause renders as "E404 communication lost", which never happened
     last_stop_cause_ = stop_cause_before_reset;
     lifecycle_.store(HandLifecycle::Faulted);
   }
@@ -235,15 +238,23 @@ void HandCore::close()
   const HandLifecycle control = requested_lifecycle_.load();
   const bool control_requested =
       control == HandLifecycle::Running || control == HandLifecycle::Stopped;
-  if (control_requested && lifecycle_.load() != HandLifecycle::Stopped) {
+  // A faulted hand is not sent anything, and its fault was logged when it happened
+  const HandLifecycle observed = lifecycle_.load();
+  if (control_requested && observed != HandLifecycle::Stopped && observed != HandLifecycle::Faulted) {
     // The drives hold the last command when the link drops, so confirm the stop before cutting TX
     requested_lifecycle_.store(HandLifecycle::Stopped);
     constexpr long kCloseStopTimeoutNanoseconds = 500000000L;
-    if (!wait_observed(HandLifecycle::Stopped, kCloseStopTimeoutNanoseconds)) {
-      log_critical(hand_side_, "drives did not confirm quick stop within " +
-                   std::to_string(kCloseStopTimeoutNanoseconds / 1000000L) +
-                   " ms — destroying anyway; drives may hold last command; "
-                   "power off the hand, or reconnect and stop again to retry the stop");
+    if (!wait_observed(HandLifecycle::Stopped, kCloseStopTimeoutNanoseconds) &&
+        lifecycle_.load() != HandLifecycle::Faulted) {
+      if (!check_communication_.load()) {
+        // The same words stop() throws, as destroy() stops the hand first and has no caller to throw to
+        log_critical(hand_side_, error_code::kQuickStopUnconfirmed,
+                     "cannot stop hand: quick stop not confirmed (CAN communication failed)");
+      } else {
+        log_critical(hand_side_, error_code::kQuickStopTimeout,
+                     "cannot stop hand: drives did not reach quick stop within " +
+                         std::to_string(kCloseStopTimeoutNanoseconds / 1000000L) + " ms");
+      }
     }
   }
   stop_control_loop();
@@ -253,8 +264,7 @@ void HandCore::close()
   if (event_logging_thread_.joinable()) {
     event_logging_thread_.join();
   }
-  (void)comms_.stop();
-  comms_.disconnect();
+  comms_.deactivate();
 
   // Only a session that actually observed something
   if (check_first_frame_.load()) {
@@ -301,15 +311,15 @@ Status HandCore::stop()
     if (lifecycle_.load() == HandLifecycle::Faulted) {
       if (Status faulted = check_allowed(HandAction::Stop); !faulted.ok()) return faulted;
     }
-    // No RX means the stop could not be confirmed, a live link means the drives did not reach it
+    // A failing link means the stop could not be confirmed, a live link means the drives did not
+    // reach it. A lost RX faults within the wait, so a failing link here is a failing TX
     if (!check_communication_.load()) {
-      return {ErrorCode::CommunicationLost,
-              "Cannot stop hand: cannot confirm quick stop — no RX on " + interface_name_ +
-                  "; drives may hold last command. Restore CAN link and hand power"};
+      return {error_code::kQuickStopUnconfirmed,
+              "cannot stop hand: quick stop not confirmed (CAN communication failed)"};
     }
-    return {ErrorCode::HardwareFault,
-            "Cannot stop hand: drives did not reach quick stop within " +
-                std::to_string(kStopTimeoutNanoseconds / 1000000L) + " ms — retry stop() or power off the hand"};
+    return {error_code::kQuickStopTimeout,
+            "cannot stop hand: drives did not reach quick stop within " +
+                std::to_string(kStopTimeoutNanoseconds / 1000000L) + " ms"};
   }
   log_info(hand_side_, "stop() succeeded — control stopped");
   return {};
@@ -331,24 +341,20 @@ Status HandCore::home()
     if (Status allowed = check_allowed(HandAction::Home); !allowed.ok()) {
       return allowed;
     }
-    return {ErrorCode::WrongCallOrder,
-            "Cannot home hand: interrupted during homing — call run() and home() again"};
+    return {error_code::kHomingInterrupted, "cannot home hand: interrupted during homing"};
   }
   if (result_homing_.load()) {
     // The RT completion point already stored the homing state and logged it
     return {};
   }
 
-  // CiA402 wording stays in the debug log, the returned message uses public vocabulary
+  // CiA402 wording stays in the debug log, and the step and reason in the RT log of the failure
   log_debug(hand_side_, homing_debug_detail(comms_.last_homing_failure_stage(),
                                             comms_.last_homing_failed_actuators(),
                                             comms_.last_homing_status_snapshot(),
                                             comms_.last_homing_position_snapshot()));
-  const std::string reason = homing_failure_reason(comms_.last_homing_outcome());
   const std::string actuators = failed_actuator_list(comms_.last_homing_failed_actuators());
-  return {ErrorCode::HardwareFault,
-          "Cannot home hand: " + reason + " (actuators " + actuators +
-              ") — retry home(), or check actuator faults via diagnostics()"};
+  return {error_code::kHomingFailed, "cannot home hand: homing failed (actuators " + actuators + ")"};
 }
 
 Status HandCore::start_homing()
@@ -356,14 +362,15 @@ Status HandCore::start_homing()
   if (Status allowed = check_allowed(HandAction::Home); !allowed.ok()) {
     return allowed;
   }
-  homing_state_.store(HomingState::InProgress);
+  const HomingState previous_homing_state = homing_state_.exchange(HomingState::InProgress);
 
   // Homing moves the hand, so the previous command is void
   reset_command_to_idle();
 
   // Homing is active motion, so control has to be requested first. The sequence enables the
   // drives itself, so this does not wait for them
-  if (Status requested = request_control(); !requested.ok()) {
+  if (Status requested = request_control("home hand"); !requested.ok()) {
+    homing_state_.store(previous_homing_state);
     return requested;
   }
 
@@ -454,10 +461,10 @@ Status HandCore::set_command(const ActuatorEffortCommand& command)
 Status HandCore::set_max_effort(const std::array<double, kActuatorCount>& limit)
 {
   if (request_destroy_.load()) {
-    return {ErrorCode::WrongCallOrder, "Cannot set max effort: hand is destroyed — create a hand"};
+    return hand_destroyed();
   }
   if (!all_finite(limit)) {
-    return {ErrorCode::InvalidArgument, "Cannot set max effort: limit contains NaN/Inf"};
+    return {error_code::kMaxEffortInvalid, "cannot set max effort: limit contains NaN/Inf"};
   }
 
   // Bound here so everything downstream only ever sees [0, kMaxEffortLimit]
@@ -472,13 +479,13 @@ Status HandCore::set_max_effort(const std::array<double, kActuatorCount>& limit)
 Status HandCore::set_controller_config(const ControllerConfig& config)
 {
   if (request_destroy_.load()) {
-    return {ErrorCode::WrongCallOrder, "Cannot set controller config: hand is destroyed — create a hand"};
+    return hand_destroyed();
   }
   const ControllerConfig::JointPositionController& position = config.joint_position_controller;
   if (!std::isfinite(position.cutoff_freq) || position.cutoff_freq < 0.0 ||
       !std::isfinite(position.deadband) || position.deadband < 0.0) {
-    return {ErrorCode::InvalidArgument,
-            "Cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0"};
+    return {error_code::kPositionControllerInvalid,
+            "cannot set controller config: joint position cutoff_freq and deadband must be finite and >= 0"};
   }
   const ControllerConfig::JointImpedanceController& impedance = config.joint_impedance_controller;
   if (Status joint = check_joint_impedance(impedance); !joint.ok()) return joint;
@@ -505,7 +512,7 @@ Status HandCore::reset_tactile_bias()
 HandState HandCore::state() const
 {
   if (request_destroy_.load()) {
-    throw_error(hand_side_, ErrorCode::WrongCallOrder, "Cannot read state: hand is destroyed — create a hand");
+    throw_if_error(hand_side_, hand_destroyed());
   }
   HandState latest{};
   if (state_buffer_.read(latest)) {
@@ -517,7 +524,7 @@ HandState HandCore::state() const
 TactileState HandCore::tactile_bias() const
 {
   if (request_destroy_.load()) {
-    throw_error(hand_side_, ErrorCode::WrongCallOrder, "Cannot read tactile bias: hand is destroyed — create a hand");
+    throw_if_error(hand_side_, hand_destroyed());
   }
   TactileState latest{};
   if (tactile_bias_buffer_.read(latest)) last_tactile_bias_ = latest;
@@ -527,12 +534,15 @@ TactileState HandCore::tactile_bias() const
 Diagnostics HandCore::diagnostics() const
 {
   if (request_destroy_.load()) {
-    throw_error(hand_side_, ErrorCode::WrongCallOrder, "Cannot read diagnostics: hand is destroyed — create a hand");
+    throw_if_error(hand_side_, hand_destroyed());
   }
   Diagnostics latest{};
   if (diagnostics_buffer_.read(latest)) last_diagnostics_ = latest;
   Diagnostics diagnostics = last_diagnostics_;
+  // Loaded first, so last_stop_cause_ is read only after Faulted has been seen
   diagnostics.lifecycle = lifecycle_.load();
+  diagnostics.fault_code =
+      diagnostics.lifecycle == HandLifecycle::Faulted ? stop_cause_code(last_stop_cause_) : 0;
   diagnostics.homing_state = homing_state_.load();
   diagnostics.nan_command_count = count_nan_command_.load(std::memory_order_relaxed);
   return diagnostics;
@@ -556,28 +566,15 @@ Status HandCore::check_allowed(HandAction action, bool require_homed) const
                               last_stop_cause_, homed);
 }
 
-Status HandCore::request_control()
+Status HandCore::request_control(const char* operation)
 {
   const HandLifecycle requested = requested_lifecycle_.load();
   if (requested == HandLifecycle::Running && lifecycle_.load() == HandLifecycle::Running) {
     return {};
   }
-  // A gone or re-created interface cannot resume receiving on this socket
+  // Enabling drives that cannot be observed or reached would leave them uncontrolled
   if (!check_communication_.load()) {
-    const unsigned int current_interface_index = if_nametoindex(interface_name_.c_str());
-    if (current_interface_index == 0) {
-      return {ErrorCode::CommunicationLost,
-              "Cannot enable hand: interface " + interface_name_ +
-                  " is gone — reconnect the CAN adapter, then recover with reconnect()"};
-    }
-    if (static_cast<int>(current_interface_index) != comms_.bound_interface_index()) {
-      return {ErrorCode::CommunicationLost,
-              "Cannot enable hand: interface " + interface_name_ +
-                  " was re-created — recover with reconnect() once the hand faults"};
-    }
-    return {ErrorCode::CommunicationLost,
-            "Cannot enable hand: communication not restored (no RX on " + interface_name_ +
-                ") — restore CAN link and hand power, then recover with reconnect()"};
+    return {error_code::kLinkFailed, std::string("cannot ") + operation + ": CAN communication failed"};
   }
   if (requested == HandLifecycle::Stopped) {
     // Idle first, so the worst case is torque-free until the RT loop fills the hold
@@ -590,28 +587,31 @@ Status HandCore::request_control()
 
 Status HandCore::enable_control()
 {
-  if (Status requested = request_control(); !requested.ok()) {
+  if (Status requested = request_control("run hand"); !requested.ok()) {
     return requested;
   }
   // The same budget the homing enable stage uses, because it is the same drive handshake
   constexpr long kEnableTimeoutNanoseconds = 4000000000L;
   if (!wait_observed(HandLifecycle::Running, kEnableTimeoutNanoseconds)) {
+    // A fault ends the wait early, so the fault cause is the honest answer
+    if (lifecycle_.load() == HandLifecycle::Faulted) {
+      if (Status faulted = check_allowed(HandAction::Run); !faulted.ok()) return faulted;
+    }
+
     // Some actuators may have come up, so the hand is asked to stop instead of being left with the
     // staged command on the wire. Requesting Connected would cut TX and leave whatever came up
     // enabled, with no quick stop to bring it down
     requested_lifecycle_.store(HandLifecycle::Stopped);
     reset_command_to_idle();
 
-    // No RX means the enable could not be confirmed, a live link means the drives did not follow
+    // A failing link means the enable could not be confirmed, a live link means the drives did not
+    // follow
     if (!check_communication_.load()) {
-      return {ErrorCode::CommunicationLost,
-              "Cannot run hand: cannot confirm drive enable — no RX on " + interface_name_ +
-                  "; restore CAN link and hand power, then reconnect()"};
+      return {error_code::kLinkFailed, "cannot run hand: CAN communication failed"};
     }
-    return {ErrorCode::HardwareFault,
-            "Cannot run hand: drives did not reach operation enabled within " +
-                std::to_string(kEnableTimeoutNanoseconds / 1000000L) +
-                " ms — retry run(), or check actuator faults via diagnostics()"};
+    return {error_code::kEnableTimeout,
+            "cannot run hand: drives did not reach operation enabled within " +
+                std::to_string(kEnableTimeoutNanoseconds / 1000000L) + " ms"};
   }
   transition_to(HandLifecycle::Running);
   return {};
@@ -623,10 +623,40 @@ void HandCore::transition_to(HandLifecycle next)
 {
   lifecycle_.store(next);
   switch (next) {
-    case HandLifecycle::Connected:
-      log_info(hand_side_, "connect() succeeded — " + interface_name_ + " at " +
-               std::to_string(1000000000L / period_nanoseconds_) + " Hz, control not running");
+    case HandLifecycle::Connected: {
+      // A Connection Info block between two rules, under the succeeded line and from the first column
+      const auto row = [](std::string key, const std::string& value) {
+        key.resize(kInfoKeyWidth, ' ');
+        return key + value + "\n";
+      };
+      const std::string title  = " Connection Info ";
+      const std::size_t dashes = kInfoRuleWidth - title.size();
+      std::size_t faulted = 0;
+      for (const ActuatorFault fault : diagnostics().actuator_health.fault) {
+        if (fault != ActuatorFault::None) ++faulted;
+      }
+      const RealtimeReport& realtime = realtime_report_;
+
+      std::string text = "connect() succeeded\n" + std::string(dashes - dashes / 2, '-') + title +
+                         std::string(dashes / 2, '-') + "\n";
+      text += row("side", hand_side_ == HandSide::Left ? "left" : "right");
+      text += row("model", to_string(hand_model_));
+      text += row("interface", interface_name_);
+      text += row("rate", std::to_string(1000000000L / kPeriodNanoseconds) + " Hz");
+      text += row("auto_home", auto_home_ ? "on" : "off");
+      text += row("scheduler", realtime.fifo_priority > 0 ? "SCHED_FIFO " + std::to_string(realtime.fifo_priority)
+                                                          : std::string("SCHED_OTHER"));
+      text += row("cpu", std::to_string(realtime.running_cpu));
+      text += row("affinity", rt_cpu_affinity_ >= 0 ? std::to_string(rt_cpu_affinity_) : std::string("none"));
+      text += row("memory", realtime.memory_locked ? "locked" : "not locked");
+      text += row("actuators", std::to_string(kActuatorCount));
+      text += row("disabled", std::to_string(comms_.disabled_actuator_count()));
+      text += row("faulted", std::to_string(faulted));
+      text += row("sdk", kVersionString);
+      text += std::string(kInfoRuleWidth, '-');
+      log_info(hand_side_, text);
       break;
+    }
     case HandLifecycle::Running:
       log_info(hand_side_, "run() succeeded — control active");
       break;
@@ -661,9 +691,9 @@ Status HandCore::wait_first_frame(const char* operation)
     nanosleep(&poll, nullptr);
   }
   if (!check_first_frame_.load()) {
-    return {ErrorCode::CommunicationLost,
-            std::string("Cannot ") + operation + ": no data received from " + interface_name_ +
-                " within 300 ms — check hand power and CAN wiring"};
+    return {error_code::kNoFirstFrame,
+            std::string("cannot ") + operation + ": no data received from " + interface_name_ +
+                " within 300 ms"};
   }
   return {};
 }
@@ -683,10 +713,9 @@ Status HandCore::request_tactile_bias(TactileBiasRequest request, HandAction act
 {
   if (Status allowed = check_allowed(action); !allowed.ok()) return allowed;
 
-  // Without RX the reading is the last frame before the link dropped
+  // Without a live link the reading is the last frame before the link dropped
   if (request == TactileBiasRequest::Set && !check_communication_.load()) {
-    return {ErrorCode::CommunicationLost,
-            "Cannot set tactile bias: no RX on " + interface_name_ + " — restore CAN link and hand power"};
+    return {error_code::kLinkFailed, "cannot set tactile bias: CAN communication failed"};
   }
   request_tactile_bias_.store(request);
   return {};
@@ -694,7 +723,6 @@ Status HandCore::request_tactile_bias(TactileBiasRequest request, HandAction act
 
 void HandCore::reset_fault_state()
 {
-  stop_confirmation_.store(StopConfirmation::Waiting);
   last_stop_cause_ = {};
   request_homing_.store(false);
   active_homing_.store(false);
@@ -720,7 +748,7 @@ void HandCore::reset_command_to_idle()
   command_buffer_.write(staging_command_);
 }
 
-// Count 0 is the hard stop, so the hand backs out of the push pose by kHomeHoldCount and holds there
+// The hand backs out of the push pose to kHomeHoldCount and holds there, off the stop at count 0
 void HandCore::set_command_to_home_hold()
 {
   ActuatorPositionCommand hold{};
@@ -746,12 +774,12 @@ void HandCore::set_command_to_position_hold(const HandState& hand_state)
 namespace
 {
 
-bool workspace_clamp_enabled()
+bool workspace_clamp_enabled(HandSide side)
 {
   const char* value = std::getenv("AIDIN_HAND2_WORKSPACE_CLAMP");
   if (value == nullptr || std::string(value) != "0") return true;
-  log_warn("workspace clamp DISABLED by AIDIN_HAND2_WORKSPACE_CLAMP=0 "
-           "— targets bypass the reachable-workspace limits (limit measurement only)");
+  log_warn(side, "workspace clamp DISABLED by AIDIN_HAND2_WORKSPACE_CLAMP=0 "
+                 "— targets bypass the reachable-workspace limits (limit measurement only)");
   return false;
 }
 
@@ -764,21 +792,19 @@ bool all_finite(const std::array<double, Size>& values)
 
 Status check_joint_impedance(const ControllerConfig::JointImpedanceController& config)
 {
-  const auto fail = [](const char* what) {
-    return Status{ErrorCode::InvalidArgument,
-                  std::string("Cannot set controller config: joint impedance ") + what};
+  const auto fail = [](std::uint16_t code, const char* what) {
+    return Status{code, std::string("cannot set controller config: joint impedance ") + what};
   };
   for (const double stiffness : config.stiffness) {
     if (!std::isfinite(stiffness) || stiffness < 0.0 || stiffness > 1.0) {
-      return fail("stiffness must be finite and in [0, 1]");
+      return fail(error_code::kImpedanceStiffnessInvalid, "stiffness must be finite and in [0, 1]");
     }
   }
   if (!std::isfinite(config.cutoff_freq) || config.cutoff_freq < 0.0) {
-    return fail("cutoff_freq must be finite and >= 0");
+    return fail(error_code::kImpedanceCutoffInvalid, "cutoff_freq must be finite and >= 0");
   }
   return {};
 }
-
 
 bool is_command_valid(const JointPositionCommand& command)
 {
@@ -809,8 +835,7 @@ Status drop_invalid_command(HandSide side, std::atomic<std::uint64_t>& count,
 {
   count.fetch_add(1, std::memory_order_relaxed);
   if (!rejection_active.exchange(true)) {
-    log_warn(side, "set_command: command contains an invalid value — holding previous command; "
-                   "watch nan_command_count");
+    log_warn(side, "set_command: command with an invalid value dropped, previous command kept");
   }
   return {};
 }

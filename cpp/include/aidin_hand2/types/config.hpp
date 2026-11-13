@@ -10,6 +10,7 @@
 
 #include <aidin_hand2/types/description.hpp>
 #include <aidin_hand2/types/error.hpp>
+#include <aidin_hand2/types/error_codes.hpp>
 
 namespace aidin_hand2
 {
@@ -17,29 +18,29 @@ namespace aidin_hand2
 // ------------------------------- Hand config --------------------------------
 
 struct HandConfig {
-  HandConfig(std::string interface_name, HandSide hand_side, HandType hand_type)
-  : interface_name(std::move(interface_name)), hand_side(hand_side), hand_type(hand_type)
+  // Throws E101, E102 or E103 of the error message table
+  HandConfig(std::string interface_name, HandSide hand_side, HandModel hand_model)
+  : interface_name(std::move(interface_name)), hand_side(hand_side), hand_model(hand_model)
   {
     if (this->interface_name.empty()) {
-      throw Exception(ErrorCode::InvalidArgument, "HandConfig: interface_name must not be empty");
+      throw Exception(error_code::kInterfaceNameEmpty,
+                      "cannot create HandConfig: interface_name must not be empty");
     }
     if (hand_side != HandSide::Left && hand_side != HandSide::Right) {
-      throw Exception(ErrorCode::InvalidArgument,
-                      "HandConfig: hand_side must be HandSide::Left or HandSide::Right");
+      throw Exception(error_code::kHandSideInvalid,
+                      "cannot create HandConfig: hand_side must be HandSide::Left or HandSide::Right");
     }
-    if (hand_type != HandType::Gen2 && hand_type != HandType::Gen2_B) {
-      throw Exception(ErrorCode::InvalidArgument,
-                      "HandConfig: hand_type must be HandType::Gen2 or HandType::Gen2_B");
+    if (hand_model != HandModel::Gen2 && hand_model != HandModel::Gen2B) {
+      throw Exception(error_code::kHandModelInvalid,
+                      "cannot create HandConfig: hand_model must be HandModel::Gen2 or HandModel::Gen2B");
     }
   }
 
   // "can0", or "auto" to scan for this hand's channel
   std::string interface_name;
   HandSide    hand_side;
-  HandType    hand_type;
+  HandModel   hand_model;
 
-  // Hz
-  int control_rate{500};
   bool auto_home{true};
 
   // -1 = unset
@@ -67,7 +68,7 @@ struct ControllerConfig {
   };
   struct JointImpedanceController {
     // Per active joint, in the order of JointImpedanceCommand::target
-    // 0..1, 1 = the joint's hard stiffness; the damping follows from it at a fixed damping ratio
+    // 0..1, 1 = the joint's hard stiffness
     std::array<double, kActiveJointCount> stiffness{
         0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
         0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8};

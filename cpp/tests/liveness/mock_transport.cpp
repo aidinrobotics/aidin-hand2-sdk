@@ -7,8 +7,8 @@
 // privileges. Production code and CMake are untouched; the substitution is
 // purely which .cpp gets compiled into the test target.
 //
-// The class layout (private members fd_, last_send_errno_, bound_interface_index_
-// and the inline is_open()/last_send_errno()/bound_interface_index()) is fixed by
+// The class layout (private members fd_, last_send_errno_ and the inline
+// is_open()/last_send_errno()) is fixed by
 // transport.hpp — we may only supply the out-of-line method bodies. All mock
 // state therefore lives in file-scope globals below.
 
@@ -22,6 +22,7 @@
 #include <cstring>
 
 #include "hand_core/comms/canfd/protocol.hpp"          // frame layout constants / IDs (reused)
+#include <aidin_hand2/types/error_codes.hpp>
 #include "hand_core/comms/state_machine/cia402.hpp"  // status_word::kQuickStopActive
 #include "tests/liveness/mock_transport.hpp"
 
@@ -43,6 +44,10 @@ std::atomic<bool> g_emitted_this_drain{false};
 // is harmless, while the correct-side frame decodes as Decoded within a cycle or
 // two. This keeps the mock side-agnostic.
 std::atomic<unsigned> g_drain_counter{0};
+
+// Set by send() when a control word frame (left 0x213, right 0x113) carries 0x0002
+// in its first slot, which is the quick stop write() forces.
+std::atomic<bool> g_quick_stop_sent{false};
 
 // CiA402 statusword written into every actuator slot: Operation Enabled
 // (bits 0,1,2) + kQuickStopActive (bit5, active-LOW == "alive"). error_code = 0.
@@ -71,11 +76,17 @@ void set_mode(Mode mode) noexcept
   g_mode.store(static_cast<int>(mode), std::memory_order_relaxed);
   g_emitted_this_drain.store(false, std::memory_order_relaxed);
   g_drain_counter.store(0, std::memory_order_relaxed);
+  g_quick_stop_sent.store(false, std::memory_order_relaxed);
 }
 
 Mode get_mode() noexcept
 {
   return static_cast<Mode>(g_mode.load(std::memory_order_relaxed));
+}
+
+bool quick_stop_sent() noexcept
+{
+  return g_quick_stop_sent.load(std::memory_order_relaxed);
 }
 
 }  // namespace aidin_hand2::mock
@@ -93,10 +104,9 @@ Transport::~Transport()
 Status Transport::open(const std::string& /*interface*/)
 {
   if (fd_ >= 0) {
-    return {ErrorCode::WrongCallOrder, "mock transport already open"};
+    return {error_code::kInternalState, "mock transport already open"};
   }
-  fd_ = 1;                     // any non-negative value ⇒ is_open() == true
-  bound_interface_index_ = 1;  // stable, non-zero ⇒ enable_control()'s index gate passes
+  fd_ = 1;  // any non-negative value ⇒ is_open() == true
   last_send_errno_ = 0;
   return {};  // ok
 }
@@ -131,10 +141,14 @@ bool Transport::recv(canfd_frame& frame)
 
 // TX seam — always accepted (link is "alive"), so write_ok stays true and the
 // comm-liveness measurement never flags a transmit failure.
-bool Transport::send(const canfd_frame& /*frame*/)
+bool Transport::send(const canfd_frame& frame)
 {
   if (fd_ < 0) {
     return false;
+  }
+  const bool control_word = frame.can_id == 0x213u || frame.can_id == 0x113u;
+  if (control_word && frame.data[0] == 0x02 && frame.data[1] == 0x00) {
+    mock::g_quick_stop_sent.store(true, std::memory_order_relaxed);
   }
   last_send_errno_ = 0;
   return true;
@@ -145,16 +159,11 @@ bool Transport::set_id_filters(const std::vector<can_filter>& /*filters*/)
   return fd_ >= 0;
 }
 
-bool Transport::set_error_mask(can_err_mask_t /*mask*/)
-{
-  return fd_ >= 0;
-}
-
 Status Transport::open_failure(const std::string& interface, int /*err*/)
 {
   // Unreachable in the mock (open never fails), but the symbol is declared in the
   // header, so provide a definition to keep the class complete.
-  return {ErrorCode::InterfaceUnavailable, "mock transport open failed: " + interface};
+  return {error_code::kInterfaceOpenFailed, "mock transport open failed: " + interface};
 }
 
 }  // namespace aidin_hand2::canfd

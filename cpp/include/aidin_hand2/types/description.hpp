@@ -4,10 +4,8 @@
 #pragma once
 
 #include <array>
-#include <cctype>
 #include <cstddef>
 #include <optional>
-#include <string>
 #include <string_view>
 
 namespace aidin_hand2
@@ -43,28 +41,6 @@ enum class HandSide {
   Right,
 };
 
-// Gen2_B carries the 2 mm lead on the thumb d1 and d2 screws, Gen2 the 1 mm lead
-enum class HandType {
-  Gen2,
-  Gen2_B,
-};
-
-// "gen2" or "gen2-b" in any letter case, "gen2_b" too; nullopt for anything else
-inline std::optional<HandType> parse_hand_type(std::string_view text)
-{
-  std::string lower(text);
-  for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  if (lower == "gen2") return HandType::Gen2;
-  if (lower == "gen2-b" || lower == "gen2_b") return HandType::Gen2_B;
-  return std::nullopt;
-}
-
-// "gen2" or "gen2-b"
-inline const char* to_string(HandType type)
-{
-  return type == HandType::Gen2_B ? "gen2-b" : "gen2";
-}
-
 enum class Finger {
   Thumb,
   Index,
@@ -72,5 +48,40 @@ enum class Finger {
   Ring,
   Baby,
 };
+
+// -------------------------------- Hand model --------------------------------
+
+// The robot hand's model, given with the hand
+enum class HandModel {
+  Gen2,
+  Gen2B,
+};
+
+// HandModel name for launch arguments and settings
+[[nodiscard]] constexpr const char* to_string(HandModel model) noexcept
+{
+  switch (model) {
+    case HandModel::Gen2: return "gen2";
+    case HandModel::Gen2B: return "gen2b";
+  }
+  return "gen2";
+}
+
+// "gen2" or "gen2b" in any letter case, nullopt for anything else
+[[nodiscard]] constexpr std::optional<HandModel> parse_hand_model(std::string_view text) noexcept
+{
+  const auto matches = [text](std::string_view name) {
+    if (text.size() != name.size()) return false;
+    for (std::size_t i = 0; i < name.size(); ++i) {
+      const char lower =
+          (text[i] >= 'A' && text[i] <= 'Z') ? static_cast<char>(text[i] - 'A' + 'a') : text[i];
+      if (lower != name[i]) return false;
+    }
+    return true;
+  };
+  if (matches("gen2")) return HandModel::Gen2;
+  if (matches("gen2b")) return HandModel::Gen2B;
+  return std::nullopt;
+}
 
 }  // namespace aidin_hand2

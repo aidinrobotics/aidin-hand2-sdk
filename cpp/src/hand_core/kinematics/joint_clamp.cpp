@@ -51,7 +51,7 @@ struct BoundaryPiece
 constexpr std::size_t kLongPieceCount  = 5;
 constexpr std::size_t kThumbPieceCount = 4;
 
-// Shared by index, middle, ring and baby, tuned on the 2026-10-01 right hand (hand type a)
+// Shared by index, middle, ring and baby, tuned on the 2026-10-01 right hand (Gen2)
 constexpr std::array<BoundaryPiece, kLongPieceCount> kLongBoundary{{
     // kind            flexion lo    hi   abduction lo   hi    arc centre flexion  centre abduction  signed radius
     {PieceKind::Arc,    0.00,  11.56,    0.00,  30.00, -142.7639230149,   72.2389250017, -160.0},
@@ -94,7 +94,7 @@ constexpr std::array<LongDistal, 4> kLongDistals{{
 }};
 
 // Long j3 floor constants, a0..a10 and b0..b8 of docs 14 section 3.2, printed there to the same digits
-// They fold the long finger linkage of hand type a, which type b shares, into ratios; the formula
+// They fold the long finger linkage of Gen2, which Gen2B shares, into ratios; the formula
 // matches the angle at which the j3 actuator meets its home stop within 0.0004 deg
 constexpr std::array<double, 11> kDistalFloorA{{
     0.819728, 1.79827, 0.287368, 0.142105, 0.371072, 0.34125, 0.16875, 1.02019, 0.0825804, 0.574736, 0.28421,

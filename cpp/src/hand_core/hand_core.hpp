@@ -16,11 +16,11 @@
 #include "hand_core/comms/hand_comms.hpp"
 #include "hand_core/controllers/joint_impedance_controller.hpp"
 #include "hand_core/controllers/joint_position_controller.hpp"
-#include "hand_core/hand_model.hpp"
+#include "hand_core/kinematics/kinematics.hpp"
 #include "hand_core/lifecycle/action_check.hpp"
+#include "types/actuator_constants.hpp"
 #include "types/hand_command.hpp"
 #include "types/realtime_buffer.hpp"
-#include "types/stop_confirmation.hpp"
 #include "types/realtime_event_ring.hpp"
 #include "types/status.hpp"
 
@@ -28,6 +28,8 @@ namespace aidin_hand2
 {
 
 namespace test { struct HandCoreTestPeer; }
+
+struct ModelComposition;
 
 // Execution unit owned by HandManager: HandComms, the RT control thread and the state buffers
 // Three threads that never call each other, they meet only on the channels drawn below
@@ -42,7 +44,6 @@ namespace test { struct HandCoreTestPeer; }
 //                         <- tactile_bias_buffer_ <------
 //   connect/run/stop ------> requested_lifecycle_ ------->
 //                         <- lifecycle_ <----------------
-//                         <- stop_confirmation_ <--------
 //   state/diagnostics     <- state_buffer_ <-------------
 //                                          event_ring_ -------------> log text
 //
@@ -128,7 +129,20 @@ class HandCore {
   // What set_tactile_bias() and reset_tactile_bias() ask the RT loop for
   enum class TactileBiasRequest { None, Set, Reset };
 
+  // What apply_realtime_scheduling() got, for the connect log
+  struct RealtimeReport {
+    // 0 = SCHED_FIFO not applied
+    int  fifo_priority{0};
+    int  running_cpu{-1};
+    bool memory_locked{false};
+  };
+
   // =============================== Functions ================================
+
+  // ------------------------------ Construction ------------------------------
+
+  // The public constructor picks the model's composition once and builds the hand from it
+  HandCore(const HandConfig& config, const ModelComposition& composition);
 
   // ---------------------------- State transition ----------------------------
 
@@ -136,7 +150,8 @@ class HandCore {
   [[nodiscard]] Status check_allowed(HandAction action, bool require_homed = true) const;
 
   // Request control without waiting for the drives, which is what homing needs
-  [[nodiscard]] Status request_control();
+  // operation is the "<action>" of a "cannot <action>: " message, as in "run hand"
+  [[nodiscard]] Status request_control(const char* operation);
 
   // request_control() plus the wait for the drives to confirm the enable, which run() needs
   [[nodiscard]] Status enable_control();
@@ -179,15 +194,8 @@ class HandCore {
     std::array<ActuatorFault, kActuatorCount> previous_fault{};
     bool          previous_receiving{true};
     bool          first_frame_reported{false};
-    bool          previous_latched{false};
     bool          homing_was_active{false};
     HomingPhase   previous_homing_phase{};
-
-    // One latch episode, reporting each outcome once
-    long confirmation_cycles{0};
-    bool confirmation_by_fault{false};
-    bool confirmation_confirmed_reported{false};
-    bool confirmation_not_confirmed_reported{false};
 
     std::uint64_t deadline_misses{0};
     long          previous_cycle_start{0};
@@ -202,8 +210,8 @@ class HandCore {
   // ----------------------- Loop internals [RT thread] -----------------------
 
   // Best effort: SCHED_FIFO and affinity for this thread, and in RAM its stack between the two
-  // addresses, this core and the SDK's code; logs what was applied
-  void apply_realtime_scheduling(std::uintptr_t stack_floor, std::uintptr_t stack_top) const;
+  // addresses, this core and the SDK's code; warns on what failed and fills realtime_report_
+  void apply_realtime_scheduling(std::uintptr_t stack_floor, std::uintptr_t stack_top);
 
   // One in-loop link retry while Faulted
   [[nodiscard]] bool try_reconnect_once();
@@ -223,12 +231,10 @@ class HandCore {
                                 std::uint64_t cycle, long loss_cycles);
 
   void watch_actuator_faults(LoopState& loop, const ActuatorHealth& actuator_health,
-                             HandLifecycle observed, std::uint64_t cycle);
+                             std::uint64_t cycle);
 
   // The only place drive evidence moves the observed lifecycle
   void watch_drive_state(bool receiving);
-
-  void watch_stop_verdict(LoopState& loop, bool receiving, std::uint64_t cycle, long window);
 
   void watch_homing(LoopState& loop, std::uint64_t cycle);
 
@@ -246,7 +252,9 @@ class HandCore {
   // Fixed after construction, declaration order is constructor order
 
   HandComms comms_;
-  long period_nanoseconds_;
+
+  // 500 Hz, the rate the robot hand sends its state at
+  static constexpr long kPeriodNanoseconds = 2000000L;
 
   // -1 = unset
   int  rt_cpu_affinity_;
@@ -265,8 +273,10 @@ class HandCore {
   std::string interface_name_;
   HandSide    hand_side_;
 
-  // Kinematics and hard stiffness of this hand's type
-  const HandModel& model_;
+  // This hand's model, and the solver and actuators the loop uses from its composition
+  HandModel                 hand_model_;
+  const kinematics::Solver& solver_;
+  ActuatorConstants         actuator_;
 
   // ---------------- Single thread: plain [RT, user, logging] ----------------
 
@@ -276,6 +286,9 @@ class HandCore {
 
   // [RT] holds the last solved angle for joints FK could not solve
   std::array<double, kJointCount> last_valid_joint_rad_{};
+
+  // [RT] written before the first frame, so connect() reads it after wait_first_frame()
+  RealtimeReport realtime_report_{};
 
   // [RT] subtracted from every tactile reading, kept across connects until reset
   TactileState tactile_bias_{};
@@ -327,9 +340,7 @@ class HandCore {
   // Fact, written by RT from drive evidence and by the user thread once the socket is closed
   std::atomic<HandLifecycle> lifecycle_{HandLifecycle::Disconnected};
 
-  // Stop verdict for the event log, written by RT
-  // last_stop_cause_ is written before the release store to lifecycle_, read after the acquire
-  std::atomic<StopConfirmation> stop_confirmation_{StopConfirmation::Waiting};
+  // Written before the release store to lifecycle_, read after the acquire
   StopCause last_stop_cause_{};
 
   // Homing, home() requests, the RT loop runs it and mirrors the result back

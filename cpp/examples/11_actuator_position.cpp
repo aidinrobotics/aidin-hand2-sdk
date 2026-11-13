@@ -12,7 +12,7 @@
 // safe way to use this command: read where the actuator is, offset from there. The example
 // then sends a count past the int32 range to show the one value check that does apply.
 //
-// Run as: 11_actuator_position [right|left] [interface=can0] [hand_type=gen2|gen2-b]
+// Run as: 11_actuator_position [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, and the index finger then
 // steps away from its homed count and back.
 
@@ -43,17 +43,19 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
-  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   // One of the index finger's three actuators, which are 4, 5 and 6. Everything this example
   // prints is in actuator space, so no index mapping comes up.
   constexpr std::size_t kActuator = 5;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -82,10 +84,9 @@ int main(int argc, char** argv)
       command.target[a] = homed.actuators.position_count[a];
     }
 
-    // 4) Step the one actuator out and back, twice. A count is a fraction of a millimetre of
-    //    screw travel rather than an angle, and on a long finger 8192 of them make 1 mm, so
-    //    these two offsets are 1 mm and 2 mm. The thumb screws have a finer lead and take
-    //    16384 counts per millimetre, which is why an offset means different travel there.
+    // 4) Step the one actuator out and back, twice. The offsets are encoder counts rather than
+    //    an angle, and how far a count moves an actuator depends on the actuator and the hand
+    //    model.
     const double base = command.target[kActuator];
     for (const double offset : {8192.0, 0.0, 16384.0, 0.0}) {
       if (g_shutdown.load()) break;
@@ -136,7 +137,7 @@ int main(int argc, char** argv)
     hand.stop();
     std::printf("[example] done — this command is not workspace-clamped, so the limits are yours to hold\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

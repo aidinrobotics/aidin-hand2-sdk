@@ -49,8 +49,7 @@ void check(bool ok, const char* what)
 // 소켓을 열지 않는다. 생성만 한다.
 HandConfig make_config()
 {
-  HandConfig config{"ah2_no_such_iface", HandSide::Right, HandType::Gen2};
-  config.control_rate = 500;
+  HandConfig config{"ah2_no_such_iface", HandSide::Right, HandModel::Gen2};
   config.auto_reconnect = false;
   return config;
 }
@@ -144,9 +143,9 @@ void test_refused_without_loop()
 {
   HandCore core{make_config()};
   const Status set = core.set_tactile_bias();
-  check(!set.ok() && set.code == ErrorCode::WrongCallOrder, "(f) Disconnected 에서 set 은 WrongCallOrder");
+  check(!set.ok() && set.kind() == ErrorKind::WrongCallOrder, "(f) Disconnected 에서 set 은 WrongCallOrder");
   const Status reset = core.reset_tactile_bias();
-  check(!reset.ok() && reset.code == ErrorCode::WrongCallOrder, "(f) Disconnected 에서 reset 은 WrongCallOrder");
+  check(!reset.ok() && reset.kind() == ErrorKind::WrongCallOrder, "(f) Disconnected 에서 reset 은 WrongCallOrder");
 }
 
 }  // namespace

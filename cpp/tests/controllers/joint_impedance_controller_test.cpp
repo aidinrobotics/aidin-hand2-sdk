@@ -5,7 +5,7 @@
 //      stiffness 램프, hard stop 여유.
 //   4) 마찰 보상: Coulomb + 점성을 impedance effort 를 직접 넣어 보고, compute() 가 더하는지 본다.
 // 기준값은 Gen2 kinematics 로 기준 자세(엄지 20/20/0/20°, 긴 손가락 0/20/20°)에서 구했다.
-// Gen2_B 는 엄지 d1·d2 리드(2 mm)만 달라 같은 torque 에 그 쌍의 effort 가 두 배이고 hard stiffness 가 1/4 이다.
+// Gen2B 는 같은 torque 에 엄지 d1·d2 쌍의 effort 가 두 배이고 그 쌍의 hard stiffness 가 1/4 이다.
 
 #include <array>
 #include <cmath>
@@ -18,7 +18,7 @@
 
 #include "hand_core/comms/canfd/protocol.hpp"
 #include "hand_core/controllers/joint_impedance_controller.hpp"
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
+#include "hand_core/model/model_composition.hpp"
 
 using namespace aidin_hand2;
 
@@ -40,8 +40,8 @@ using Config = ControllerConfig::JointImpedanceController;
 using Active = std::array<double, kActiveJointCount>;
 
 // 숫자 기준값은 모두 Gen2 의 것이다.
-const HandModel& kGen2  = hand_model_of(HandType::Gen2);
-const HandModel& kGen2B = hand_model_of(HandType::Gen2_B);
+const ModelComposition& kGen2  = kGen2Composition;
+const ModelComposition& kGen2B = kGen2BComposition;
 
 // 엄지 q0..q3, 긴 손가락마다 q1..q3 (deg)
 Active pose_deg(std::array<double, 4> thumb, std::array<double, 3> finger)
@@ -62,11 +62,11 @@ struct Jacobians {
   controllers::JointJacobian count_per_joint{};
 };
 
-Jacobians jacobians_at(const HandModel& model, const Active& q)
+Jacobians jacobians_at(const ModelComposition& model, const Active& q)
 {
   Jacobians j{};
-  kinematics::jacobian_actuator_to_joint(model.kinematics, q, j.joint_per_count);
-  kinematics::jacobian_joint_to_actuator(model.kinematics, q, j.count_per_joint);
+  model.solver.jacobian_actuator_to_joint(q, j.joint_per_count);
+  model.solver.jacobian_joint_to_actuator(q, j.count_per_joint);
   return j;
 }
 
@@ -93,12 +93,12 @@ bool efforts_are(const std::array<double, kActuatorCount>& effort,
   return true;
 }
 
-// ── Test 1: joint torque → actuator effort. s 는 엄지 d1·d2 쌍의 리드 배율(Gen2 1, Gen2_B 2) ──
-void test_joint_torque_to_effort(const HandModel& model, double s)
+// ── Test 1: joint torque → actuator effort. s 는 엄지 d1·d2 쌍의 effort 배율(Gen2 1, Gen2B 2) ──
+void test_joint_torque_to_effort(const ModelComposition& model, double s)
 {
   const Jacobians j = jacobians_at(model, reference_pose());
   auto effort = [&](std::size_t joint, double k) {
-    return controllers::joint_torque_to_effort(torque_on(joint, k * kDeg), j.joint_per_count);
+    return controllers::joint_torque_to_effort(model.actuator, torque_on(joint, k * kDeg), j.joint_per_count);
   };
   check(efforts_are(effort(0, 27), {{0, 319.57}}), "thumb j0 1 deg at K 27");
   check(efforts_are(effort(1, 90), {{1, 323.94 * s}, {2, 323.94 * s}}), "thumb j1 is the common mode of d1 d2");
@@ -111,8 +111,8 @@ void test_joint_torque_to_effort(const HandModel& model, double s)
 
   // 엄지 q2 20°: 두 rod 의 몫이 갈라져도 j1 torque 는 j1 에만 걸린다.
   const Jacobians tilted = jacobians_at(model, pose_deg({20, 20, 20, 20}, {0, 20, 20}));
-  const auto split = controllers::joint_torque_to_effort(torque_on(1, 90 * kDeg), tilted.joint_per_count);
-  check(efforts_are(split, {{1, 308.99 * s}, {2, 373.60 * s}}), "thumb j1 at j2 20 deg splits 308.99 / 373.60 (x2 on Gen2_B)");
+  const auto split = controllers::joint_torque_to_effort(model.actuator, torque_on(1, 90 * kDeg), tilted.joint_per_count);
+  check(efforts_are(split, {{1, 308.99 * s}, {2, 373.60 * s}}), "thumb j1 at j2 20 deg splits 308.99 / 373.60 (x2 on Gen2B)");
   Active back{};
   for (std::size_t q = 0; q < kActiveJointCount; ++q) {
     for (std::size_t i = 0; i < kActuatorCount; ++i) {
@@ -128,7 +128,8 @@ void test_joint_impedance_torque()
 {
   const Active q = reference_pose();
   const Jacobians j = jacobians_at(kGen2, q);
-  const auto& hard = kGen2.hard_stiffness;
+  const auto& hard     = kGen2.hard_stiffness;
+  const auto& actuator = kGen2.actuator;
   Config config{};
   config.stiffness.fill(0.0);
   config.stiffness[0] = 1.0;
@@ -137,14 +138,14 @@ void test_joint_impedance_torque()
   Active target = q;
   target[0] += 1.0 * kDeg;
   const Active still{};
-  const Active spring = controllers::joint_impedance_torque(hard, target, q, still, config.stiffness, j.count_per_joint);
+  const Active spring = controllers::joint_impedance_torque(hard, actuator,target, q, still, config.stiffness, j.count_per_joint);
   bool others_zero = true;
   for (std::size_t k = 1; k < kActiveJointCount; ++k) others_zero = others_zero && spring[k] == 0.0;
   check(std::abs(spring[0] - 0.478220) < 1e-6 && others_zero, "stiffness 1 is the hard stiffness times the joint error");
 
   Config middle = config;
   middle.stiffness[0] = 0.5;
-  check(std::abs(controllers::joint_impedance_torque(hard, target, q, still, middle.stiffness, j.count_per_joint)[0] -
+  check(std::abs(controllers::joint_impedance_torque(hard, actuator,target, q, still, middle.stiffness, j.count_per_joint)[0] -
                  0.239110) < 1e-6,
         "stiffness scales the hard stiffness linearly");
 
@@ -152,25 +153,25 @@ void test_joint_impedance_torque()
   // 엄지 j0 의 감쇠비는 0.62 로 고정이라 D = 0.37972.
   Active moving{};
   moving[0] = 0.61698;
-  const Active damped = controllers::joint_impedance_torque(hard, q, q, moving, config.stiffness, j.count_per_joint);
+  const Active damped = controllers::joint_impedance_torque(hard, actuator,q, q, moving, config.stiffness, j.count_per_joint);
   check(std::abs(damped[0] - (-0.234279)) < 1e-4, "thumb j0 damping ratio is 0.62");
 
   Config soft = config;
   soft.stiffness[0] = 0.0;
-  check(controllers::joint_impedance_torque(hard, q, q, moving, soft.stiffness, j.count_per_joint)[0] == 0.0,
+  check(controllers::joint_impedance_torque(hard, actuator,q, q, moving, soft.stiffness, j.count_per_joint)[0] == 0.0,
         "no stiffness, no damping");
 
-  // Gen2_B 의 엄지 j1 hard 는 15 N·m/rad(Gen2 60 의 1/4), 1° 오차에 0.261799.
+  // Gen2B 의 엄지 j1 hard 는 15 N·m/rad(Gen2 60 의 1/4), 1° 오차에 0.261799.
   Config thumb_j1{};
   thumb_j1.stiffness.fill(0.0);
   thumb_j1.stiffness[1] = 1.0;
   Active j1_target = q;
   j1_target[1] += 1.0 * kDeg;
   const Jacobians jb = jacobians_at(kGen2B, q);
-  check(std::abs(controllers::joint_impedance_torque(kGen2B.hard_stiffness, j1_target, q, still, thumb_j1.stiffness,
-                                                     jb.count_per_joint)[1] - 0.261799) < 1e-6,
-        "Gen2_B thumb j1 stiffness 1 is 15 N m/rad");
-  check(std::abs(controllers::joint_impedance_torque(hard, j1_target, q, still, thumb_j1.stiffness,
+  check(std::abs(controllers::joint_impedance_torque(kGen2B.hard_stiffness, kGen2B.actuator, j1_target, q, still,
+                                                     thumb_j1.stiffness, jb.count_per_joint)[1] - 0.261799) < 1e-6,
+        "Gen2B thumb j1 stiffness 1 is 15 N m/rad");
+  check(std::abs(controllers::joint_impedance_torque(hard, actuator,j1_target, q, still, thumb_j1.stiffness,
                                                      j.count_per_joint)[1] - 1.047198) < 1e-6,
         "Gen2 thumb j1 stiffness 1 is 60 N m/rad");
 
@@ -181,14 +182,14 @@ void test_joint_impedance_torque()
   j3.stiffness[9] = 1.0;
   Active bent = q;
   bent[9] += 1.0 * kDeg;
-  check(std::abs(controllers::joint_impedance_torque(hard, bent, q, still, j3.stiffness, j.count_per_joint)[9] - 0.18151) <
+  check(std::abs(controllers::joint_impedance_torque(hard, actuator,bent, q, still, j3.stiffness, j.count_per_joint)[9] - 0.18151) <
             1e-3,
         "long finger j3 stiffness 1 holds the motor-side stiffness at (0, 20, 20)");
   const Active flexed = pose_deg({20, 20, 0, 20}, {0, 80, 0});
   Active flexed_target = flexed;
   flexed_target[9] += 1.0 * kDeg;
   const Jacobians at_flexed = jacobians_at(kGen2, flexed);
-  check(std::abs(controllers::joint_impedance_torque(hard, flexed_target, flexed, still, j3.stiffness,
+  check(std::abs(controllers::joint_impedance_torque(hard, actuator,flexed_target, flexed, still, j3.stiffness,
                                                      at_flexed.count_per_joint)[9] -
                  0.26859) < 1e-4,
         "long finger j3 hard stiffness stops at the cap");
@@ -201,7 +202,7 @@ HandState state_from_counts(const std::array<int, kActuatorCount>& count)
   for (std::size_t i = 0; i < kActuatorCount; ++i) state.actuators.position_count[i] = count[i];
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM> task{};
-  kinematics::fk_actuator_to_joint(kGen2.kinematics, count, joint, task);
+  kGen2.solver.fk_actuator_to_joint(count, joint, task);
   for (std::size_t k = 0; k < kJointCount; ++k) state.joints.position_rad[k] = joint[k];
   return state;
 }
@@ -210,7 +211,7 @@ HandState state_from_counts(const std::array<int, kActuatorCount>& count)
 HandState state_at(const Active& q)
 {
   std::array<int, kActuatorCount> count{};
-  kinematics::ik_joint_to_actuator(kGen2.kinematics, q, count);
+  kGen2.solver.ik_joint_to_actuator(q, count);
   return state_from_counts(count);
 }
 
@@ -238,7 +239,7 @@ Config thumb_j0_gains()
 // 상태를 고정한 채 100 주기(목표가 250°/s 제한 아래 50° 까지 닿는 시간) 돌린 마지막 frame.
 canfd::CommandFrames run_settled(const Active& target, const Config& config, const HandState& state, double max_effort)
 {
-  controllers::JointImpedanceController controller(kPeriodNs, kGen2);
+  controllers::JointImpedanceController controller(kPeriodNs, kGen2.solver, kGen2.hard_stiffness, kGen2.actuator);
   JointImpedanceCommand command{};
   command.target = target;
   std::array<double, kActuatorCount> limit{};
@@ -303,7 +304,7 @@ void test_compute()
   {
     Config filtered = thumb_j0_gains();
     filtered.filter_enabled = true;
-    controllers::JointImpedanceController controller(kPeriodNs, kGen2);
+    controllers::JointImpedanceController controller(kPeriodNs, kGen2.solver, kGen2.hard_stiffness, kGen2.actuator);
     JointImpedanceCommand command{};
     command.target = target;
     std::array<double, kActuatorCount> limit{};
@@ -318,7 +319,7 @@ void test_compute()
 
   // g. 목표는 250°/s 로만 움직인다: 1° 계단은 첫 주기에 0.5°(162.15), 두 번째 주기에 1°(324.30).
   {
-    controllers::JointImpedanceController controller(kPeriodNs, kGen2);
+    controllers::JointImpedanceController controller(kPeriodNs, kGen2.solver, kGen2.hard_stiffness, kGen2.actuator);
     JointImpedanceCommand command{};
     command.target = target;
     std::array<double, kActuatorCount> limit{};
@@ -334,7 +335,7 @@ void test_compute()
   // h. 새 stiffness 는 0.2 s 시정수로 다가간다: 1 → 0.5 로 바꾼 다음 주기는 0.995 → 322.7.
   {
     Config ramp = thumb_j0_gains();
-    controllers::JointImpedanceController controller(kPeriodNs, kGen2);
+    controllers::JointImpedanceController controller(kPeriodNs, kGen2.solver, kGen2.hard_stiffness, kGen2.actuator);
     JointImpedanceCommand command{};
     command.target = target;
     std::array<double, kActuatorCount> limit{};
@@ -348,7 +349,7 @@ void test_compute()
 
   // 엄지 j0 2° 자세(d0 4197). i·j 는 d0 만 바꾼다.
   std::array<int, kActuatorCount> near_stop{};
-  kinematics::ik_joint_to_actuator(kGen2.kinematics, pose_deg({2, 20, 0, 20}, {0, 20, 20}), near_stop);
+  kGen2.solver.ik_joint_to_actuator(pose_deg({2, 20, 0, 20}, {0, 20, 20}), near_stop);
 
   // i. −1° 목표는 d0 1000(0.486°)으로 올라간다.
   {

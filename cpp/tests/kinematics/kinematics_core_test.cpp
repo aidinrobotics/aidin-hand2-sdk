@@ -3,7 +3,7 @@
 //
 // Oracle: round trips rather than hardcoded numbers. FK is the reference for IK.
 //
-// Covered, once per hand type:
+// Covered, once per hand model:
 //   1) active joint --ik_joint_to_actuator--> encoder --fk_actuator_to_joint--> joint
 //      The active slots of the FK output must recover the input. Encoders cannot go negative.
 //   2) task --ik_task_to_joint--> joint --IK/FK--> task
@@ -16,32 +16,26 @@
 //   0.0043 deg and 0.7301 mm. The margins are 10x and 2.7x. The computation is deterministic,
 //   so these do not drift between runs.
 //
-// build-kinematics.sh links one type's archive and defines AIDIN_HAND2_KIN_ONLY_A or _B so that
-// the other type's entry points are not referenced. The SDK's ctest links both and runs both.
+// build-kinematics.sh links one archive with its model's kinematics.cpp and defines
+// AIDIN_HAND2_KIN_ONLY_A or _B so that the other model is not referenced. The SDK's ctest links
+// both and runs both.
 
 #include <array>
 #include <cmath>
 #include <cstdio>
 
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
+#include "hand_core/kinematics/kinematics.hpp"
+#if !defined(AIDIN_HAND2_KIN_ONLY_B)
+#include "hand_core/kinematics/gen2/kinematics.hpp"
+#endif
+#if !defined(AIDIN_HAND2_KIN_ONLY_A)
+#include "hand_core/kinematics/gen2b/kinematics.hpp"
+#endif
 
 using namespace aidin_hand2::kinematics;
 
 namespace
 {
-
-#if !defined(AIDIN_HAND2_KIN_ONLY_B)
-constexpr Boundary kGen2{
-    aidin_hand2_kin_a_fk_actuator_to_joint,       aidin_hand2_kin_a_ik_joint_to_actuator,
-    aidin_hand2_kin_a_ik_task_to_joint,           aidin_hand2_kin_a_ik_oriented_task_to_joint,
-    aidin_hand2_kin_a_jacobian_actuator_to_joint, aidin_hand2_kin_a_jacobian_joint_to_actuator};
-#endif
-#if !defined(AIDIN_HAND2_KIN_ONLY_A)
-constexpr Boundary kGen2B{
-    aidin_hand2_kin_b_fk_actuator_to_joint,       aidin_hand2_kin_b_ik_joint_to_actuator,
-    aidin_hand2_kin_b_ik_task_to_joint,           aidin_hand2_kin_b_ik_oriented_task_to_joint,
-    aidin_hand2_kin_b_jacobian_actuator_to_joint, aidin_hand2_kin_b_jacobian_joint_to_actuator};
-#endif
 
 int g_failures = 0;
 
@@ -88,21 +82,21 @@ bool all_finite(const double* v, int n)
 struct Pose { double flex_deg; double abd_deg; };
 constexpr Pose kPoses[] = {{10, 0}, {25, 0}, {40, 0}, {25, 5}, {35, 8}};
 
-void test_joint_round_trip(const Boundary& kin)
+void test_joint_round_trip(const Solver& solver)
 {
   double worst_deg = 0.0;
   for (const Pose& p : kPoses) {
     const auto aj = pose(p.flex_deg, p.abd_deg);
 
     std::array<int, ACTUATOR_NUM> encoder{};
-    ik_joint_to_actuator(kin, aj, encoder);
+    solver.ik_joint_to_actuator(aj, encoder);
     for (int i = 0; i < ACTUATOR_NUM; ++i) {
       check(encoder[i] >= 0, "encoder 가 음수다 (0 클램프가 깨졌다)");
     }
 
     std::array<double, JOINT_NUM> joint{};
     std::array<double, TASK_NUM> task{};
-    fk_actuator_to_joint(kin, encoder, joint, task);
+    solver.fk_actuator_to_joint(encoder, joint, task);
     check(all_finite(joint.data(), JOINT_NUM), "FK joint 에 비유한값이 있다");
     check(all_finite(task.data(), TASK_NUM), "FK task 에 비유한값이 있다");
 
@@ -115,27 +109,27 @@ void test_joint_round_trip(const Boundary& kin)
   check(worst_deg < kJointTolDeg, "active joint 왕복 복원 실패");
 }
 
-void test_task_round_trip(const Boundary& kin)
+void test_task_round_trip(const Solver& solver)
 {
   double worst_mm = 0.0;
   for (const Pose& p : kPoses) {
     const auto aj = pose(p.flex_deg, p.abd_deg);
 
     std::array<int, ACTUATOR_NUM> encoder{};
-    ik_joint_to_actuator(kin, aj, encoder);
+    solver.ik_joint_to_actuator(aj, encoder);
     std::array<double, JOINT_NUM> joint{};
     std::array<double, TASK_NUM> task{};
-    fk_actuator_to_joint(kin, encoder, joint, task);
+    solver.fk_actuator_to_joint(encoder, joint, task);
 
     std::array<double, ACTIVE_JOINT_NUM> solved{};
-    ik_task_to_joint(kin, task, solved);
+    solver.ik_task_to_joint(task, solved);
     check(all_finite(solved.data(), ACTIVE_JOINT_NUM), "IK 해에 비유한값이 있다");
 
     std::array<int, ACTUATOR_NUM> encoder2{};
-    ik_joint_to_actuator(kin, solved, encoder2);
+    solver.ik_joint_to_actuator(solved, encoder2);
     std::array<double, JOINT_NUM> joint2{};
     std::array<double, TASK_NUM> task2{};
-    fk_actuator_to_joint(kin, encoder2, joint2, task2);
+    solver.fk_actuator_to_joint(encoder2, joint2, task2);
 
     for (int i = 0; i < TASK_NUM; ++i) {
       const double d = std::fabs(task[i] - task2[i]);
@@ -146,19 +140,19 @@ void test_task_round_trip(const Boundary& kin)
   check(worst_mm < kTaskTolMm, "fingertip task 왕복 복원 실패");
 }
 
-void test_determinism(const Boundary& kin)
+void test_determinism(const Solver& solver)
 {
   const auto aj = pose(25, 0);
   std::array<int, ACTUATOR_NUM> encoder{};
-  ik_joint_to_actuator(kin, aj, encoder);
+  solver.ik_joint_to_actuator(aj, encoder);
   std::array<double, JOINT_NUM> joint{};
   std::array<double, TASK_NUM> task{};
-  fk_actuator_to_joint(kin, encoder, joint, task);
+  solver.fk_actuator_to_joint(encoder, joint, task);
 
   std::array<double, ACTIVE_JOINT_NUM> first{};
   std::array<double, ACTIVE_JOINT_NUM> second{};
-  ik_task_to_joint(kin, task, first);
-  ik_task_to_joint(kin, task, second);
+  solver.ik_task_to_joint(task, first);
+  solver.ik_task_to_joint(task, second);
   check(first == second, "ik_task_to_joint 이 같은 입력에 다른 해를 준다");
 
   // Oriented form: the thumb takes xyz plus a unit direction, the long fingers stay xyz.
@@ -169,20 +163,20 @@ void test_determinism(const Boundary& kin)
     oriented[i] = task[i - (THUMB_ORIENTED_TASK_COUNT - THUMB_TASK_COUNT)];
   }
   std::array<double, ACTIVE_JOINT_NUM> oriented_solved{};
-  ik_oriented_task_to_joint(kin, oriented, oriented_solved);
+  solver.ik_oriented_task_to_joint(oriented, oriented_solved);
   check(all_finite(oriented_solved.data(), ACTIVE_JOINT_NUM),
         "ik_oriented_task_to_joint 해에 비유한값이 있다");
 }
 
-void run(const char* label, const Boundary& kin)
+void run(const char* label, const Solver& solver)
 {
   std::printf("== %s ==\n", label);
   std::printf("[joint 왕복]\n");
-  test_joint_round_trip(kin);
+  test_joint_round_trip(solver);
   std::printf("[task 왕복]\n");
-  test_task_round_trip(kin);
+  test_task_round_trip(solver);
   std::printf("[결정성·유한성]\n");
-  test_determinism(kin);
+  test_determinism(solver);
 }
 
 }  // namespace
@@ -190,10 +184,10 @@ void run(const char* label, const Boundary& kin)
 int main()
 {
 #if !defined(AIDIN_HAND2_KIN_ONLY_B)
-  run("gen2", kGen2);
+  run("gen2", gen2::kSolver);
 #endif
 #if !defined(AIDIN_HAND2_KIN_ONLY_A)
-  run("gen2-b", kGen2B);
+  run("gen2b", gen2b::kSolver);
 #endif
 
   std::printf("kinematics_core_test: %s\n", g_failures == 0 ? "PASS" : "FAIL");

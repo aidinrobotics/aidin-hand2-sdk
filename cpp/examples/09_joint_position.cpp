@@ -12,7 +12,7 @@
 // complaining, and the third is dropped in silence — the only trace is a counter, which is
 // printed. An application that only catches exceptions never learns about the third one.
 //
-// Run as: 09_joint_position [right|left] [interface=can0] [hand_type=gen2|gen2-b]
+// Run as: 09_joint_position [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, and the fingers then flex
 // and extend repeatedly, so clear the space around the hand.
 
@@ -44,13 +44,15 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
-  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -153,7 +155,7 @@ int main(int argc, char** argv)
     std::printf("[example] done — of the three checks, only the state check throws\n");
   } catch (const Exception& error) {
     // A WrongCallOrder here is the state check: not Running, or not homed.
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

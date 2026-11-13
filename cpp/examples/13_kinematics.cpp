@@ -15,7 +15,7 @@
 // The second half connects, if a hand is there, to show that get_state().joints.position_rad
 // is nothing more than fk_actuator_to_joint() applied to the encoder counts.
 //
-// Run as: 13_kinematics [right|left] [interface=can0] [hand_type=gen2|gen2-b]
+// Run as: 13_kinematics [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Runs without a hand: the conversion half needs no connection, and the comparison half says
 // so and stops if there is nothing to connect to. Nothing moves either way.
 
@@ -43,10 +43,13 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  // The conversions depend on the hand type: Gen2_B has the 2 mm lead on the thumb d1 and d2.
-  const std::optional<HandType> parsed = parse_hand_type(argc > 3 ? argv[3] : "gen2");
-  if (!parsed) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
-  const HandType hand_type = *parsed;
+  // The conversions depend on the hand model, so each one takes it.
+  const std::optional<HandModel> parsed = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!parsed) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
+  const HandModel hand_model = *parsed;
 
   // 1) A pose in joint space, the same 16 active joints a command carries.
   const std::array<double, kActiveJointCount> pose = {
@@ -58,7 +61,7 @@ int main(int argc, char** argv)
 
   // 2) Joint angles to encoder counts. The result is integer counts, because that is what goes
   //    into a CAN frame, and there are 16 of them — one per actuator.
-  const std::array<int, kActuatorCount> encoder = ik_joint_to_actuator(hand_type, pose);
+  const std::array<int, kActuatorCount> encoder = ik_joint_to_actuator(hand_model, pose);
 
   std::printf("[example] ik_joint_to_actuator, %zu counts:\n ", kActuatorCount);
   for (std::size_t a = 0; a < kActuatorCount; ++a) {
@@ -69,7 +72,7 @@ int main(int argc, char** argv)
 
   // 3) Back the other way. This returns 21 entries rather than 16: the four-bar coupled joint
   //    of each digit comes out too, and it was never an input.
-  const std::array<double, kJointCount> joints = fk_actuator_to_joint(hand_type, encoder);
+  const std::array<double, kJointCount> joints = fk_actuator_to_joint(hand_model, encoder);
 
   std::printf("[example] fk_actuator_to_joint, %zu angles in rad:\n ", kJointCount);
   for (std::size_t j = 0; j < kJointCount; ++j) {
@@ -122,9 +125,8 @@ int main(int argc, char** argv)
   if (g_shutdown.load()) return 0;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side, hand_type};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -139,7 +141,7 @@ int main(int argc, char** argv)
       measured[a] = static_cast<int>(std::lround(state.actuators.position_count[a]));
     }
 
-    const std::array<double, kJointCount> computed = fk_actuator_to_joint(hand_type, measured);
+    const std::array<double, kJointCount> computed = fk_actuator_to_joint(hand_model, measured);
 
     // 11) The SDK filled state.joints with this call, so the two columns agree except where a
     //     cycle landed between the read and the rounding.
@@ -153,7 +155,7 @@ int main(int argc, char** argv)
   } catch (const Exception& error) {
     // No hand attached is the ordinary case for this half, so it is reported and not treated
     // as a failure of the example.
-    std::printf("[example] no hand to compare against — %s: %s\n", to_string(error.code()), error.what());
+    std::printf("[example] no hand to compare against — %s: %s\n", to_string(error.kind()), error.what());
     std::printf("[example] the conversion half above needed no connection\n");
   }
 

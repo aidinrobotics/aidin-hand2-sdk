@@ -45,7 +45,7 @@ void check(bool ok, const char* what)
 }
 
 constexpr double kDeg2Rad = 3.14159265358979323846 / 180.0;
-constexpr HandType kType = HandType::Gen2;
+constexpr HandModel kModel = HandModel::Gen2;
 
 // 왕복 허용오차. FK active 복원은 실측 최악 8.5e-5 rad(<0.005°); 넉넉히 1e-3 rad.
 constexpr double kJointTolRad = 1e-3;
@@ -130,8 +130,8 @@ void test_fk_actuator_to_joint()
   double worst_recover = 0.0;
   for (const Pose& deg : kPosesDeg) {
     const Pose active = pose_to_rad(deg);
-    const std::array<int, kActuatorCount> encoder = ik_joint_to_actuator(kType, active);
-    const std::array<double, kJointCount> joint = fk_actuator_to_joint(kType, encoder);
+    const std::array<int, kActuatorCount> encoder = ik_joint_to_actuator(kModel,active);
+    const std::array<double, kJointCount> joint = fk_actuator_to_joint(kModel,encoder);
 
     // 21 joint 전부 유한.
     bool all_finite = true;
@@ -165,13 +165,13 @@ void test_fk_actuator_to_joint()
 void test_fk_actuator_to_task()
 {
   const std::array<int, kActuatorCount> enc_a =
-      ik_joint_to_actuator(kType, pose_to_rad(kPosesDeg[1]));
+      ik_joint_to_actuator(kModel,pose_to_rad(kPosesDeg[1]));
   const std::array<int, kActuatorCount> enc_b =
-      ik_joint_to_actuator(kType, pose_to_rad(kPosesDeg[2]));
+      ik_joint_to_actuator(kModel,pose_to_rad(kPosesDeg[2]));
 
-  const std::array<double, kTaskCount> task_a  = fk_actuator_to_task(kType, enc_a);
-  const std::array<double, kTaskCount> task_a2 = fk_actuator_to_task(kType, enc_a);
-  const std::array<double, kTaskCount> task_b  = fk_actuator_to_task(kType, enc_b);
+  const std::array<double, kTaskCount> task_a  = fk_actuator_to_task(kModel,enc_a);
+  const std::array<double, kTaskCount> task_a2 = fk_actuator_to_task(kModel,enc_a);
+  const std::array<double, kTaskCount> task_b  = fk_actuator_to_task(kModel,enc_b);
 
   bool all_finite = true;
   for (double v : task_a) all_finite = all_finite && std::isfinite(v);
@@ -199,12 +199,12 @@ void test_ik_task_and_oriented()
   double worst_oriented_rt = 0.0;
 
   for (const Pose& deg : kPosesDeg) {
-    const std::array<int, kActuatorCount> enc = ik_joint_to_actuator(kType, pose_to_rad(deg));
-    const std::array<double, kTaskCount> task = fk_actuator_to_task(kType, enc);
+    const std::array<int, kActuatorCount> enc = ik_joint_to_actuator(kModel,pose_to_rad(deg));
+    const std::array<double, kTaskCount> task = fk_actuator_to_task(kModel,enc);
 
     // --- xyz IK: 유한 + 결정적 ---
-    const std::array<double, kActiveJointCount> j_xyz  = ik_task_to_joint(kType, task);
-    const std::array<double, kActiveJointCount> j_xyz2 = ik_task_to_joint(kType, task);
+    const std::array<double, kActiveJointCount> j_xyz  = ik_task_to_joint(kModel,task);
+    const std::array<double, kActiveJointCount> j_xyz2 = ik_task_to_joint(kModel,task);
     bool finite_xyz = true;
     for (double v : j_xyz) finite_xyz = finite_xyz && std::isfinite(v);
     check(finite_xyz, "ik_task_to_joint: 비유한 해");
@@ -213,13 +213,13 @@ void test_ik_task_and_oriented()
 
     // xyz IK task 왕복 (min naive/corrected — BLOCKER 우회).
     const double rt_naive = [&] {
-      const auto e2 = ik_joint_to_actuator(kType, j_xyz);
-      const auto t2 = fk_actuator_to_task(kType, e2);
+      const auto e2 = ik_joint_to_actuator(kModel,j_xyz);
+      const auto t2 = fk_actuator_to_task(kModel,e2);
       return max_abs_diff(task.data(), t2.data(), kTaskCount);
     }();
     const double rt_corr = [&] {
-      const auto e2 = ik_joint_to_actuator(kType, ik_convention_to_fk_convention(j_xyz));
-      const auto t2 = fk_actuator_to_task(kType, e2);
+      const auto e2 = ik_joint_to_actuator(kModel,ik_convention_to_fk_convention(j_xyz));
+      const auto t2 = fk_actuator_to_task(kModel,e2);
       return max_abs_diff(task.data(), t2.data(), kTaskCount);
     }();
     worst_task_rt = std::fmax(worst_task_rt, std::fmin(rt_naive, rt_corr));
@@ -235,8 +235,8 @@ void test_ik_task_and_oriented()
       ot[8 + 3 * f] = task[5 + 3 * f];
     }
 
-    const std::array<double, kActiveJointCount> j_or  = ik_oriented_task_to_joint(kType, ot);
-    const std::array<double, kActiveJointCount> j_or2 = ik_oriented_task_to_joint(kType, ot);
+    const std::array<double, kActiveJointCount> j_or  = ik_oriented_task_to_joint(kModel,ot);
+    const std::array<double, kActiveJointCount> j_or2 = ik_oriented_task_to_joint(kModel,ot);
     bool finite_or = true;
     for (double v : j_or) finite_or = finite_or && std::isfinite(v);
     check(finite_or, "ik_oriented_task_to_joint: 비유한 해");
@@ -247,7 +247,7 @@ void test_ik_task_and_oriented()
     std::array<double, kOrientedTaskCount> ot_scaled = ot;
     ot_scaled[3] *= 2.0; ot_scaled[4] *= 2.0; ot_scaled[5] *= 2.0;
     const std::array<double, kActiveJointCount> j_or_scaled =
-        ik_oriented_task_to_joint(kType, ot_scaled);
+        ik_oriented_task_to_joint(kModel,ot_scaled);
     check(max_abs_diff(j_or.data(), j_or_scaled.data(), kActiveJointCount) < 1e-9,
           "oriented IK: 방향 스케일에 해가 달라짐(정규화 안 됨)");
 
@@ -258,19 +258,19 @@ void test_ik_task_and_oriented()
     // 방향을 크게 바꾸면 thumb 해가 바뀌어야 한다(방향이 실제로 반영됨).
     std::array<double, kOrientedTaskCount> ot_dir = ot;
     ot_dir[3] = 0.9; ot_dir[4] = 0.1; ot_dir[5] = 0.2;
-    const std::array<double, kActiveJointCount> j_or_dir = ik_oriented_task_to_joint(kType, ot_dir);
+    const std::array<double, kActiveJointCount> j_or_dir = ik_oriented_task_to_joint(kModel,ot_dir);
     check(max_abs_diff(j_or.data(), j_or_dir.data(), 4) > 1e-3,
           "oriented IK: thumb 방향 변화에 해가 반응 안 함");
 
     // oriented IK 도 손가락 xyz 는 왕복해야 한다(min naive/corrected).
     const double or_naive = [&] {
-      const auto e2 = ik_joint_to_actuator(kType, j_or);
-      const auto t2 = fk_actuator_to_task(kType, e2);
+      const auto e2 = ik_joint_to_actuator(kModel,j_or);
+      const auto t2 = fk_actuator_to_task(kModel,e2);
       return max_abs_diff(&task[3], &t2[3], kTaskCount - 3);  // 손가락 부분만
     }();
     const double or_corr = [&] {
-      const auto e2 = ik_joint_to_actuator(kType, ik_convention_to_fk_convention(j_or));
-      const auto t2 = fk_actuator_to_task(kType, e2);
+      const auto e2 = ik_joint_to_actuator(kModel,ik_convention_to_fk_convention(j_or));
+      const auto t2 = fk_actuator_to_task(kModel,e2);
       return max_abs_diff(&task[3], &t2[3], kTaskCount - 3);
     }();
     worst_oriented_rt = std::fmax(worst_oriented_rt, std::fmin(or_naive, or_corr));

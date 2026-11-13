@@ -18,7 +18,7 @@
 // The controller is still in development. It works, but its behaviour may change in a later
 // version, so do not build on it yet.
 //
-// Run as: 10_joint_impedance [right|left] [interface=can0] [hand_type=gen2|gen2-b]
+// Run as: 10_joint_impedance [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. home() drives every finger into its hard stop, and the fingers then flex
 // toward a grasp pose. Put a soft object in the hand for the impedance pass.
 
@@ -48,8 +48,11 @@ int main(int argc, char** argv)
   std::signal(SIGINT, [](int) { g_shutdown.store(true); });
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
-  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   // The index finger, watched through three different index spaces. A command is indexed by
   // active joint and state.joints by joint index, and the two differ because each finger's
@@ -69,9 +72,8 @@ int main(int argc, char** argv)
       -0.08, 0.75, 0.60};       // baby
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = false;
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = false;
 
     HandManager manager;
     Hand hand = manager.create(config);
@@ -158,7 +160,7 @@ int main(int argc, char** argv)
     hand.stop();
     std::printf("[example] done — the command struct picks the controller, not a mode setting\n");
   } catch (const Exception& error) {
-    std::printf("\n[example] failed: %s: %s\n", to_string(error.code()), error.what());
+    std::printf("\n[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     return 1;
   }
 

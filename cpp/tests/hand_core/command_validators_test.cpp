@@ -23,7 +23,7 @@
 #include <aidin_hand2/types/error.hpp>
 
 #include "hand_core/hand_core.hpp"
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
+#include "hand_core/kinematics/kinematics.hpp"
 
 using namespace aidin_hand2;
 
@@ -65,15 +65,14 @@ constexpr double kInf = std::numeric_limits<double>::infinity();
 
 HandConfig make_config()
 {
-  HandConfig config{"can0", HandSide::Right, HandType::Gen2};  // 절대 open 안 함 (생성만)
-  config.control_rate = 500;
+  HandConfig config{"can0", HandSide::Right, HandModel::Gen2};  // 절대 open 안 함 (생성만)
   return config;
 }
 
 // set_controller_config·set_max_effort 는 여전히 실패 Status 를 돌려준다.
 bool rejected(const Status& status)
 {
-  return !status.ok() && status.code == ErrorCode::InvalidArgument;
+  return !status.ok() && status.kind() == ErrorKind::InvalidArgument;
 }
 
 // set_command 는 값이 잘못돼도 예외 없이 버리므로 Status 로는 안 보인다.

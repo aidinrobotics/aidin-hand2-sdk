@@ -1,5 +1,6 @@
 // 목적: enum→string / enum-변환 순수 헬퍼의 전수(exhaustive) 값 검증.
-//       to_string(ErrorCode) · to_string(ActuatorFault) · to_string(HandLifecycle) ·
+//       to_string(ErrorKind) · to_string(ActuatorFault) · to_string(HandLifecycle) ·
+//       to_string(HandModel) · parse_hand_model ·
 //       to_command_mode(ControllerCommand) 의 모든 enum 값/입력을 기대값과 직접 대조.
 // 방법: constexpr/noexcept 순수 함수이므로 결정적 값 대조만 수행. enum 이 성장했을 때
 //       빠진 case 를 잡는 것이 이 테스트의 가치 — 각 값마다 정확한 문자열/모드를 명시한다.
@@ -34,22 +35,22 @@ using aidin_hand2::to_string;
 
 void test_error_code()
 {
-  using aidin_hand2::ErrorCode;
-  check(str_eq(to_string(ErrorCode::None), "None"), "ErrorCode::None → \"None\"");
-  check(str_eq(to_string(ErrorCode::InvalidArgument), "InvalidArgument"),
-        "ErrorCode::InvalidArgument");
-  check(str_eq(to_string(ErrorCode::WrongCallOrder), "WrongCallOrder"),
-        "ErrorCode::WrongCallOrder");
-  check(str_eq(to_string(ErrorCode::InterfaceUnavailable), "InterfaceUnavailable"),
-        "ErrorCode::InterfaceUnavailable");
-  check(str_eq(to_string(ErrorCode::CommunicationLost), "CommunicationLost"),
-        "ErrorCode::CommunicationLost");
-  check(str_eq(to_string(ErrorCode::HardwareFault), "HardwareFault"),
-        "ErrorCode::HardwareFault");
-  check(str_eq(to_string(ErrorCode::ControlLoopFault), "ControlLoopFault"),
-        "ErrorCode::ControlLoopFault");
-  check(str_eq(to_string(ErrorCode::UnexpectedError), "UnexpectedError"),
-        "ErrorCode::UnexpectedError");
+  using aidin_hand2::ErrorKind;
+  check(str_eq(to_string(ErrorKind::None), "None"), "ErrorKind::None → \"None\"");
+  check(str_eq(to_string(ErrorKind::InvalidArgument), "InvalidArgument"),
+        "ErrorKind::InvalidArgument");
+  check(str_eq(to_string(ErrorKind::WrongCallOrder), "WrongCallOrder"),
+        "ErrorKind::WrongCallOrder");
+  check(str_eq(to_string(ErrorKind::InterfaceUnavailable), "InterfaceUnavailable"),
+        "ErrorKind::InterfaceUnavailable");
+  check(str_eq(to_string(ErrorKind::CommunicationLost), "CommunicationLost"),
+        "ErrorKind::CommunicationLost");
+  check(str_eq(to_string(ErrorKind::HardwareFault), "HardwareFault"),
+        "ErrorKind::HardwareFault");
+  check(str_eq(to_string(ErrorKind::ControlLoopFault), "ControlLoopFault"),
+        "ErrorKind::ControlLoopFault");
+  check(str_eq(to_string(ErrorKind::UnexpectedError), "UnexpectedError"),
+        "ErrorKind::UnexpectedError");
 }
 
 void test_homing_state()
@@ -127,6 +128,28 @@ void test_hand_lifecycle()
         "HandLifecycle::Faulted");
 }
 
+void test_hand_model()
+{
+  using aidin_hand2::HandModel;
+  using aidin_hand2::parse_hand_model;
+  // 다른 to_string 과 같은 constexpr 계약 — 컴파일 시점에도 쓸 수 있다.
+  static_assert(parse_hand_model("GEN2B") == HandModel::Gen2B);
+  static_assert(to_string(HandModel::Gen2)[0] == 'g');
+  check(str_eq(to_string(HandModel::Gen2), "gen2"), "HandModel::Gen2 → \"gen2\"");
+  check(str_eq(to_string(HandModel::Gen2B), "gen2b"), "HandModel::Gen2B → \"gen2b\"");
+  for (const char* text : {"gen2", "GEN2", "Gen2"}) {
+    check(parse_hand_model(text) == HandModel::Gen2, text);
+  }
+  for (const char* text : {"gen2b", "GEN2B", "Gen2B", "Gen2b"}) {
+    check(parse_hand_model(text) == HandModel::Gen2B, text);
+  }
+  // 이름은 enum 을 소문자로 쓴 것 하나뿐이다.
+  for (const char* text : {"", "gen", "gen2-b", "gen2_b", "gen2c", "gen3", " gen2", "gen2 "}) {
+    check(!parse_hand_model(text).has_value(), text);
+  }
+  check(parse_hand_model(to_string(HandModel::Gen2B)) == HandModel::Gen2B, "to_string 왕복");
+}
+
 void test_to_command_mode()
 {
   using namespace aidin_hand2;
@@ -147,23 +170,23 @@ void test_to_command_mode()
 // 그리고 이 테스트가 함께 갱신되도록 (전수 검증 계약 명시).
 void test_distinctness()
 {
-  using aidin_hand2::ErrorCode;
-  // 대표적으로 ErrorCode 8 값이 서로 다른 문자열임을 교차 확인.
+  using aidin_hand2::ErrorKind;
+  // 대표적으로 ErrorKind 8 값이 서로 다른 문자열임을 교차 확인.
   const char* names[] = {
-      to_string(ErrorCode::None),
-      to_string(ErrorCode::InvalidArgument),
-      to_string(ErrorCode::WrongCallOrder),
-      to_string(ErrorCode::InterfaceUnavailable),
-      to_string(ErrorCode::CommunicationLost),
-      to_string(ErrorCode::HardwareFault),
-      to_string(ErrorCode::ControlLoopFault),
-      to_string(ErrorCode::UnexpectedError),
+      to_string(ErrorKind::None),
+      to_string(ErrorKind::InvalidArgument),
+      to_string(ErrorKind::WrongCallOrder),
+      to_string(ErrorKind::InterfaceUnavailable),
+      to_string(ErrorKind::CommunicationLost),
+      to_string(ErrorKind::HardwareFault),
+      to_string(ErrorKind::ControlLoopFault),
+      to_string(ErrorKind::UnexpectedError),
   };
   constexpr int kN = sizeof(names) / sizeof(names[0]);
   for (int i = 0; i < kN; ++i) {
-    check(names[i] != nullptr && names[i][0] != '\0', "ErrorCode 이름 비어있지 않음");
+    check(names[i] != nullptr && names[i][0] != '\0', "ErrorKind 이름 비어있지 않음");
     for (int j = i + 1; j < kN; ++j) {
-      check(!str_eq(names[i], names[j]), "ErrorCode 이름이 서로 구별됨");
+      check(!str_eq(names[i], names[j]), "ErrorKind 이름이 서로 구별됨");
     }
   }
 }
@@ -176,6 +199,7 @@ int main()
   test_homing_state();
   test_actuator_fault();
   test_hand_lifecycle();
+  test_hand_model();
   test_to_command_mode();
   test_distinctness();
   if (g_failures == 0) {

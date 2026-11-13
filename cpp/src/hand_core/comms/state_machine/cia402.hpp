@@ -24,8 +24,7 @@ constexpr std::uint16_t kFault            = 1u << 3;
 constexpr std::uint16_t kQuickStopActive  = 1u << 5;
 
 // Homing bits, meaningful only in mode 6
-// Welcon Servo Drive Reference Manual 5.4.2: bit13 0 with bit12 0 is running, bit13 0 with
-// bit12 1 is complete, bit13 1 is an error
+// bit13 0 with bit12 0 is running, bit13 0 with bit12 1 is complete, bit13 1 is an error
 // bit12 stays 1 after a homing, so completion is read as a rising edge, and re-entering
 // Operation Enabled beforehand resets it to a known 0
 constexpr std::uint16_t kHomingAttained = 1u << 12;

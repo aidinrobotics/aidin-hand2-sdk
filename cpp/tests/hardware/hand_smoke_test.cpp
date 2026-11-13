@@ -2,7 +2,7 @@
 //
 // 게이팅: 환경변수 HAND_TEST_CAN 이 없으면 SKIP(통과 처리)한다. 그래서 트리에 있어도 CI/개발
 // 머신에서 안전하다. 실기에서는:
-//   HAND_TEST_CAN=can0 [HAND_TEST_SIDE=left|right] [HAND_TEST_TYPE=gen2|gen2-b] ctest -L hardware
+//   HAND_TEST_CAN=can0 [HAND_TEST_SIDE=left|right] [HAND_TEST_MODEL=gen2|gen2b] ctest -L hardware
 //
 // 안전: 기본은 **listen-only** — connect(관측만, 무토크) → 상태 조회 → disconnect → destroy.
 // run()/home()/set_command(모션)은 하지 않는다(실제 손이 움직이므로 작업자 감독 하에 별도로).
@@ -36,10 +36,10 @@ void listen_only_smoke(const char* iface, aidin_hand2::HandSide side)
 {
   namespace ah2 = aidin_hand2;
   ah2::HandManager manager;
-  const char* type_env = std::getenv("HAND_TEST_TYPE");
-  const ah2::HandType type =
-      ah2::parse_hand_type(type_env != nullptr ? type_env : "gen2").value_or(ah2::HandType::Gen2);
-  ah2::HandConfig config{iface, side, type};
+  const char* model_env = std::getenv("HAND_TEST_MODEL");
+  const ah2::HandModel model =
+      ah2::parse_hand_model(model_env != nullptr ? model_env : "gen2").value_or(ah2::HandModel::Gen2);
+  ah2::HandConfig config{iface, side, model};
   config.auto_home = false;  // run/home 안 함 — 관측만
 
   ah2::Hand hand = manager.create(config);
@@ -54,7 +54,7 @@ void listen_only_smoke(const char* iface, aidin_hand2::HandSide side)
     hand.disconnect();  // (제어 세션 아님) 통신 내리고 Disconnected
   } catch (const ah2::Exception& e) {
     check(false, "hardware smoke: connect/observe/disconnect 중 예외");
-    std::printf("  (%s: %s)\n", ah2::to_string(e.code()), e.what());
+    std::printf("  (%s: %s)\n", ah2::to_string(e.kind()), e.what());
   }
   manager.destroy(hand);  // 정지 확인 + 종료 + 자원 파기
 }

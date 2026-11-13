@@ -7,7 +7,7 @@
 // One try around the whole thing, because there is nothing to recover for: a calibration run,
 // a diagnostic readout or a rehearsal fails, someone fixes the cause, and it runs again
 //
-// Run as: 20_exit_on_failure [right|left] [interface=can0] [hand_type=gen2|gen2-b]
+// Run as: 20_exit_on_failure [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand. auto_home is on, so run() drives every finger into its hard stop:
 // clear the space around the hand before running
 
@@ -37,8 +37,11 @@ int main(int argc, char** argv)
   set_log_to_console(true);
 
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
-  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
 
   // Declared before the try so the destructor still runs on the failure path, where it
   // confirms the quick stop and closes the link
@@ -46,9 +49,8 @@ int main(int argc, char** argv)
   int exit_code = 0;
 
   try {
-    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
-    config.control_rate = 500;    // Hz
-    config.auto_home    = true;   // run() homes before it enables control
+    HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
+    config.auto_home = true;  // run() homes before it enables control
 
     Hand hand = manager.create(config);
     hand.connect();
@@ -76,8 +78,9 @@ int main(int argc, char** argv)
 
     // Ctrl-C is not a failure, so the exit code stays 0; the run simply ended early
     if (g_shutdown.load()) std::printf("[example] interrupted, leaving through the destructor\n");
-  } catch (const Exception&) {
-    exit_code = 1;   // the SDK logged the cause before throwing
+  } catch (const Exception& error) {
+    std::printf("[example] failed: %s: %s\n", to_string(error.kind()), error.what());
+    exit_code = 1;
   }
 
   flush_log();

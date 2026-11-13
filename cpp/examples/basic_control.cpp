@@ -6,7 +6,7 @@
 // create -> connect -> set_max_effort -> run -> home -> joint sweep -> stop -> destroy
 // One header to include and one library to link, and every failure arrives as an Exception
 //
-// Run as: basic_control [right|left] [interface=can0] [hand_type=gen2|gen2-b]
+// Run as: basic_control [right|left] [interface=can0] [hand_model=gen2|gen2b]
 // Needs a real hand, and the fingers move during home() and the sweep
 
 #include <array>
@@ -22,10 +22,12 @@ using namespace aidin_hand2;
 int main(int argc, char** argv)
 {
   const HandSide side = (argc > 1 && std::string(argv[1]) == "left") ? HandSide::Left : HandSide::Right;
-  const std::optional<HandType> hand_type = parse_hand_type(argc > 3 ? argv[3] : "gen2");
-  if (!hand_type) { std::fprintf(stderr, "hand type must be gen2 or gen2-b, got %s\n", argv[3]); return 1; }
-  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_type};
-  config.control_rate   = 500;  // Hz
+  const std::optional<HandModel> hand_model = parse_hand_model(argc > 3 ? argv[3] : "gen2");
+  if (!hand_model) {
+    std::fprintf(stderr, "[example] hand_model must be gen2 or gen2b, got %s\n", argv[3]);
+    return 1;
+  }
+  HandConfig config{argc > 2 ? argv[2] : "can0", side, *hand_model};
 
   try {
     // 1) HandManager owns the resources and hands back a non-owning Hand
@@ -87,8 +89,8 @@ int main(int argc, char** argv)
     manager.destroy(hand);
 
     return 0;
-  } catch (const Exception&) {
-    // The SDK already logged the failure, so only the exit code is left to decide
+  } catch (const Exception& error) {
+    std::printf("[example] failed: %s: %s\n", to_string(error.kind()), error.what());
     flush_log();
     return 1;
   }

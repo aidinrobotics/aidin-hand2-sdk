@@ -7,7 +7,8 @@
 #include <aidin_hand2/types/description.hpp>
 #include <aidin_hand2/types/state.hpp>
 #include "hand_core/comms/canfd/protocol.hpp"
-#include "hand_core/hand_model.hpp"
+#include "hand_core/kinematics/kinematics.hpp"
+#include "types/actuator_constants.hpp"
 
 namespace aidin_hand2::controllers
 {
@@ -15,24 +16,29 @@ namespace aidin_hand2::controllers
 // Row-major 16 x 16
 using JointJacobian = std::array<double, kActiveJointCount * kActuatorCount>;
 
-// N·m per active joint, K * (target - position) - 2 * damping ratio * sqrt(K * inertia) * velocity
+// Nm per active joint, K * (target - position) - 2 * damping ratio * sqrt(K * inertia) * velocity
 // K is hard_stiffness times stiffness (0..1); count_per_joint is count per rad, row actuator
 std::array<double, kActiveJointCount> joint_impedance_torque(
-    const std::array<double, kActiveJointCount>& hard_stiffness,
+    const std::array<double, kActiveJointCount>& hard_stiffness, const ActuatorConstants& actuator,
     const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
     const std::array<double, kActiveJointCount>& velocity, const std::array<double, kActiveJointCount>& stiffness,
     const JointJacobian& count_per_joint);
 
-// Effort per actuator for joint torques, before the max_effort clamp; joint_per_count is rad per count, row joint
+// Effort per actuator for joint torques, before the max_effort clamp
+// joint_per_count is rad per count, row joint
 std::array<double, kActuatorCount> joint_torque_to_effort(
-    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count);
+    const ActuatorConstants& actuator, const std::array<double, kActiveJointCount>& torque,
+    const JointJacobian& joint_per_count);
 
-// Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort, sent as CST
-// The target passes a low-pass and a 250 deg/s limit and keeps off the hard stop
+// Joint space impedance: joint_impedance_torque at the FK pose, then joint_torque_to_effort,
+// sent as CST
+// The target passes the low-pass and the velocity limit and keeps off the hard stop
 class JointImpedanceController
 {
  public:
-  JointImpedanceController(long period_nanoseconds, const HandModel& model);
+  JointImpedanceController(long period_nanoseconds, const kinematics::Solver& solver,
+                           const std::array<double, kActiveJointCount>& hard_stiffness,
+                           const ActuatorConstants& actuator);
 
   // Fills mode_of_operation and target_effort in frames
   void compute(const JointImpedanceCommand& command,
@@ -49,7 +55,12 @@ class JointImpedanceController
       const ControllerConfig::JointImpedanceController& config,
       const std::array<double, kActiveJointCount>& measured);
 
-  const HandModel& model_;
+  const kinematics::Solver& solver_;
+
+  // Nm/rad at stiffness 1
+  const std::array<double, kActiveJointCount> hard_stiffness_;
+
+  const ActuatorConstants actuator_;
   const double dt_seconds_;
 
   // Per cycle share of the way to a new stiffness
@@ -59,11 +70,11 @@ class JointImpedanceController
   double cutoff_freq_{-1.0};
   double alpha_{1.0};
 
-  // rad, and a NaN in target_ means unset, so the next compute seeds it and section_ from the measured pose
+  // rad, NaN = unset: the next compute seeds it and section_ from the measured pose
   std::array<double, kActiveJointCount> target_{};
   std::array<std::array<double, 3>, kActiveJointCount> section_{};
 
-  // 0..1, and a NaN means unset, so the next compute starts at the setting
+  // 0..1, NaN = unset: the next compute starts it at the setting
   std::array<double, kActiveJointCount> stiffness_{};
 };
 

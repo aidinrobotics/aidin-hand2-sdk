@@ -60,12 +60,12 @@ void HandCore::run_event_logging_loop()
     log_pending_events();
     flush_log();
   } catch (const std::exception& thread_exception) {
-    log_critical(hand_side_, std::string("event logging thread terminated: ") + thread_exception.what() +
-                 " — realtime events will no longer be logged");
+    log_critical(hand_side_, error_code::kEventLoggingTerminated,
+                 std::string("event logging thread terminated (") + thread_exception.what() + ")");
     flush_log();
   } catch (...) {
-    log_critical(hand_side_, "event logging thread terminated: unknown exception"
-                 " — realtime events will no longer be logged");
+    log_critical(hand_side_, error_code::kEventLoggingTerminated,
+                 "event logging thread terminated (unknown exception)");
     flush_log();
   }
 }
@@ -74,92 +74,61 @@ void HandCore::log_pending_events()
 {
   RealtimeEvent event{};
   while (event_ring_.pop(event)) {
-    const std::string cycle_prefix = "[cycle " + std::to_string(event.cycle) + "] ";
     switch (event.kind) {
       case RealtimeEventKind::ActuatorFaultSet:
         // The fault mask keeps the other actuators running, so this is a warning
-        log_warn(hand_side_, cycle_prefix + "actuator " + std::to_string(event.actuator_index) + " fault set (" +
-                 fault_description(event.detail) + ")");
+        log_warn(hand_side_, error_code::kActuatorFault,
+                 "actuator " + std::to_string(event.actuator_index) + " fault set (" +
+                     fault_description(event.detail) + ")");
         break;
       case RealtimeEventKind::ActuatorFaultCleared:
-        log_info(hand_side_, cycle_prefix + "actuator " + std::to_string(event.actuator_index) + " fault cleared");
+        log_info(hand_side_, "actuator " + std::to_string(event.actuator_index) + " fault cleared");
         break;
-      case RealtimeEventKind::ReceiveSilence: {
-        const std::string base =
-            cycle_prefix + "communication lost (no RX" +
-            receive_anomaly_suffix(event.detail, event.can_error_class) + ")";
-        if (event.stop_latched) {
-          // Only RX died, so the quick stop is still reaching the wire and only its confirmation is lost
-          log_critical(hand_side_, base + " — sending quick stop; awaiting confirmation");
-        } else if (event.lifecycle == HandLifecycle::Stopped) {
-          log_critical(hand_side_, base +
-                       " while stopped — hand is no longer observable; call reconnect() to recover");
-        } else if (event.lifecycle == HandLifecycle::Connected) {
-          log_critical(hand_side_, base +
-                       " while connected — hand is no longer observable; call reconnect() to recover");
-        } else {
-          log_warn(hand_side_, base + " — check CAN link and hand power");
-        }
-        break;
-      }
-      case RealtimeEventKind::ReceiveRestored:
-        log_info(hand_side_, cycle_prefix + "communication restored (RX resumed)" +
-                 (event.lifecycle == HandLifecycle::Faulted  ? " — call reconnect() to recover"
-                  : event.lifecycle == HandLifecycle::Stopped ? " — call run() to resume"
-                                                              : ""));
+      case RealtimeEventKind::ReceiveSilence:
+        log_critical(hand_side_, error_code::kReceiveLost,
+                     "communication lost (no RX" + receive_anomaly_suffix(event.detail) + ")");
         break;
       case RealtimeEventKind::TransmitFailure:
-        // Reported at once rather than waiting out the verdict window, because the quick stop
-        // cannot be delivered at all
-        log_critical(hand_side_, cycle_prefix + "CAN TX failed" + transmit_errno_suffix(event.detail) +
-                     " — cannot deliver quick stop, retrying; drives may hold last command");
-        break;
-      case RealtimeEventKind::StopConfirmed:
-        log_info(hand_side_, cycle_prefix + "quick stop attained — drives torque-free" +
-                 (event.lifecycle == HandLifecycle::Faulted ? "; call reconnect() to recover" : ""));
-        break;
-      case RealtimeEventKind::StopNotConfirmed:
-        log_critical(hand_side_, cycle_prefix + "quick stop NOT confirmed" +
-                     " — drives may hold last torque command; restore CAN link or power off the hand");
+        log_critical(hand_side_, error_code::kTransmitFailed,
+                     "CAN TX failed" + transmit_errno_suffix(event.detail));
         break;
       case RealtimeEventKind::ControlLoopFailure:
         // The exception text cannot travel as POD, so the dying thread logs it itself
         break;
       case RealtimeEventKind::HomingPhaseEntered:
-        log_info(hand_side_, cycle_prefix + "homing: " +
+        log_info(hand_side_, std::string("homing: ") +
                  homing_phase_text(static_cast<HomingPhase>(event.detail)));
         break;
       case RealtimeEventKind::HomingCompleted:
-        log_info(hand_side_, cycle_prefix + "homing complete — home position established");
+        log_info(hand_side_, "homing complete — home position established");
         break;
       case RealtimeEventKind::HomingFailed:
         // Index -1 is the whole hand, index 0 and up is one actuator's status word
         if (event.actuator_index >= 0) {
-          log_debug(hand_side_, cycle_prefix + "homing failed: actuator " +
+          log_debug(hand_side_, "homing failed: actuator " +
                     std::to_string(event.actuator_index) + " status " +
                     to_hex16(static_cast<std::uint16_t>(event.detail)));
         } else {
           const auto outcome = static_cast<HomingOutcome>(event.detail);
           const std::string actuators = actuator_mask_text(event.actuator_mask);
-          log_warn(hand_side_, cycle_prefix + "homing failed at " +
-                   homing_phase_text(homing_failure_phase(outcome)) + ": " +
-                   homing_failure_reason(outcome) +
-                   (actuators.empty() ? "" : " (actuators " + actuators + ")") +
-                   " — home position NOT established; retry home()");
+          log_warn(hand_side_, error_code::kHomingFailed,
+                   std::string("homing failed at ") + homing_phase_text(homing_failure_phase(outcome)) +
+                       ": " + homing_failure_reason(outcome) +
+                       (actuators.empty() ? "" : " (actuators " + actuators + ")"));
         }
         break;
       case RealtimeEventKind::TactileBiasSet:
-        log_info(hand_side_, cycle_prefix + "tactile bias set — current tactile values are now zero");
+        log_info(hand_side_, "tactile bias set — current tactile values are now zero");
         break;
       case RealtimeEventKind::TactileBiasReset:
-        log_info(hand_side_, cycle_prefix + "tactile bias reset — tactile values are raw again");
+        log_info(hand_side_, "tactile bias reset — tactile values are raw again");
         break;
     }
   }
   const std::uint64_t dropped = event_ring_.count_dropped();
   if (dropped != count_reported_dropped_) {
     log_warn(hand_side_, std::to_string(dropped - count_reported_dropped_) +
-             " realtime events dropped (event ring full)");
+                             " realtime events dropped (event ring full)");
     count_reported_dropped_ = dropped;
   }
 }

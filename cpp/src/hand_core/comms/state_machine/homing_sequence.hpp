@@ -72,7 +72,7 @@ enum class HomingPhase {
 }
 
 // Homing state machine, pure logic with no transport
-// home() starts it and every RT cycle drives it through step()
+// HandComms::start_homing() starts it and every RT cycle drives it through step()
 //
 // An actuator that never reaches Operation Enabled inside the enable window counts as absent,
 // so a dead motor cannot block the connected ones

@@ -1,7 +1,7 @@
 // Purpose: fail the build when the public ABI changes, so that the version bump is not forgotten.
 //
-// Why this exists: the SDK ships as libaidin_hand2.so.0.4, and the SOVERSION boundary is the
-//   minor. A consumer that does not rebuild keeps loading whatever 0.4.x is installed. So if a
+// Why this exists: the SDK ships as libaidin_hand2.so.0.<minor>, and the SOVERSION boundary is the
+//   minor. A consumer that does not rebuild keeps loading whatever 0.<minor>.x is installed. So if a
 //   field is added to a public struct, or an enumerator is inserted mid-enum, and the minor is
 //   not bumped, the old consumer loads the new library and there is no diagnostic:
 //     - a grown struct returned by value overruns the caller's return slot (stack smashing)
@@ -42,9 +42,8 @@ struct SizeLock {
 
 #define AIDIN_ABI_SIZE_LOCK(T, expected) template struct SizeLock<T, sizeof(T), expected>
 
-AIDIN_ABI_SIZE_LOCK(HandState,               1320);
-AIDIN_ABI_SIZE_LOCK(HandStateJointVelEff,     512);
-AIDIN_ABI_SIZE_LOCK(Diagnostics,               96);
+AIDIN_ABI_SIZE_LOCK(HandState,               1656);
+AIDIN_ABI_SIZE_LOCK(Diagnostics,              104);
 AIDIN_ABI_SIZE_LOCK(HandConfig,                88);
 AIDIN_ABI_SIZE_LOCK(ControllerConfig,         168);
 AIDIN_ABI_SIZE_LOCK(Idle,                       1);
@@ -52,7 +51,7 @@ AIDIN_ABI_SIZE_LOCK(JointPositionCommand,     128);
 AIDIN_ABI_SIZE_LOCK(JointImpedanceCommand,    128);
 AIDIN_ABI_SIZE_LOCK(ActuatorPositionCommand,  128);
 AIDIN_ABI_SIZE_LOCK(ActuatorEffortCommand,    128);
-AIDIN_ABI_SIZE_LOCK(Hand,                      16);
+AIDIN_ABI_SIZE_LOCK(Hand,                      24);
 AIDIN_ABI_SIZE_LOCK(HandManager,               24);
 AIDIN_ABI_SIZE_LOCK(Exception,                 24);
 
@@ -64,9 +63,9 @@ static_assert(static_cast<int>(HandLifecycle::Faulted) == 4, "HandLifecycle renu
 static_assert(static_cast<int>(HomingState::Failed) == 3, "HomingState renumbered");
 static_assert(static_cast<int>(CommandMode::ActuatorEffort) == 4, "CommandMode renumbered");
 static_assert(static_cast<int>(CommandSource::Homing) == 3, "CommandSource renumbered");
-static_assert(static_cast<int>(ErrorCode::UnexpectedError) == 7, "ErrorCode renumbered");
+static_assert(static_cast<int>(ErrorKind::UnexpectedError) == 8, "ErrorKind renumbered");
 static_assert(static_cast<int>(HandSide::Right) == 1, "HandSide renumbered");
-static_assert(static_cast<int>(HandType::Gen2_B) == 1, "HandType renumbered");
+static_assert(static_cast<int>(HandModel::Gen2B) == 1, "HandModel renumbered");
 static_assert(static_cast<int>(Finger::Baby) == 4, "Finger renumbered");
 static_assert(static_cast<int>(LogLevel::Off) == 6, "LogLevel renumbered");
 

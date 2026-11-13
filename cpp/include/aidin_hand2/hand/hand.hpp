@@ -63,7 +63,7 @@ class Hand {
   void set_max_effort(double limit);
   void set_max_effort(const std::array<double, kActuatorCount>& limit);
 
-  // Set the position filter and the impedance gains, with how those gains become effort
+  // Set the position filter and the impedance gains
   void set_controller_config(const ControllerConfig& config);
 
   // -------------------------------- Tactile ---------------------------------
@@ -89,9 +89,12 @@ class Hand {
   [[nodiscard]] CommandMode get_command_mode() const;
 
  private:
-  explicit Hand(std::weak_ptr<HandCore> core);
+  Hand(std::weak_ptr<HandCore> core, HandSide side);
 
   std::weak_ptr<HandCore> core_;
+
+  // For the "[left] " of a failure, which may come after the core is gone
+  HandSide side_;
 
   friend class HandManager;
 };

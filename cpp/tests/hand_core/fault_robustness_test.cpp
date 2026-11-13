@@ -21,7 +21,6 @@
 #include "hand_core/comms/state_machine/cia402.hpp"
 #include "hand_core/comms/state_machine/homing_sequence.hpp"
 #include "hand_core/hand_core.hpp"
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
 
 using namespace aidin_hand2;
 
@@ -55,8 +54,7 @@ void check(bool ok, const char* what)
 
 HandConfig make_config()
 {
-  HandConfig config{"can0", HandSide::Right, HandType::Gen2};  // 절대 open 안 함 (생성만); Right = CAN index identity
-  config.control_rate = 500;
+  HandConfig config{"can0", HandSide::Right, HandModel::Gen2};  // 절대 open 안 함 (생성만); Right = CAN index identity
   return config;
 }
 
@@ -146,8 +144,7 @@ void test_fault_mask_defends_active_actuator(HandCore& core)
     // 모든 관절 20° 자세 → target 0 과 큰 오차, 기본 stiffness 로 큰 토크 유발
     std::array<double, kActiveJointCount> bent{};
     bent.fill(20.0 * 3.14159265358979323846 / 180.0);
-    std::array<int, kActuatorCount> count{};
-    kinematics::ik_joint_to_actuator(kinematics::boundary_of(HandType::Gen2), bent, count);
+    const std::array<int, kActuatorCount> count = ik_joint_to_actuator(HandModel::Gen2, bent);
     HandState state = healthy_state();
     for (std::size_t i = 0; i < kActuatorCount; ++i) state.actuators.position_count[i] = count[i];
     HandCoreTestPeer::fill_joint_state(core, state);
@@ -173,7 +170,7 @@ void test_fk_nan_does_not_propagate()
   constexpr int kImplausibleEncoder = 1000000;  // 도달불가 — thumb/finger FK 가 non-finite 산출
   std::array<int, kActuatorCount> encoder{};
   encoder.fill(kImplausibleEncoder);
-  const auto fk_joints = aidin_hand2::fk_actuator_to_joint(HandType::Gen2, encoder);
+  const auto fk_joints = aidin_hand2::fk_actuator_to_joint(HandModel::Gen2, encoder);
   bool fk_has_nonfinite = false;
   for (double value : fk_joints) if (!std::isfinite(value)) fk_has_nonfinite = true;
   check(fk_has_nonfinite, "public FK produces non-finite for implausible encoder (hazard is real)");

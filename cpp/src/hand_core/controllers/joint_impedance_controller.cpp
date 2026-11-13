@@ -4,8 +4,6 @@
 #include <cmath>
 #include <limits>
 
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
-
 namespace aidin_hand2::controllers
 {
 
@@ -14,17 +12,9 @@ namespace
 
 using Config = ControllerConfig::JointImpedanceController;
 
-// 256 CPT x 4 on the motor shaft
-constexpr double kCountPerRevolution = 1024.0;
-constexpr double kMotorRadPerCount   = 2.0 * 3.14159265358979323846 / kCountPerRevolution;
+constexpr double kPi = 3.14159265358979323846;
 
-// N·m at effort 1000: maxon ECX SPEED 8 M at the drive's 0.4 A
-constexpr double kRatedMotorTorqueNm = 3.62e-3 * 0.4;
-
-// kg·m² per actuator on the motor shaft
-constexpr double kMotorInertia = 3.3e-9;
-
-// N·m/rad on the motor shaft at long finger j3 stiffness 1
+// Nm/rad on the motor shaft at long finger j3 stiffness 1
 constexpr double kHardMotorStiffnessJ3 = 3.62e-5;
 
 // Motor rad per long finger j3 rad, the most the j3 hard stiffness follows
@@ -37,8 +27,8 @@ constexpr std::array<double, kActiveJointCount> kDampingRatio{
 // s, the time constant a new stiffness is approached with
 constexpr double kStiffnessTimeConstant = 0.2;
 
-// rad/s, 250 deg/s, the most a target moves per second
-constexpr double kMaxTargetVelocity = 250.0 * 3.14159265358979323846 / 180.0;
+// rad/s, the most a target moves
+constexpr double kMaxTargetVelocity = 250.0 * kPi / 180.0;
 
 // count, the least a target keeps each actuator off its hard stop at 0
 constexpr int kMinTargetCount = 1000;
@@ -50,7 +40,7 @@ constexpr double kStopZoneCount = 1000.0;
 double lowpass_alpha(double cutoff_freq, double dt_seconds)
 {
   if (!(cutoff_freq > 0.0)) return 1.0;
-  return 1.0 - std::exp(-dt_seconds * 2.0 * 3.14159265358979323846 * cutoff_freq);
+  return 1.0 - std::exp(-dt_seconds * 2.0 * kPi * cutoff_freq);
 }
 
 // Active joints 6, 9, 12 and 15, each driven by the actuator of the same index
@@ -59,13 +49,27 @@ bool is_long_finger_j3(std::size_t joint)
   return joint >= 4 && (joint - 4) % 3 == 2;
 }
 
-// N·m/rad at stiffness 1; the long finger j3 holds its motor-side stiffness, so it follows the pose
-double hard_stiffness(const std::array<double, kActiveJointCount>& hard, std::size_t joint,
-                      const JointJacobian& count_per_joint)
+// rad of the motor shaft per encoder count
+double motor_rad_per_count(const ActuatorConstants& actuator)
 {
-  if (!is_long_finger_j3(joint)) return hard[joint];
+  return 2.0 * kPi / actuator.count_per_revolution;
+}
+
+// Nm on the motor shaft at effort 1000
+double rated_motor_torque(const ActuatorConstants& actuator)
+{
+  return actuator.torque_constant_Nm_per_A * actuator.rated_current_A;
+}
+
+// Nm/rad at stiffness 1; the long finger j3 follows the pose at its motor-side stiffness
+double joint_hard_stiffness(const std::array<double, kActiveJointCount>& hard_stiffness,
+                            const ActuatorConstants& actuator, std::size_t joint,
+                            const JointJacobian& count_per_joint)
+{
+  if (!is_long_finger_j3(joint)) return hard_stiffness[joint];
   const double motor_per_joint = std::min(
-      std::abs(count_per_joint[joint * kActiveJointCount + joint]) * kMotorRadPerCount, kMaxMotorPerJ3);
+      std::abs(count_per_joint[joint * kActiveJointCount + joint]) * motor_rad_per_count(actuator),
+      kMaxMotorPerJ3);
   return kHardMotorStiffnessJ3 * motor_per_joint * motor_per_joint;
 }
 
@@ -87,11 +91,11 @@ std::size_t finger_of(std::size_t index)
 }
 
 // A finger with an IK count below kMinTargetCount takes the FK pose of its counts raised to it
-std::array<double, kActiveJointCount> off_hard_stop(const kinematics::Boundary& kin,
+std::array<double, kActiveJointCount> off_hard_stop(const kinematics::Solver& solver,
                                                      const std::array<double, kActiveJointCount>& target)
 {
   std::array<int, kActuatorCount> count{};
-  kinematics::ik_joint_to_actuator(kin, target, count);
+  solver.ik_joint_to_actuator(target, count);
   std::array<bool, kFingerCount> raised{};
   bool any_raised = false;
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
@@ -104,7 +108,7 @@ std::array<double, kActiveJointCount> off_hard_stop(const kinematics::Boundary& 
 
   std::array<double, kJointCount> joints{};
   std::array<double, kTaskCount> task{};
-  kinematics::fk_actuator_to_joint(kin, count, joints, task);
+  solver.fk_actuator_to_joint(count, joints, task);
   const std::array<double, kActiveJointCount> lifted = active_joints_of(joints);
   std::array<double, kActiveJointCount> result = target;
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
@@ -114,12 +118,13 @@ std::array<double, kActiveJointCount> off_hard_stop(const kinematics::Boundary& 
 }
 
 // rad/s from the drives' velocity_rpm
-std::array<double, kActiveJointCount> joint_velocity(const HandState& state, const JointJacobian& joint_per_count)
+std::array<double, kActiveJointCount> joint_velocity(const ActuatorConstants& actuator, const HandState& state,
+                                                      const JointJacobian& joint_per_count)
 {
   std::array<double, kActiveJointCount> velocity{};
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
     for (std::size_t i = 0; i < kActuatorCount; ++i) {
-      const double count_rate = state.actuators.velocity_rpm[i] * kCountPerRevolution / 60.0;
+      const double count_rate = state.actuators.velocity_rpm[i] * actuator.count_per_revolution / 60.0;
       velocity[j] += joint_per_count[j * kActuatorCount + i] * count_rate;
     }
   }
@@ -129,7 +134,7 @@ std::array<double, kActiveJointCount> joint_velocity(const HandState& state, con
 }  // namespace
 
 std::array<double, kActiveJointCount> joint_impedance_torque(
-    const std::array<double, kActiveJointCount>& hard,
+    const std::array<double, kActiveJointCount>& hard_stiffness, const ActuatorConstants& actuator,
     const std::array<double, kActiveJointCount>& target, const std::array<double, kActiveJointCount>& position,
     const std::array<double, kActiveJointCount>& velocity, const std::array<double, kActiveJointCount>& stiffness,
     const JointJacobian& count_per_joint)
@@ -138,10 +143,10 @@ std::array<double, kActiveJointCount> joint_impedance_torque(
   for (std::size_t j = 0; j < kActiveJointCount; ++j) {
     double inertia = 0.0;
     for (std::size_t i = 0; i < kActuatorCount; ++i) {
-      const double motor_per_joint = count_per_joint[i * kActiveJointCount + j] * kMotorRadPerCount;
-      inertia += motor_per_joint * motor_per_joint * kMotorInertia;
+      const double motor_per_joint = count_per_joint[i * kActiveJointCount + j] * motor_rad_per_count(actuator);
+      inertia += motor_per_joint * motor_per_joint * actuator.motor_inertia_kg_m2;
     }
-    const double k           = hard_stiffness(hard, j, count_per_joint) * stiffness[j];
+    const double k           = joint_hard_stiffness(hard_stiffness, actuator, j, count_per_joint) * stiffness[j];
     const double coefficient = 2.0 * kDampingRatio[j] * std::sqrt(k * inertia);
     torque[j] = k * (target[j] - position[j]) - coefficient * velocity[j];
   }
@@ -149,24 +154,30 @@ std::array<double, kActiveJointCount> joint_impedance_torque(
 }
 
 std::array<double, kActuatorCount> joint_torque_to_effort(
-    const std::array<double, kActiveJointCount>& torque, const JointJacobian& joint_per_count)
+    const ActuatorConstants& actuator, const std::array<double, kActiveJointCount>& torque,
+    const JointJacobian& joint_per_count)
 {
   std::array<double, kActuatorCount> effort{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     // Motor torque is the joint torques through d(joint)/d(motor rad)
     double motor_torque = 0.0;
     for (std::size_t j = 0; j < kActiveJointCount; ++j) {
-      // The long finger j3 drives its own actuator only, and j2 holds the linkage's reaction by its stiffness
+      // The long finger j3 drives its own actuator only
+      // j2 holds the linkage's reaction by its stiffness
       if (is_long_finger_j3(j) && i != j) continue;
-      motor_torque += joint_per_count[j * kActuatorCount + i] / kMotorRadPerCount * torque[j];
+      motor_torque += joint_per_count[j * kActuatorCount + i] / motor_rad_per_count(actuator) * torque[j];
     }
-    effort[i] = motor_torque / kRatedMotorTorqueNm * 1000.0;
+    effort[i] = motor_torque / rated_motor_torque(actuator) * 1000.0;
   }
   return effort;
 }
 
-JointImpedanceController::JointImpedanceController(long period_nanoseconds, const HandModel& model)
-: model_(model),
+JointImpedanceController::JointImpedanceController(long period_nanoseconds, const kinematics::Solver& solver,
+                                                   const std::array<double, kActiveJointCount>& hard_stiffness,
+                                                   const ActuatorConstants& actuator)
+: solver_(solver),
+  hard_stiffness_(hard_stiffness),
+  actuator_(actuator),
   dt_seconds_(static_cast<double>(period_nanoseconds) / 1e9),
   stiffness_alpha_(1.0 - std::exp(-dt_seconds_ / kStiffnessTimeConstant))
 {
@@ -209,7 +220,7 @@ std::array<double, kActiveJointCount> JointImpedanceController::filtered_target(
 
     target_[i] += std::clamp(section_[i][2] - target_[i], -max_step, max_step);
   }
-  target_ = off_hard_stop(model_.kinematics, target_);
+  target_ = off_hard_stop(solver_, target_);
   return target_;
 }
 
@@ -223,8 +234,8 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
   const std::array<double, kActiveJointCount> position = active_joints_of(state.joints.position_rad);
   JointJacobian joint_per_count{};
   JointJacobian count_per_joint{};
-  kinematics::jacobian_actuator_to_joint(model_.kinematics, position, joint_per_count);
-  kinematics::jacobian_joint_to_actuator(model_.kinematics, position, count_per_joint);
+  solver_.jacobian_actuator_to_joint(position, joint_per_count);
+  solver_.jacobian_joint_to_actuator(position, count_per_joint);
 
   // 2) Target through the low-pass and the velocity limit, stiffness on its way to the setting
   const std::array<double, kActiveJointCount> target = filtered_target(command.target, config, position);
@@ -234,12 +245,12 @@ void JointImpedanceController::compute(const JointImpedanceCommand& command,
   }
 
   // 3) Joint law, then its effort through the transposed Jacobian
-  const std::array<double, kActiveJointCount> velocity = joint_velocity(state, joint_per_count);
-  const std::array<double, kActiveJointCount> torque =
-      joint_impedance_torque(model_.hard_stiffness, target, position, velocity, stiffness_, count_per_joint);
-  const std::array<double, kActuatorCount> effort = joint_torque_to_effort(torque, joint_per_count);
+  const std::array<double, kActiveJointCount> velocity = joint_velocity(actuator_, state, joint_per_count);
+  const std::array<double, kActiveJointCount> torque   = joint_impedance_torque(
+      hard_stiffness_, actuator_, target, position, velocity, stiffness_, count_per_joint);
+  const std::array<double, kActuatorCount> effort = joint_torque_to_effort(actuator_, torque, joint_per_count);
 
-  // 4) CST command — the drive does not cap current in CST, so clamp to ±max_effort here.
+  // 4) CST command within ±max_effort, the only cap: the drive does not cap current in CST
   //    The bound toward the hard stop tapers to 0 over kStopZoneCount
   //    An effort that is not finite sends 0
   for (std::size_t i = 0; i < kActuatorCount; ++i) {

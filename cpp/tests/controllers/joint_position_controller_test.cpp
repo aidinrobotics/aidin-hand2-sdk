@@ -20,8 +20,7 @@
 
 #include "hand_core/comms/canfd/protocol.hpp"  // CommandFrames, mode_of_operation::kCSP
 #include "hand_core/controllers/joint_position_controller.hpp"
-#include "hand_core/hand_model.hpp"
-#include "hand_core/kinematics/hand_kinematics_core.hpp"
+#include "hand_core/kinematics/gen2/kinematics.hpp"
 
 using namespace aidin_hand2;
 
@@ -37,7 +36,7 @@ void check(bool ok, const char* what)
 // 실기와 동일한 제어 주기 — 필터 계수가 dt 에 의존하므로 500Hz 를 그대로 쓴다.
 constexpr long kPeriodNs = 2'000'000;  // 2 ms
 
-const HandModel& kGen2 = hand_model_of(HandType::Gen2);
+const kinematics::Solver& kGen2 = kinematics::gen2::kSolver;
 
 // 기본 config 로 계약을 본다 — deadband 도 여기서 읽어 기본값과 테스트가 어긋나지 않게 한다.
 const ControllerConfig::JointPositionController kConfig{};
@@ -64,7 +63,7 @@ std::array<double, kActiveJointCount> active_from_uniform_encoder(double encoder
   encoder.fill(static_cast<int>(encoder_scalar));
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM>  task{};
-  kinematics::fk_actuator_to_joint(kGen2.kinematics, encoder, joint, task);
+  kGen2.fk_actuator_to_joint(encoder, joint, task);
   std::array<double, kActiveJointCount> active{};
   for (std::size_t k = 0; k < kActiveJointCount; ++k) active[k] = joint[map[k]];
   return active;
@@ -77,7 +76,7 @@ HandState state_from_uniform_encoder(double encoder_scalar)
   encoder.fill(static_cast<int>(encoder_scalar));
   std::array<double, kinematics::JOINT_NUM> joint{};
   std::array<double, kinematics::TASK_NUM>  task{};
-  kinematics::fk_actuator_to_joint(kGen2.kinematics, encoder, joint, task);
+  kGen2.fk_actuator_to_joint(encoder, joint, task);
   HandState state{};
   state.joints.position_rad = joint;
   return state;
@@ -101,7 +100,7 @@ bool all_csp(const canfd::CommandFrames& f)
 canfd::CommandFrames frames_of(const std::array<double, kActiveJointCount>& joint_rad)
 {
   std::array<int, kActuatorCount> cnt{};
-  kinematics::ik_joint_to_actuator(kGen2.kinematics, joint_rad, cnt);
+  kGen2.ik_joint_to_actuator(joint_rad, cnt);
   canfd::CommandFrames frames{};
   for (std::size_t i = 0; i < kActuatorCount; ++i) {
     frames.mode_of_operation[i] = canfd::mode_of_operation::kCSP;
