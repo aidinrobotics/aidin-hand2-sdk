@@ -14,7 +14,7 @@
 
 ## Latest release
 
-- [0.9.0](CHANGELOG.md#unreleased)
+- [0.9.0](CHANGELOG.md#090---2026-11-13)
   - Build
     - `find_package`에서 0.9를 요청하고 다시 빌드하십시오. soname은 `libaidin_hand2.so.0.9`입니다.
   - Hand model

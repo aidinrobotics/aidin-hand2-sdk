@@ -14,7 +14,7 @@ The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. I
 
 ## Latest release
 
-- [0.9.0](CHANGELOG.md#unreleased)
+- [0.9.0](CHANGELOG.md#090---2026-11-13)
   - Build
     - Request 0.9 in `find_package` and rebuild. The soname is `libaidin_hand2.so.0.9`.
   - Hand model

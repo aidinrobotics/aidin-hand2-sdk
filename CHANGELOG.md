@@ -8,6 +8,8 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-13
+
 ### Notable changes
 
 - Build
@@ -575,7 +577,8 @@ upgrading.
 
 - Initial release.
 
-[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.8.0...develop
+[Unreleased]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.9.0...develop
+[0.9.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/aidinrobotics/aidin-hand2-sdk/compare/v0.6.0...v0.7.0
