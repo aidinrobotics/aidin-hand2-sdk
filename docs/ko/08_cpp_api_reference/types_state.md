@@ -8,7 +8,7 @@
 | [`HomingState`](#enum-homingstate) | enum | 원점 상태 |
 | [`ActuatorFault`](#enum-actuatorfault) | enum | actuator error code |
 | [`CommandSource`](#enum-commandsource) | enum | 이번 cycle에 쓴 출처 |
-| [`HandState`](#handstate) | struct | [`get_state()`](hand.md#handget_state)가 돌려주는 값 |
+| [`HandState`](#handstate) | struct | [`get_state()`](hand.md#handget_state)가 반환하는 값 |
 | [`ActuatorState`](#actuatorstate) | struct | actuator 16개의 위치·속도·전류 |
 | [`JointState`](#jointstate) | struct | joint 21개의 각도·속도·추정 토크 |
 | [`TactileState`](#tactilestate) | struct | 촉각 센서 값 |
@@ -151,7 +151,7 @@ effort가 없어 NaN입니다.
 
 값은 센서의 raw value입니다. [`Hand::set_tactile_bias()`](hand.md#handset_tactile_bias)로 bias를
 설정하면 값은 bias와의 차이이며 음수일 수 있습니다.
-[`Hand::get_tactile_bias()`](hand.md#handget_tactile_bias)도 이 type으로 bias를 돌려줍니다.
+[`Hand::get_tactile_bias()`](hand.md#handget_tactile_bias)도 이 type으로 bias를 반환합니다.
 
 ---
 

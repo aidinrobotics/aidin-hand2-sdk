@@ -184,7 +184,7 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 | [`HomingState`](08_cpp_api_reference/types_state.md#enum-homingstate) | enum | 원점 상태 |
 | [`ActuatorFault`](08_cpp_api_reference/types_state.md#enum-actuatorfault) | enum | actuator error code |
 | [`CommandSource`](08_cpp_api_reference/types_state.md#enum-commandsource) | enum | 이번 cycle에 쓴 출처 |
-| [`HandState`](08_cpp_api_reference/types_state.md#handstate) | struct | [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state)가 돌려주는 값 |
+| [`HandState`](08_cpp_api_reference/types_state.md#handstate) | struct | [`Hand::get_state()`](08_cpp_api_reference/hand.md#handget_state)가 반환하는 값 |
 | [`ActuatorState`](08_cpp_api_reference/types_state.md#actuatorstate) | struct | actuator 16개의 위치·속도·전류 |
 | [`JointState`](08_cpp_api_reference/types_state.md#jointstate) | struct | joint 21개의 각도·속도·추정 토크 |
 | [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) | struct | 촉각 센서 값 |
@@ -197,7 +197,7 @@ enum·struct·class·alias 전부입니다. 선언된 파일별로 묶고, 중�
 
 | 타입 | 종류 | 역할 |
 |---|---|---|
-| [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics) | struct | [`Hand::get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)가 돌려주는 값 |
+| [`Diagnostics`](08_cpp_api_reference/types_diagnostics.md#diagnostics) | struct | [`Hand::get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnostics)가 반환하는 값 |
 
 **[`types/error.hpp`](08_cpp_api_reference/types_error.md)**
 

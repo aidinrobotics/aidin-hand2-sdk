@@ -734,7 +734,7 @@ const TactileState bias = hand.get_tactile_bias();   // 빼고 있는 값
 |---|---|
 | [`set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | 요청만 하고 바로 반환합니다. 다음 cycle의 raw value가 bias가 됩니다 |
 | [`reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | 요청만 하고 바로 반환합니다. 다음 cycle부터 bias가 `0`입니다 |
-| [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 값을 돌려줍니다. 설정하지 않았으면 모두 `0`입니다 |
+| [`get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 값을 반환합니다. 설정하지 않았으면 모두 `0`입니다 |
 
 bias가 적용된 cycle부터 `state.tactile` 필드는 taxel마다 raw value에서 bias를 뺀 값이며, 이 값은
 음수일 수 있습니다. bias가 적용되면 log에 `tactile bias set` 줄이 남습니다. bias는
@@ -983,13 +983,13 @@ namespace ah2 = aidin_hand2;
 
 bool shutdown_requested()
 {
-  // 종료 신호를 확인해 돌려줍니다
+  // 종료 신호를 확인해 반환합니다
   return false;
 }
 
 ah2::JointPositionCommand next_command()
 {
-  // 이번 주기에 보낼 목표를 만들어 돌려줍니다. 여기서는 고정 자세를 예로 들었습니다
+  // 이번 주기에 보낼 목표를 만들어 반환합니다. 여기서는 고정 자세를 예로 들었습니다
   ah2::JointPositionCommand command;
   command.target = {
       0.20,  0.35,  0.10, 0.25,   // thumb   j0 j1 j2 j3
@@ -1079,7 +1079,7 @@ externally managed 구조는 외부가 `run`·`stop`·`disconnect`까지 지시�
 namespace ah2 = aidin_hand2;
 
 // ------------------------------ Application ---------------------------------
-// 명령을 받고 결과를 돌려주는 방법은 통신 방식에 따라 다릅니다
+// 명령을 받고 결과를 보내는 방법은 통신 방식에 따라 다릅니다
 
 enum class Kind { Connect, Disconnect, Run, Stop, Home, Reconnect, Command };
 
@@ -1090,13 +1090,13 @@ struct Request {
 
 bool shutdown_requested()
 {
-  // 종료 신호를 확인해 돌려줍니다
+  // 종료 신호를 확인해 반환합니다
   return false;
 }
 
 std::optional<Request> poll_request()
 {
-  // 외부에서 들어온 명령을 하나 꺼냅니다. 없으면 nullopt를 돌려줍니다
+  // 외부에서 들어온 명령을 하나 꺼냅니다. 없으면 nullopt를 반환합니다
   return std::nullopt;
 }
 
@@ -1107,7 +1107,7 @@ void send_state(ah2::HandLifecycle lifecycle, ah2::HomingState homing)
 
 void send_response(const Request& request, bool ok, const std::string& reason)
 {
-  // 명령 처리 결과를 돌려줍니다. 실패하면 reason에 사유가 들어 있습니다
+  // 명령 처리 결과를 보냅니다. 실패하면 reason에 사유가 들어 있습니다
 }
 
 void wait_next_period()
@@ -1147,7 +1147,7 @@ int main()
           }
           send_response(*request, true, "");
         } catch (const ah2::Exception& error) {
-          // 재시도하지 않고 사유를 돌려줍니다. 다시 시도할지는 사용자가 정합니다
+          // 재시도하지 않고 사유를 보냅니다. 다시 시도할지는 사용자가 정합니다
           send_response(*request, false, error.what());
         }
       }

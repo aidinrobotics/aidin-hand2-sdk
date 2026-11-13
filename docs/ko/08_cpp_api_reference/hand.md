@@ -67,7 +67,7 @@ quick stop 상태에 도달한 것을 확인합니다.
 **Postconditions** ｜ `Disconnected`<br>
 **Notes**          ｜ 확인까지 최대 500 ms 기다립니다. 확인하지 못하면 예외를 던지고 연결을 끊지
 않으므로, 그대로 끊어야 하면 [`destroy()`](hand_manager.md#handmanagerdestroy)를 호출하십시오. 도달을 확인하는 동안 fault가
-발생하면 제한 시간을 기다리지 않고 그 fault의 원인을 예외로 돌려줍니다
+발생하면 제한 시간을 기다리지 않고 그 fault의 원인을 담은 예외를 던집니다
 
 ---
 
@@ -130,7 +130,7 @@ quick stop을 요청하고 actuator가 quick stop 상태에 도달한 것을 확
 **Notes**          ｜ 확인까지 최대 500 ms 기다립니다. 확인하지 못하면 예외를 던지고 `Running` 상태로 남으므로
 actuator가 마지막 command를 유지하고 있을 수 있습니다. 다시 호출하면 재호출 시점의 상태를 기준으로 다시
 판정합니다. 도달을 확인하는 동안 fault가 발생하면 제한 시간을 기다리지 않고 그 fault의 원인을
-예외로 돌려줍니다
+담은 예외를 던집니다
 
 ---
 
@@ -245,7 +245,7 @@ bias를 `0`으로 되돌리도록 요청하고 바로 반환합니다. 다음 cy
 [[nodiscard]] TactileState get_tactile_bias() const;
 ```
 
-[`set_tactile_bias()`](#handset_tactile_bias)가 잡아 지금 빼고 있는 값을 돌려줍니다.
+[`set_tactile_bias()`](#handset_tactile_bias)가 잡아 지금 빼고 있는 값을 반환합니다.
 
 **Returns**        ｜ [`TactileState`](types_state.md#tactilestate). bias를 설정하지 않았거나
 [`reset_tactile_bias()`](#handreset_tactile_bias) 뒤에는 모두 `0`<br>
@@ -260,7 +260,7 @@ bias를 `0`으로 되돌리도록 요청하고 바로 반환합니다. 다음 cy
 [[nodiscard]] HandState get_state() const;
 ```
 
-로봇 핸드에서 읽은 최신 값을 돌려줍니다.
+로봇 핸드에서 읽은 최신 값을 반환합니다.
 
 **Returns**        ｜ [`HandState`](types_state.md#handstate)<br>
 **Throws**         ｜ `WrongCallOrder`(파기된 `HandCore` 또는 무효가 된 handle)<br>
@@ -276,7 +276,7 @@ bias를 `0`으로 되돌리도록 요청하고 바로 반환합니다. 다음 cy
 [[nodiscard]] Diagnostics get_diagnostics() const;
 ```
 
-SDK와 제어·통신 루프의 최신 상태를 돌려줍니다.
+SDK와 제어·통신 루프의 최신 상태를 반환합니다.
 
 **Returns**        ｜ [`Diagnostics`](types_diagnostics.md#diagnostics)<br>
 **Throws**         ｜ `WrongCallOrder`(파기된 `HandCore` 또는 무효가 된 handle)<br>
@@ -291,7 +291,7 @@ SDK와 제어·통신 루프의 최신 상태를 돌려줍니다.
 [[nodiscard]] CommandMode get_command_mode() const;
 ```
 
-지금 활성인 controller mode를 돌려줍니다.
+지금 활성인 controller mode를 반환합니다.
 
 **Returns**        ｜ [`CommandMode`](types_command.md#enum-commandmode)<br>
 **Throws**         ｜ `WrongCallOrder`(무효가 된 handle)

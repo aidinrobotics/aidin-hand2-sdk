@@ -57,7 +57,7 @@ enum class HandModel { Gen2, Gen2B };
 constexpr std::optional<HandModel> parse_hand_model(std::string_view text) noexcept;
 ```
 
-`"gen2"`·`"gen2b"`를 대소문자 구분 없이 읽고, 그 밖의 문자열이면 `std::nullopt`를 돌려줍니다.
+`"gen2"`·`"gen2b"`를 대소문자 구분 없이 읽고, 그 밖의 문자열이면 `std::nullopt`를 반환합니다.
 
 ### `to_string()`
 
@@ -65,7 +65,7 @@ constexpr std::optional<HandModel> parse_hand_model(std::string_view text) noexc
 constexpr const char* to_string(HandModel model) noexcept;
 ```
 
-`"gen2"` 또는 `"gen2b"`를 돌려줍니다.
+`"gen2"` 또는 `"gen2b"`를 반환합니다.
 
 ---
 

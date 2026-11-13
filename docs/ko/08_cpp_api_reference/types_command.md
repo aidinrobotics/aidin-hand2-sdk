@@ -21,7 +21,7 @@
 enum class CommandMode { Idle, JointPosition, JointImpedance, ActuatorPosition, ActuatorEffort };
 ```
 
-[`set_command()`](hand.md#handset_command) 인자 type과 1:1이며 [`get_command_mode()`](hand.md#handget_command_mode)가 돌려줍니다.
+[`set_command()`](hand.md#handset_command) 인자 type과 1:1이며 [`get_command_mode()`](hand.md#handget_command_mode)가 반환합니다.
 
 ---
 

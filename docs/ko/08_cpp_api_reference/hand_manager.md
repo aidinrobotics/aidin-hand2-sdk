@@ -10,7 +10,7 @@
 
 ## `HandManager`
 
-manager 자신은 CAN에 연결하지 않습니다. 연결과 제어는 [`create()`](#handmanagercreate)가 돌려준 [`Hand`](hand.md#hand)로
+manager 자신은 CAN에 연결하지 않습니다. 연결과 제어는 [`create()`](#handmanagercreate)가 반환한 [`Hand`](hand.md#hand)로
 합니다. manager가 사라지거나 [`destroy()`](#handmanagerdestroy)를 부르면 파기된 `HandCore`를 가리키던 `Hand`가 전부 무효가
 됩니다.
 
@@ -69,7 +69,7 @@ HandManager& operator=(const HandManager&) = delete;
 ```
 
 config를 검증하고 hand 하나를 만듭니다. 이 시점에는 CAN에 연결하지 않으며, 연결은
-돌려받은 handle의 [`connect()`](hand.md#handconnect)로 합니다.
+반환된 handle의 [`connect()`](hand.md#handconnect)로 합니다.
 
 **Parameters**     ｜ `config` — 만들 hand의 설정<br>
 **Returns**        ｜ 새로 만든 `HandCore`를 가리키는 [`Hand`](hand.md#hand)<br>

@@ -204,7 +204,7 @@ lifecycle은 [`get_diagnostics()`](08_cpp_api_reference/hand.md#handget_diagnost
 [E306] cannot connect hand: CAN interface '<name>' could not be opened (<reason>)
 ```
 
-- 원인: 위의 경우가 아닌 이유로 interface를 열지 못함. `<reason>`은 OS가 돌려준 오류 설명입니다
+- 원인: 위의 경우가 아닌 이유로 interface를 열지 못함. `<reason>`은 OS가 반환한 오류 설명입니다
 - 조치: [CAN-FD setup](05_can_fd_setup.md#1-bring-up-the-interface)의 절차로 interface를 다시 올려 봅니다
 
 ```text
@@ -271,7 +271,7 @@ log 줄의 `no RX` 뒤에 `, last RX error: conflicting command`가 붙으면, �
 [E405] CAN TX failed (errno <number>: <text>)
 ```
 
-- 원인: `Running`에서 송신이 실패해 제어·통신 루프가 `lifecycle` 값을 `Faulted`로 바꿈. `(errno …)`는 OS가 돌려준 오류이고 없을 수도 있습니다
+- 원인: `Running`에서 송신이 실패해 제어·통신 루프가 `lifecycle` 값을 `Faulted`로 바꿈. `(errno …)`는 OS가 반환한 오류이고 없을 수도 있습니다
 - 상태: `Faulted`이고 `fault_code` 필드 값은 `405`입니다. SDK는 이 뒤로 로봇 핸드에 아무것도 보내지 않고, 그 뒤 호출은 [E601](#7-e6xx-handfaulted)로 거부됩니다
 - 조치: 통신을 복구한 뒤 `reconnect()`를 호출합니다
 
@@ -357,7 +357,7 @@ enable 단계에서 일부 actuator만 응답하면, 응답하지 않은 actuato
 [E701] cannot connect hand: failed to start SDK threads (<reason>)
 ```
 
-- 원인: SDK의 thread를 만들지 못함. `<reason>`은 OS가 돌려준 오류입니다
+- 원인: SDK의 thread를 만들지 못함. `<reason>`은 OS가 반환한 오류입니다
 - `connect()`가 실패한 경우: `lifecycle` 값은 `Disconnected`로 남습니다
 - `reconnect()`가 실패한 경우: `lifecycle` 값은 `Faulted`로 남습니다
 - 조치: process의 thread·메모리 한도를 확인한 뒤 실패한 함수를 다시 호출합니다
@@ -414,4 +414,4 @@ actuator에 fault가 없습니다. fault가 생기는 순간에는 [E504](#6-e5x
 | `EmergencySwitchError` · `Sto1Error` · `Sto2Error` | `0xFF05` · `0xFF06` · `0xFF07` |
 | `SerialEncoderChannelAError` · `SerialEncoderChannelBError` | `0xFF24` · `0xFF26` |
 | `SerialEncoderChannelADisconnectedError` · `SerialEncoderChannelBDisconnectedError` | `0xFF25` · `0xFF27` |
-| 표에 없는 값 | drive가 보낸 code가 그대로 들어옴. `to_string()`은 `"Unknown"`을 돌려주고, E504 log에는 `UnknownError`로 적힘 |
+| 표에 없는 값 | drive가 보낸 code가 그대로 들어옴. `to_string()`은 `"Unknown"`을 반환하고, E504 log에는 `UnknownError`로 적힘 |

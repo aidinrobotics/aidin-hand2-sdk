@@ -4,7 +4,7 @@
 
 | Symbol | Kind | Description |
 |---|---|---|
-| [`Diagnostics`](#diagnostics) | struct | [`get_diagnostics()`](hand.md#handget_diagnostics)가 돌려주는 값 |
+| [`Diagnostics`](#diagnostics) | struct | [`get_diagnostics()`](hand.md#handget_diagnostics)가 반환하는 값 |
 
 ---
 
