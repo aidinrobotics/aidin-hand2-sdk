@@ -15,14 +15,25 @@
 ## Latest release
 
 - [0.9.0](CHANGELOG.md#unreleased)
-  - `HandConfig`가 hand model(`HandModel::Gen2`·`Gen2B`)을 받고, 빌드 옵션 `AIDIN_HAND2_HAND_TYPE`과 hand type C는 없어졌습니다.
-  - `HandConfig::control_rate`가 없어졌습니다. 제어 주기는 500 Hz로 고정입니다.
-  - joint impedance controller의 stiffness가 active joint별 0~1 값이 되었습니다.
-  - encoder count 0이 hard stop이 되어, 같은 자세의 actuator 위치가 0.8보다 1000 큽니다.
-  - 오류에 번호(`[E401]` 등)가 붙고 `ErrorCode`가 `ErrorKind`로 바뀌었습니다. `Faulted`에서 거부된 호출은 `HandFaulted`이고, 원인은 `Diagnostics::fault_code`에 있습니다.
-  - SDK가 던진 예외를 log에 남기지 않습니다. 실패는 application이 `what()`으로 남기십시오.
+  - Build
+    - `find_package`에서 0.9를 요청하고 다시 빌드하십시오. soname은 `libaidin_hand2.so.0.9`입니다.
+  - Hand model
+    - hand model은 빌드할 때가 아니라 `HandConfig::hand_model` 필드로 선택합니다(`HandModel::Gen2`·`HandModel::Gen2B` 값).
+    - `AIDIN_HAND2_HAND_TYPE` 빌드 옵션과 hand type C는 제거되었습니다.
+    - kinematics 함수는 첫 인자로 `HandModel` 값을 받습니다.
+  - Control
+    - `HandConfig::control_rate` 필드는 제거되었습니다.
+    - `ControllerConfig::JointImpedanceController` 구조체에서 actuator별 gain인 `stiffness`·`damping` 필드는 제거되었습니다.
+    - `ControllerConfig::JointImpedanceController` 구조체에는 active joint별 0~1 수준을 담는 `stiffness` 필드와, 목표에 쓰는 `filter_enabled`·`cutoff_freq` 필드가 있습니다.
+  - State
+    - `HandState::joints` 필드의 각 joint에 `velocity_rad_s`·`effort_Nm` 필드가 추가되었습니다.
+  - Errors and log
+    - `ErrorCode` enum의 이름이 `ErrorKind`로 변경되었고, 이 값을 반환하던 `Exception::code()`는 `Exception::kind()`가 되었습니다.
+    - `Exception::code()`는 이제 오류 번호(예: 401)를 반환하고, 이 번호는 `what()`에 `[E401]`로 나타납니다.
+    - `ErrorKind::HandFaulted` 값이 추가되었습니다. `Faulted` state에서 거부된 호출은 이 kind로 예외를 던지고, 원인은 `Diagnostics::fault_code` 필드에 있습니다.
+    - SDK가 던진 예외를 log에 남기지 않습니다. application에서 `what()`을 남기십시오.
 - [0.8.0](CHANGELOG.md#080---2026-10-07)
-  - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 바뀌었습니다.
+  - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 변경되었습니다.
   - tactile bias 기능(`Hand::set_tactile_bias()` 등)이 추가되었습니다.
 
 전체 변경은 [CHANGELOG](CHANGELOG.md)에 있습니다.
