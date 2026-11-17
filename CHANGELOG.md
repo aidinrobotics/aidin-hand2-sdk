@@ -8,7 +8,7 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-11-13
+## [0.9.0] - 2026-11-17
 
 ### Notable changes
 
