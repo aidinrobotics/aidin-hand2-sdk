@@ -63,7 +63,7 @@ class Hand {
   void set_max_effort(double limit);
   void set_max_effort(const std::array<double, kActuatorCount>& limit);
 
-  // The cap in effect from the next cycle on, after the clamp
+  // The max effort in effect from the next cycle on, after the clamp
   [[nodiscard]] std::array<double, kActuatorCount> get_max_effort() const;
 
   // Set the position filter and the impedance gains

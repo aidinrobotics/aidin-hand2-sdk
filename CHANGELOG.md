@@ -26,7 +26,7 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a
     value from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
   - The `Hand::get_max_effort()` and `Hand::get_controller_config()` functions are added. They
-    return the effort cap and the controller config in effect.
+    return the max effort and the controller config in effect.
 - State
   - The `velocity_rad_s` and `effort_Nm` fields are added to each joint of the `HandState::joints`
     field.
@@ -52,7 +52,7 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   joint torque. The passive joint4 has a velocity and a NaN effort.
 
 - **`Hand::get_max_effort()` and `Hand::get_controller_config()` return the settings in effect.**
-  The control loop uses them from the next cycle on, and the cap is the value after
+  The control loop uses them from the next cycle on, and the max effort is the value after
   `set_max_effort()` clipped it to [0, 2000]. Before any set they return the defaults, 1000 for
   every actuator and `ControllerConfig{}`. An application no longer keeps its own copy of what it
   set.
@@ -133,10 +133,10 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 - **Breaking: `HandConfig::control_rate`.** The control loop runs at a fixed 500 Hz, the rate the
   robot hand sends its state at. Remove the field from your config.
 
-- **Breaking: `CommandedState::max_effort_pct`.** The cap is a setting like `ControllerConfig`
-  rather than part of the command path, and `Hand::get_max_effort()` returns it. Replace
-  `state.commanded.max_effort_pct` with `hand.get_max_effort()`, which also shows a new cap right
-  after `set_max_effort()`, where the field lagged a cycle.
+- **Breaking: `CommandedState::max_effort_pct`.** The max effort is a setting like
+  `ControllerConfig` rather than part of the command path, and `Hand::get_max_effort()` returns it.
+  Replace `state.commanded.max_effort_pct` with `hand.get_max_effort()`, which also shows a new max
+  effort right after `set_max_effort()`, where the field lagged a cycle.
 
 - **The SDK no longer brings a down CAN interface up.** `connect()` on a down interface fails with
   E305, `CAN interface '<name>' is down`. In 0.8 a process with `CAP_NET_ADMIN`, such as one run as
