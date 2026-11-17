@@ -60,19 +60,17 @@ int main(int argc, char** argv)
     hand.set_max_effort(300.0);
     std::printf("[example] cap set to 300 (30 %% of rated, about 120 mA)\n");
 
-    // 2) The applied value is readable, so there is no need to track it in the application.
-    //    It appears in HandState rather than in Diagnostics, because it is part of the command
-    //    path rather than of the loop's health.
-    const HandState staged = hand.get_state();
-    std::printf("[example] state.commanded.max_effort_pct[0] = %.0f\n\n", staged.commanded.max_effort_pct[0]);
+    // 2) get_max_effort() reads the applied value back, so there is no need to track it in the
+    //    application.
+    std::printf("[example] get_max_effort()[0] = %.0f\n\n", hand.get_max_effort()[0]);
 
     // 3) Out of range does not throw. Anything outside [0, 2000] is pulled to the nearest end,
     //    so a bad number becomes a safe number rather than an exception to handle.
     hand.set_max_effort(5000.0);
     std::printf("[example] asked for 5000, applied %.0f — the range is [0, 2000]\n",
-                hand.get_state().commanded.max_effort_pct[0]);
+                hand.get_max_effort()[0]);
     hand.set_max_effort(-100.0);
-    std::printf("[example] asked for -100, applied %.0f\n\n", hand.get_state().commanded.max_effort_pct[0]);
+    std::printf("[example] asked for -100, applied %.0f\n\n", hand.get_max_effort()[0]);
 
     // 4) A per-actuator array for the other overload. The thumb carries the grasp, so it keeps
     //    the higher cap while the long fingers are held lower.
@@ -83,9 +81,8 @@ int main(int argc, char** argv)
         400.0, 400.0, 400.0,          // ring
         400.0, 400.0, 400.0};         // baby
     hand.set_max_effort(per_actuator);
-    const HandState mixed = hand.get_state();
-    std::printf("[example] per-actuator cap: thumb a0 %.0f, index a1 %.0f\n\n",
-                mixed.commanded.max_effort_pct[0], mixed.commanded.max_effort_pct[4]);
+    const std::array<double, kActuatorCount> applied = hand.get_max_effort();
+    std::printf("[example] per-actuator cap: thumb a0 %.0f, index a1 %.0f\n\n", applied[0], applied[4]);
 
     // 5) Bring the hand under control and home it, then flex every finger. From here on the
     //    controller is asking for a position it may not be able to reach, which is the

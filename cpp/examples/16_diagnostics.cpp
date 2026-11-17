@@ -171,12 +171,17 @@ int main(int argc, char** argv)
                    std::get_if<ActuatorEffortSetpoint>(&state.commanded.controller_output)) {
       std::printf("  controller_output effort, a0 %.1f\n", effort->target_effort_pct[0]);
     }
-    std::printf("  max_effort_pct   a0 %.0f\n", state.commanded.max_effort_pct[0]);
 
-    // 9) ControllerConfig has no getter, so the application keeps its own copy of whatever it
-    //    last set and writes that into the record. Nothing here has set one, so there is
-    //    nothing to write, and the defaults are what were in force.
-    std::printf("  controller_config not set by this program, so the defaults applied\n");
+    // 9) The settings in force, read back from the hand rather than from what the application
+    //    remembers setting. Nothing here has set them, so these are the defaults.
+    const ControllerConfig controller_config = hand.get_controller_config();
+    const ControllerConfig::JointPositionController& position = controller_config.joint_position_controller;
+    const ControllerConfig::JointImpedanceController& impedance = controller_config.joint_impedance_controller;
+    std::printf("  max_effort       a0 %.0f\n", hand.get_max_effort()[0]);
+    std::printf("  joint_position   filter %s, cutoff %.1f Hz, deadband %.6f rad\n",
+                position.filter_enabled ? "on" : "off", position.cutoff_freq, position.deadband);
+    std::printf("  joint_impedance  filter %s, cutoff %.1f Hz, stiffness j0 %.2f\n",
+                impedance.filter_enabled ? "on" : "off", impedance.cutoff_freq, impedance.stiffness[0]);
 
     // 10) disabled_actuators belongs in the record too: an actuator on that list reports no
     //     fault because it is not reported on at all, which reads exactly like a healthy one.

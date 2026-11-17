@@ -68,7 +68,9 @@ with `::` is a member of that class or struct, and one without `::` is a free fu
 | [`Hand::set_command(ActuatorEffortCommand)`](08_cpp_api_reference/hand.md#handset_command) | Actuator effort target |
 | [`Hand::set_max_effort(double)`](08_cpp_api_reference/hand.md#handset_max_effort) | One effort ceiling for every actuator |
 | [`Hand::set_max_effort(array<double, 16>)`](08_cpp_api_reference/hand.md#handset_max_effort) | Per-actuator effort ceiling |
+| [`Hand::get_max_effort()`](08_cpp_api_reference/hand.md#handget_max_effort) | The per-actuator effort ceiling in effect |
 | [`Hand::set_controller_config()`](08_cpp_api_reference/hand.md#handset_controller_config) | Position filter and impedance gains |
+| [`Hand::get_controller_config()`](08_cpp_api_reference/hand.md#handget_controller_config) | The position filter and impedance gains in effect |
 | [`Hand::set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | Take the current tactile values as the bias |
 | [`Hand::reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | Return the tactile bias to `0` |
 | [`Hand::get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | The [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) being subtracted |

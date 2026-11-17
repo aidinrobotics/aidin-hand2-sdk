@@ -14,7 +14,7 @@
 
 ## Latest release
 
-- [0.9.0](CHANGELOG.md#090---2026-11-13)
+- [0.9.0](CHANGELOG.md#090---2026-11-17)
   - Build
     - `find_package`에서 0.9를 요청하고 다시 빌드하십시오. soname은 `libaidin_hand2.so.0.9`입니다.
   - Hand model
@@ -25,8 +25,10 @@
     - `HandConfig::control_rate` 필드는 제거되었습니다.
     - `ControllerConfig::JointImpedanceController` 구조체에서 actuator별 gain인 `stiffness`·`damping` 필드는 제거되었습니다.
     - `ControllerConfig::JointImpedanceController` 구조체에는 active joint별 0~1 값을 담는 `stiffness` 필드와, 목표에 쓰는 `filter_enabled`·`cutoff_freq` 필드가 있습니다.
+    - `Hand::get_max_effort()`·`Hand::get_controller_config()` 함수가 추가되었습니다. 적용 중인 전류 상한과 controller 설정을 반환합니다.
   - State
     - `HandState::joints` 필드의 각 joint에 `velocity_rad_s`·`effort_Nm` 필드가 추가되었습니다.
+    - `CommandedState` 구조체의 `max_effort_pct` 필드는 제거되었습니다. 대신 `Hand::get_max_effort()`로 읽으십시오.
   - Errors and log
     - `ErrorCode` enum의 이름이 `ErrorKind`로 변경되었고, 이 값을 반환하던 `Exception::code()`는 `Exception::kind()`가 되었습니다.
     - `Exception::code()`는 이제 오류 번호(예: 401)를 반환하고, 이 번호는 `what()`에 `[E401]`로 나타납니다.

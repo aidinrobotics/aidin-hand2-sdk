@@ -375,7 +375,7 @@ const std::array<double, ah2::kActuatorCount> max_effort = {
 hand.set_max_effort(max_effort);
 ```
 
-Read the value in effect from the `state.commanded.max_effort_pct` field.
+Read the value in effect with [`get_max_effort()`](08_cpp_api_reference/hand.md#handget_max_effort).
 
 ### 4.2 Controllers
 
@@ -719,7 +719,6 @@ The `state.commanded` field holds the processing of one cycle stage by stage.
 | `controller_input` | The command in effect |
 | `controller_output` | The actuator position or effort setpoint that has passed the limits and the fault mask |
 | `selected_source` | The source that the SDK actually used in this cycle: `None`/`Controller`/`QuickStop`/`Homing` |
-| `max_effort_pct` | The per-actuator upper bound in effect |
 
 The `controller_output` field is a variant, so the value that it holds changes.
 
@@ -889,7 +888,8 @@ A diagnostic record serves to trace a cause later, so record the following items
 - The position of [`JointState`](08_cpp_api_reference/types_state.md#jointstate)
 - The whole `state.commanded` field
 - The whole `Diagnostics` that you read alongside it
-- The [`ControllerConfig`](08_cpp_api_reference/types_config.md#controllerconfig) in effect (the SDK has no getter for it, so the application keeps it)
+- The settings that [`get_max_effort()`](08_cpp_api_reference/hand.md#handget_max_effort) and
+  [`get_controller_config()`](08_cpp_api_reference/hand.md#handget_controller_config) return
 
 A single `Diagnostics` call mixes two moments, so align records with the `state.timestamp` field and
 the monotonic time rather than with the cycle number.
