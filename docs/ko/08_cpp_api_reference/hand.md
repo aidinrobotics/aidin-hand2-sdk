@@ -26,7 +26,9 @@
 | | [`home()`](#handhome) | homing, 완료까지 대기 |
 | Command | [`set_command()`](#handset_command) | command를 latch하고 controller 선택 |
 | Config | [`set_max_effort()`](#handset_max_effort) | actuator 전류 상한 |
+| | [`get_max_effort()`](#handget_max_effort) | 적용 중인 전류 상한 |
 | | [`set_controller_config()`](#handset_controller_config) | filter와 impedance gain |
+| | [`get_controller_config()`](#handget_controller_config) | 적용 중인 filter와 impedance gain |
 | Tactile | [`set_tactile_bias()`](#handset_tactile_bias) | 지금 tactile 값을 `0`으로 |
 | | [`reset_tactile_bias()`](#handreset_tactile_bias) | tactile을 raw value로 되돌림 |
 | | [`get_tactile_bias()`](#handget_tactile_bias) | 지금 빼고 있는 bias |
@@ -189,6 +191,21 @@ actuator 전류 상한을 결정합니다. `double`은 전체 공통, array는 a
 
 ---
 
+### `Hand::get_max_effort()`
+
+```cpp
+[[nodiscard]] std::array<double, kActuatorCount> get_max_effort() const;
+```
+
+제어·통신 루프가 다음 cycle부터 쓰는 actuator 전류 상한을 반환합니다.
+
+**Returns**        ｜ actuator별 상한, 정격 전류의 0.1% 단위. [`set_max_effort()`](#handset_max_effort)가
+`[0, 2000]`으로 자른 뒤의 값이고, 설정하지 않았으면 모두 `1000`<br>
+**Throws**         ｜ `WrongCallOrder`(무효가 된 handle)<br>
+**Notes**          ｜ lifecycle과 무관하게 호출할 수 있습니다
+
+---
+
 ### `Hand::set_controller_config()`
 
 ```cpp
@@ -201,8 +218,21 @@ filter와 impedance gain을 결정합니다. 언제든 호출할 수 있고 다�
 **Throws**         ｜ `WrongCallOrder`(파기된 `HandCore` 또는 무효가 된 handle) ·
 `InvalidArgument` — 필드가 non-finite이거나 허용 범위 밖일 때. 범위는
 [`ControllerConfig`](types_config.md#controllerconfig) 참조<br>
-**Notes**          ｜ 실패하면 기존 설정을 유지합니다. getter가 없으므로 적용값이 필요하면 application에서 직접
-보관하십시오
+**Notes**          ｜ 실패하면 기존 설정을 유지합니다
+
+---
+
+### `Hand::get_controller_config()`
+
+```cpp
+[[nodiscard]] ControllerConfig get_controller_config() const;
+```
+
+제어·통신 루프가 다음 cycle부터 쓰는 filter와 impedance gain을 반환합니다.
+
+**Returns**        ｜ [`ControllerConfig`](types_config.md#controllerconfig). 설정하지 않았으면 기본값<br>
+**Throws**         ｜ `WrongCallOrder`(무효가 된 handle)<br>
+**Notes**          ｜ lifecycle과 무관하게 호출할 수 있습니다
 
 ---
 

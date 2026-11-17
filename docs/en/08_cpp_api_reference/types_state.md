@@ -144,7 +144,6 @@ the bias and can be negative.
 | `controller_input` | [`ControllerCommand`](types_command.md#type-aliases) | The command currently in effect |
 | `controller_output` | [`ControllerOutput`](#type-aliases) | The actuator position or effort setpoint past the limits and the fault mask |
 | `selected_source` | [`CommandSource`](#enum-commandsource) | What was actually used this cycle |
-| `max_effort_pct` | `std::array<double, kActuatorCount>` | The per-actuator ceiling currently in effect |
 
 `controller_output` alone does not tell you the drives received it. How to judge that is in the
 [C++ guide](../07_cpp_usage_guide.md#72-applied-command). Read it together with `selected_source`.

@@ -66,7 +66,9 @@ public 함수 전부입니다. 선언된 파일별로 묶었습니다. 이름은
 | [`Hand::set_command(ActuatorEffortCommand)`](08_cpp_api_reference/hand.md#handset_command) | actuator effort 목표 |
 | [`Hand::set_max_effort(double)`](08_cpp_api_reference/hand.md#handset_max_effort) | 공통 effort 상한 |
 | [`Hand::set_max_effort(array<double, 16>)`](08_cpp_api_reference/hand.md#handset_max_effort) | actuator별 effort 상한 |
+| [`Hand::get_max_effort()`](08_cpp_api_reference/hand.md#handget_max_effort) | 적용 중인 actuator별 effort 상한 |
 | [`Hand::set_controller_config()`](08_cpp_api_reference/hand.md#handset_controller_config) | 위치 filter와 impedance gain |
+| [`Hand::get_controller_config()`](08_cpp_api_reference/hand.md#handget_controller_config) | 적용 중인 위치 filter와 impedance gain |
 | [`Hand::set_tactile_bias()`](08_cpp_api_reference/hand.md#handset_tactile_bias) | 지금 tactile 값을 bias로 잡음 |
 | [`Hand::reset_tactile_bias()`](08_cpp_api_reference/hand.md#handreset_tactile_bias) | tactile bias를 `0`으로 되돌림 |
 | [`Hand::get_tactile_bias()`](08_cpp_api_reference/hand.md#handget_tactile_bias) | 지금 빼고 있는 [`TactileState`](08_cpp_api_reference/types_state.md#tactilestate) |

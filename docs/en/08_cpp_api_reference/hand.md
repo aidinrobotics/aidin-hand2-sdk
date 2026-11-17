@@ -25,7 +25,9 @@ Every method throws [`Exception`](types_error.md#exception--stdruntime_error) on
 | | [`home()`](#handhome) | Home, waiting for the end |
 | Command | [`set_command()`](#handset_command) | Latch a command and pick the controller |
 | Config | [`set_max_effort()`](#handset_max_effort) | Actuator current ceiling |
+| | [`get_max_effort()`](#handget_max_effort) | The current ceiling in effect |
 | | [`set_controller_config()`](#handset_controller_config) | Filter and impedance gains |
+| | [`get_controller_config()`](#handget_controller_config) | The filter and impedance gains in effect |
 | Tactile | [`set_tactile_bias()`](#handset_tactile_bias) | Take the current tactile values as `0` |
 | | [`reset_tactile_bias()`](#handreset_tactile_bias) | Return tactile to the raw values |
 | | [`get_tactile_bias()`](#handget_tactile_bias) | The bias being subtracted |
@@ -179,6 +181,20 @@ clipped<br>
 invalidated handle)<br>
 **Notes**          ｜ Survives [`reconnect()`](#handreconnect)
 
+### `Hand::get_max_effort()`
+
+```cpp
+[[nodiscard]] std::array<double, kActuatorCount> get_max_effort() const;
+```
+
+Returns the actuator current ceiling the control and communication loop uses from the next
+cycle on.
+
+**Returns**        ｜ The ceiling per actuator, in 0.1 % of rated current, after
+[`set_max_effort()`](#handset_max_effort) clipped it to `[0, 2000]`. All `1000` when never set<br>
+**Throws**         ｜ `WrongCallOrder` (invalidated handle)<br>
+**Notes**          ｜ Callable in any lifecycle state
+
 ### `Hand::set_controller_config()`
 
 ```cpp
@@ -191,9 +207,21 @@ Sets the filter and the impedance gains. Callable at any time, applied from the 
 **Throws**         ｜ `WrongCallOrder` (destroyed `HandCore` or invalidated handle) ·
 `InvalidArgument` — a field is non-finite or outside its allowed range, see
 [`ControllerConfig`](types_config.md#controllerconfig)<br>
-**Notes**          ｜ On failure the SDK keeps the previous settings. There is no getter, so
-the application keeps
-the values it applied
+**Notes**          ｜ On failure the SDK keeps the previous settings
+
+### `Hand::get_controller_config()`
+
+```cpp
+[[nodiscard]] ControllerConfig get_controller_config() const;
+```
+
+Returns the filter and the impedance gains the control and communication loop uses from the
+next cycle on.
+
+**Returns**        ｜ [`ControllerConfig`](types_config.md#controllerconfig). The defaults when
+never set<br>
+**Throws**         ｜ `WrongCallOrder` (invalidated handle)<br>
+**Notes**          ｜ Callable in any lifecycle state
 
 ### `Hand::set_tactile_bias()`
 

@@ -162,7 +162,6 @@ effort가 없어 NaN입니다.
 | `controller_input` | [`ControllerCommand`](types_command.md#type-aliases) | 현재 적용 중인 command |
 | `controller_output` | [`ControllerOutput`](#type-aliases) | limit과 fault mask를 지난 actuator position 또는 effort setpoint |
 | `selected_source` | [`CommandSource`](#enum-commandsource) | 이번 cycle에 실제로 쓴 출처 |
-| `max_effort_pct` | `std::array<double, kActuatorCount>` | 적용 중인 actuator별 상한 |
 
 `controller_output` 필드만으로는 actuator가 값을 적용했는지 알 수 없습니다. 판단 방법은
 [C++ guide](../07_cpp_usage_guide.md#72-applied-command)에 있습니다. `selected_source` 필드와 함께

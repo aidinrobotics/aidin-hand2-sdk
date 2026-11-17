@@ -126,12 +126,11 @@ int main(int argc, char** argv)
                   settled.actuators.position_count[kActuator],
                   output->target_position_cnt[kActuator] - settled.actuators.position_count[kActuator]);
     }
-    std::printf("[example] selected_source = %s, max_effort_pct[%zu] = %.0f\n\n",
+    std::printf("[example] selected_source = %s\n\n",
                 settled.commanded.selected_source == CommandSource::Controller ? "Controller"
                 : settled.commanded.selected_source == CommandSource::Homing   ? "Homing"
                 : settled.commanded.selected_source == CommandSource::QuickStop ? "QuickStop"
-                                                                                : "None",
-                kActuator, settled.commanded.max_effort_pct[kActuator]);
+                                                                                : "None");
 
     // 6) A setpoint being present does not mean it reached the motors. Homing and the quick
     //    stop both take the path over, so check selected_source before reading the output as

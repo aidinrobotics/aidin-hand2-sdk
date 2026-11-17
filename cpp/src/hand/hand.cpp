@@ -114,10 +114,20 @@ void Hand::set_max_effort(const std::array<double, kActuatorCount>& limit)
   guard_boundary(side_, "set max effort", [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_max_effort(limit); }); });
 }
 
+std::array<double, kActuatorCount> Hand::get_max_effort() const
+{
+  return guard_boundary(side_, "read max effort", [&] { return lock_core(core_, side_)->max_effort(); });
+}
+
 void Hand::set_controller_config(const ControllerConfig& config)
 {
   guard_boundary(side_, "set controller config",
                  [&] { invoke(core_, side_, [&](HandCore& c) { return c.set_controller_config(config); }); });
+}
+
+ControllerConfig Hand::get_controller_config() const
+{
+  return guard_boundary(side_, "read controller config", [&] { return lock_core(core_, side_)->controller_config(); });
 }
 
 // --------------------------------- Tactile ----------------------------------
