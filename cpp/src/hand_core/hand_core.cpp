@@ -495,6 +495,18 @@ Status HandCore::set_controller_config(const ControllerConfig& config)
   return {};
 }
 
+std::array<double, kActuatorCount> HandCore::max_effort() const
+{
+  std::lock_guard<std::mutex> lock(staging_mutex_);
+  return staging_command_.max_effort_pct;
+}
+
+ControllerConfig HandCore::controller_config() const
+{
+  std::lock_guard<std::mutex> lock(staging_mutex_);
+  return staging_controller_config_;
+}
+
 // --------------------------------- Tactile ----------------------------------
 
 Status HandCore::set_tactile_bias()

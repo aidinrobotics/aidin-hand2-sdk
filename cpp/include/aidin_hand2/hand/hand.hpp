@@ -63,8 +63,14 @@ class Hand {
   void set_max_effort(double limit);
   void set_max_effort(const std::array<double, kActuatorCount>& limit);
 
+  // The cap in effect from the next cycle on, after the clamp
+  [[nodiscard]] std::array<double, kActuatorCount> get_max_effort() const;
+
   // Set the position filter and the impedance gains
   void set_controller_config(const ControllerConfig& config);
+
+  // The config in effect from the next cycle on
+  [[nodiscard]] ControllerConfig get_controller_config() const;
 
   // -------------------------------- Tactile ---------------------------------
 

@@ -107,7 +107,7 @@ int main(int argc, char** argv)
     const auto* capped_setpoint =
         std::get_if<ActuatorEffortSetpoint>(&capped.commanded.controller_output);
     std::printf("[example] asked for 1500 under a cap of %.0f, setpoint %+.1f\n",
-                capped.commanded.max_effort_pct[kActuator],
+                hand.get_max_effort()[kActuator],
                 capped_setpoint != nullptr ? capped_setpoint->target_effort_pct[kActuator] : 0.0);
 
     // 5) Raise the cap and nothing else. The command has not been resent, so this is the cap
@@ -119,7 +119,7 @@ int main(int argc, char** argv)
     const auto* raised_setpoint =
         std::get_if<ActuatorEffortSetpoint>(&raised.commanded.controller_output);
     std::printf("[example] same command, cap raised to %.0f, setpoint %+.1f\n\n",
-                raised.commanded.max_effort_pct[kActuator],
+                hand.get_max_effort()[kActuator],
                 raised_setpoint != nullptr ? raised_setpoint->target_effort_pct[kActuator] : 0.0);
 
     // 6) Release before finishing. Idle is the same zero effort as filling the array with 0,

@@ -3,6 +3,7 @@
 //   - is_command_valid: NaN/Inf 거부 · ActuatorPosition int32 범위 밖 거부 · 유효 command 수락.
 //   - set_controller_config: filter 의 NaN/Inf·음수 거부, joint impedance 값의 기본값과 범위.
 //   - set_max_effort: 범위 내 유지 · 음수 → 0 · 2000 초과 → 2000 · NaN/Inf 거부.
+//   - max_effort()·controller_config(): 기본값, 마지막으로 받아들인 값. 거부된 값은 남지 않는다.
 //
 // 접근 seam: is_command_valid 는 hand_core.cpp 의 anonymous namespace 자유함수라 직접 호출 불가.
 // 대신 public set_command 이 유효성 검사를 감싸므로, 그 반환 Status 로 수락/거부를 관측한다.
@@ -16,7 +17,6 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
-#include <mutex>
 
 #include <aidin_hand2/types/command.hpp>
 #include <aidin_hand2/types/config.hpp>
@@ -39,12 +39,6 @@ struct HandCoreTestPeer {
     core.requested_lifecycle_.store(HandLifecycle::Running);
     core.lifecycle_.store(HandLifecycle::Running);
     core.homing_state_.store(HomingState::Succeeded);
-  }
-  // set_max_effort 가 staging 에 남긴 clamp 결과를 읽는다.
-  static std::array<double, kActuatorCount> staged_max_effort(const HandCore& core)
-  {
-    std::lock_guard<std::mutex> lock(core.staging_mutex_);
-    return core.staging_command_.max_effort_pct;
   }
 };
 }  // namespace aidin_hand2::test
@@ -226,7 +220,7 @@ void test_set_max_effort_clamp(HandCore& core)
 
   check(core.set_max_effort(limit).ok(), "set_max_effort valid returns ok");
 
-  const auto staged = HandCoreTestPeer::staged_max_effort(core);
+  const auto staged = core.max_effort();
   check(staged[0] == 0.0,    "negative max effort clamped to 0");
   check(staged[1] == 2000.0, "above-2000 max effort clamped to 2000");
   check(staged[2] == 0.0,    "max effort lower bound 0 kept");
@@ -244,6 +238,50 @@ void test_set_max_effort_clamp(HandCore& core)
   }
 }
 
+bool same_config(const ControllerConfig& a, const ControllerConfig& b)
+{
+  const auto& ap = a.joint_position_controller;
+  const auto& bp = b.joint_position_controller;
+  const auto& ai = a.joint_impedance_controller;
+  const auto& bi = b.joint_impedance_controller;
+  return ap.filter_enabled == bp.filter_enabled && ap.cutoff_freq == bp.cutoff_freq &&
+         ap.deadband == bp.deadband && ai.stiffness == bi.stiffness &&
+         ai.filter_enabled == bi.filter_enabled && ai.cutoff_freq == bi.cutoff_freq;
+}
+
+// ── Test 7: getter 기본값 — 갓 생성한 core ──
+void test_getter_defaults()
+{
+  const HandCore core(make_config());
+  std::array<double, kActuatorCount> expected{};
+  expected.fill(1000.0);
+  check(core.max_effort() == expected, "default max effort is 1000 per actuator");
+  check(same_config(core.controller_config(), ControllerConfig{}), "default controller config");
+}
+
+// ── Test 8: getter 는 마지막으로 받아들인 값을 돌려주고, 거부된 값은 남기지 않는다 ──
+void test_getters_follow_accepted_values(HandCore& core)
+{
+  std::array<double, kActuatorCount> limit{};
+  limit.fill(700.0);
+  limit[5] = 2500.0;  // clamp 뒤 2000
+  check(core.set_max_effort(limit).ok(), "max effort accepted");
+  std::array<double, kActuatorCount> bad{};  bad.fill(300.0);  bad[0] = kNaN;
+  check(rejected(core.set_max_effort(bad)), "max effort NaN rejected");
+  const auto read = core.max_effort();
+  check(read[0] == 700.0 && read[5] == 2000.0, "max effort reads the clamped accepted value");
+
+  ControllerConfig config{};
+  config.joint_position_controller.cutoff_freq = 25.0;
+  config.joint_impedance_controller.stiffness[7] = 0.3;
+  config.joint_impedance_controller.filter_enabled = false;
+  check(core.set_controller_config(config).ok(), "controller config accepted");
+  ControllerConfig bad_config = config;
+  bad_config.joint_impedance_controller.stiffness[0] = 1.5;
+  check(rejected(core.set_controller_config(bad_config)), "controller config out of range rejected");
+  check(same_config(core.controller_config(), config), "controller config reads the accepted value");
+}
+
 }  // namespace
 
 int main()
@@ -257,6 +295,8 @@ int main()
   test_joint_impedance_config(core);
   test_actuator_position_int32_range(core);
   test_set_max_effort_clamp(core);
+  test_getter_defaults();
+  test_getters_follow_accepted_values(core);
 
   if (g_failures == 0) std::printf("command_validators_test: PASS\n");
   else                 std::printf("command_validators_test: FAIL (%d)\n", g_failures);

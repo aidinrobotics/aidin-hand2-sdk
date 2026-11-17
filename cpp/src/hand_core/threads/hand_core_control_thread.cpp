@@ -612,7 +612,6 @@ void fill_commanded(CommandedState& echo, const HandCommand& command,
                     const canfd::CommandFrames& frames, bool output_available)
 {
   echo.controller_input = command.controller;
-  echo.max_effort_pct = command.max_effort_pct;
   if (!output_available) {
     echo.controller_output = std::monostate{};
     return;

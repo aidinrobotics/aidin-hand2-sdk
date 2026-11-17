@@ -353,7 +353,7 @@ const std::array<double, ah2::kActuatorCount> max_effort = {
 hand.set_max_effort(max_effort);
 ```
 
-적용 중인 값은 `state.commanded.max_effort_pct` 필드로 확인합니다.
+적용 중인 값은 [`get_max_effort()`](08_cpp_api_reference/hand.md#handget_max_effort)로 확인합니다.
 
 ### 4.2 Controllers
 
@@ -679,7 +679,6 @@ joint 토크이고 passive joint인 joint4에서는 NaN입니다([`JointState`](
 | `controller_input` | 현재 적용 중인 command |
 | `controller_output` | limit과 fault mask를 통과한 actuator position 또는 effort setpoint |
 | `selected_source` | 이번 cycle에 실제로 사용한 출처: `None`/`Controller`/`QuickStop`/`Homing` |
-| `max_effort_pct` | 적용 중인 actuator별 상한 |
 
 `controller_output` 필드는 담기는 값이 달라지는 variant입니다.
 
@@ -838,7 +837,8 @@ enable되지 않은 actuator는 command 적용 대상에서 mask되어, position
 - [`JointState`](08_cpp_api_reference/types_state.md#jointstate)의 position
 - `state.commanded` 필드 전체
 - 함께 읽은 `Diagnostics` 전체
-- 적용 중이던 [`ControllerConfig`](08_cpp_api_reference/types_config.md#controllerconfig) (getter가 없으므로 application이 보관합니다)
+- [`get_max_effort()`](08_cpp_api_reference/hand.md#handget_max_effort)와
+  [`get_controller_config()`](08_cpp_api_reference/hand.md#handget_controller_config)가 반환하는 설정값
 
 한 번의 호출로 얻은 `Diagnostics`에는 두 시점이 섞여 있으므로, 기록을 맞출 때는 cycle 번호가 아니라
 `state.timestamp` 필드와 monotonic 시각을 사용하십시오.

@@ -25,9 +25,13 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
     `ControllerConfig::JointImpedanceController` struct are removed.
   - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a
     value from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
+  - The `Hand::get_max_effort()` and `Hand::get_controller_config()` functions are added. They
+    return the effort cap and the controller config in effect.
 - State
   - The `velocity_rad_s` and `effort_Nm` fields are added to each joint of the `HandState::joints`
     field.
+  - The `max_effort_pct` field of the `CommandedState` struct is removed. Read
+    `Hand::get_max_effort()` instead.
 - Errors and log
   - The `ErrorCode` enum is renamed `ErrorKind`, and `Exception::code()`, which returned it, is now
     `Exception::kind()`.
@@ -46,6 +50,12 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   control loop fills them every cycle for the 21 joints. The effort is the joint torque estimated
   from the motor current without transmission losses or friction, so it can differ from the actual
   joint torque. The passive joint4 has a velocity and a NaN effort.
+
+- **`Hand::get_max_effort()` and `Hand::get_controller_config()` return the settings in effect.**
+  The control loop uses them from the next cycle on, and the cap is the value after
+  `set_max_effort()` clipped it to [0, 2000]. Before any set they return the defaults, 1000 for
+  every actuator and `ControllerConfig{}`. An application no longer keeps its own copy of what it
+  set.
 
 - **`connect()` logs a Connection Info block with the setup a run used.** It lists the hand, the
   interface, how the control loop is scheduled, whether its memory is locked, the actuator count and
@@ -122,6 +132,11 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 - **Breaking: `HandConfig::control_rate`.** The control loop runs at a fixed 500 Hz, the rate the
   robot hand sends its state at. Remove the field from your config.
+
+- **Breaking: `CommandedState::max_effort_pct`.** The cap is a setting like `ControllerConfig`
+  rather than part of the command path, and `Hand::get_max_effort()` returns it. Replace
+  `state.commanded.max_effort_pct` with `hand.get_max_effort()`, which also shows a new cap right
+  after `set_max_effort()`, where the field lagged a cycle.
 
 - **The SDK no longer brings a down CAN interface up.** `connect()` on a down interface fails with
   E305, `CAN interface '<name>' is down`. In 0.8 a process with `CAP_NET_ADMIN`, such as one run as

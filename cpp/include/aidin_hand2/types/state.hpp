@@ -169,7 +169,6 @@ struct CommandedState {
   ControllerCommand controller_input{Idle{}};
   ControllerOutput controller_output{};
   CommandSource selected_source{CommandSource::None};
-  std::array<double, kActuatorCount> max_effort_pct{};
 };
 
 // -------------------------------- Hand state --------------------------------

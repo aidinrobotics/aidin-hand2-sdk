@@ -110,6 +110,10 @@ class HandCore {
   [[nodiscard]] Status set_max_effort(const std::array<double, kActuatorCount>& limit);
   [[nodiscard]] Status set_controller_config(const ControllerConfig& config);
 
+  // What the loop takes from the next cycle on, max effort after the clamp
+  [[nodiscard]] std::array<double, kActuatorCount> max_effort() const;
+  [[nodiscard]] ControllerConfig controller_config() const;
+
   // -------------------------------- Tactile ---------------------------------
 
   // Both take effect from the next cycle (non-blocking)
