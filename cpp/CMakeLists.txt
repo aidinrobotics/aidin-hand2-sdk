@@ -24,16 +24,6 @@ find_package(spdlog 1.9 REQUIRED)
 # Prebuilt archives from the private aidin-hand2-kinematics repository, one per hand model, with a
 # C boundary. Both go into libaidin_hand2.so, and HandConfig::hand_model picks one at run time.
 
-# Build options of older releases, dropped with a warning
-foreach(_old_option AIDIN_HAND2_HAND_TYPE AIDIN_HAND2_THUMB_LEAD)
-  if(DEFINED ${_old_option})
-    message(WARNING
-      "${_old_option} is gone and ignored. Every build carries the hand models Gen2 and Gen2B; "
-      "pick one at run time with HandConfig::hand_model.")
-    unset(${_old_option} CACHE)
-  endif()
-endforeach()
-
 set(_kin_dir ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${CMAKE_SYSTEM_PROCESSOR})
 set(_kin_archives libaidin_hand2_kinematics_type_a.a libaidin_hand2_kinematics_type_b.a)
 
