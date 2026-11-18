@@ -41,15 +41,10 @@
 
 ## Architecture
 
-```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart LR
-    App["<b>Application</b><br/>C++ &nbsp;&nbsp;·&nbsp;&nbsp; Python(예정)<br/>ROS 2"]
-    SDK["<b>SDK</b><br/>Control loop &nbsp;·&nbsp; CAN-FD<br/>Logging &nbsp;·&nbsp; Diagnostics"]
-    Hand["<b>Hardware</b><br/>AIDIN Hand Gen2"]
-    App <--> SDK
-    SDK <--> Hand
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture_dark.svg">
+  <img src="docs/assets/architecture.svg" alt="아키텍처">
+</picture>
 
 lifecycle과 명령·상태 API는 [C++ guide](docs/ko/07_cpp_usage_guide.md)를 참고하십시오.
 

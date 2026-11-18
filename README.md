@@ -41,15 +41,10 @@ See [Real-time kernel setup](docs/en/04_real_time_kernel_setup.md) and [CAN-FD s
 
 ## Architecture
 
-```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart LR
-    App["<b>Application</b><br/>C++ &nbsp;&nbsp;·&nbsp;&nbsp; Python (planned)<br/>ROS 2"]
-    SDK["<b>SDK</b><br/>Control loop &nbsp;·&nbsp; CAN-FD<br/>Logging &nbsp;·&nbsp; Diagnostics"]
-    Hand["<b>Hardware</b><br/>AIDIN Hand Gen2"]
-    App <--> SDK
-    SDK <--> Hand
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture_dark.svg">
+  <img src="docs/assets/architecture.svg" alt="Architecture">
+</picture>
 
 For the lifecycle and the command/state API, see the [C++ guide](docs/en/07_cpp_usage_guide.md).
 
