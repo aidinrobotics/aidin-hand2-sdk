@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+
 # Error messages and remedies
 
 SDK가 예외와 log에 붙이는 오류 번호(`E401` 등)로 원인과 조치를 찾는 문서입니다. 호출 순서와 배경은

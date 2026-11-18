@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+
 # Logging
 
 logging은 SDK가 남기는 log를 console·file·callback 세 곳으로 보내는 기능입니다. 이 문서는 세 sink를

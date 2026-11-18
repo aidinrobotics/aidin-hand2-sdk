@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+
 # CAN-FD setup
 
 SDK는 USB CAN-FD adapter를 통해 Linux SocketCAN으로 AIDIN Hand Gen2와 통신합니다(nominal

@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # Real-time kernel setup
 
 Scheduling the SDK's 500 Hz control and communication loop in real time needs a `PREEMPT_RT`

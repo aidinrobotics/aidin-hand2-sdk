@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # Specification
 
 > *Planned.* This page is a placeholder.

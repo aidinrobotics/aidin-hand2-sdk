@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # SDK build & install
 
 Build, test, and install the SDK, then confirm it works with the example. Complete

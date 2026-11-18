@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # Workspace limits
 
 The SDK clamps joint-space commands ([`JointPositionCommand`](08_cpp_api_reference/types_command.md#jointpositioncommand),

@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # C++ guide
 
 The AIDIN Hand Gen2 is a robot hand that moves 21 joints (16 active and 5 passive) with 16 actuators

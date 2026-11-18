@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # CAN-FD setup
 
 The SDK talks to the AIDIN Hand Gen2 over a USB CAN-FD adapter on Linux SocketCAN (1 Mbit/s

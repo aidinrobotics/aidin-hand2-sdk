@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+
 # C++ API Reference
 
 Public 심볼을 header 파일 단위로 정리했습니다. 함수는 선언과 계약을, struct는 필드 표를

@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+
 # SDK build & install
 
 SDK를 빌드·테스트·설치하고 예제로 동작을 확인합니다. 먼저 [CAN-FD setup](05_can_fd_setup.md)을
