@@ -51,7 +51,7 @@
 | Build system | CMake ≥ 3.16 |
 | CAN device | [SocketCAN](https://docs.kernel.org/networking/can.html)이 지원되는 CAN FD capable device |
 | CAN bitrate | arbitration 1 Mbit/s / data 5 Mbit/s |
-| Dependencies | spdlog ≥ 1.9, can-utils |
+| Dependencies | can-utils |
 | Python bindings (예정) | Python ≥ 3.10, numpy |
 | ROS 2 wrapper (선택) | Humble |
 
@@ -102,7 +102,7 @@ Install dependencies:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libspdlog-dev can-utils
+sudo apt install -y build-essential cmake can-utils
 ```
 
 Build and test:

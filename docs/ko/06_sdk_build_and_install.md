@@ -19,11 +19,12 @@ Ubuntu 22.04 / 24.04를 지원합니다. 두 배포판의 apt 패키지가 요�
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libspdlog-dev can-utils
+sudo apt install -y build-essential cmake can-utils
 ```
 
-최소 요구는 spdlog 1.9와 C++17 컴파일러입니다. Eigen은 kinematics 구현에만 쓰이고 그 부분이
-미리 빌드되어 배포되므로 설치하지 않아도 됩니다.
+최소 요구는 C++17 컴파일러입니다. spdlog와 fmt는 저장소에 들어 있어 SDK와 함께 빌드되고,
+Eigen은 kinematics 구현에만 쓰이며 그 부분이 미리 빌드되어 배포되므로 셋 모두 따로 설치하지
+않아도 됩니다.
 
 ## 2. Build
 

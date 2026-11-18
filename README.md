@@ -51,7 +51,7 @@ The configuration below is verified for building and running the SDK.
 | Build system | CMake ≥ 3.16 |
 | CAN device | CAN FD capable device supported by [SocketCAN](https://docs.kernel.org/networking/can.html) |
 | CAN bitrate | 1 Mbit/s arbitration / 5 Mbit/s data |
-| Dependencies | spdlog ≥ 1.9, can-utils |
+| Dependencies | can-utils |
 | Python bindings (planned) | Python ≥ 3.10, numpy |
 | ROS 2 wrapper (optional) | Humble |
 
@@ -103,7 +103,7 @@ Install dependencies:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libspdlog-dev can-utils
+sudo apt install -y build-essential cmake can-utils
 ```
 
 Build and test:

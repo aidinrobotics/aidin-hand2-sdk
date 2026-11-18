@@ -19,11 +19,12 @@ versions, so you do not need to pin versions.
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libspdlog-dev can-utils
+sudo apt install -y build-essential cmake can-utils
 ```
 
-The minimum requirements are spdlog 1.9 and a C++17 compiler. Only the kinematics implementation
-uses Eigen, and that part ships prebuilt, so you do not need to install it.
+The minimum requirement is a C++17 compiler. spdlog and fmt are included in the repository and
+build with the SDK, and only the kinematics implementation uses Eigen, which ships prebuilt, so you
+do not need to install any of the three.
 
 ## 2. Build
 
