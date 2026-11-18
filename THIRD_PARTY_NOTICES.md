@@ -99,7 +99,7 @@ them. The notice is reproduced in
 
 ## can-utils
 
-[README.md](README.md) recommends installing can-utils for bringing up and inspecting a CAN
+The [CAN-FD setup](docs/en/05_can_fd_setup.md) guide installs can-utils for inspecting a CAN
 interface. The SDK never invokes it, and no code path starts an external process. can-utils
 is therefore a separate program a user may choose to run, not a dependency of this software,
 and its license imposes no obligation on this repository.

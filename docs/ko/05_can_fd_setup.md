@@ -19,6 +19,12 @@ SDK가 해당 interface를 사용하도록 설정하는 것까지 다룹니다.
 adapter의 kernel driver를 확인하고, AIDIN Hand Gen2가 연결된 interface를 찾아 CAN-FD로 올린 뒤,
 들어오는 frame으로 각 interface가 어느 side인지 확인합니다.
 
+이 절에서 쓰는 도구를 설치합니다.
+
+```bash
+sudo apt install -y can-utils ethtool gawk
+```
+
 ### 1.1 Check the driver
 
 driver module이 없으면 adapter를 연결해도 CAN network device가 등록되지 않습니다.

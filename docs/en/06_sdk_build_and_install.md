@@ -19,7 +19,7 @@ versions, so you do not need to pin versions.
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake can-utils
+sudo apt install -y build-essential cmake
 ```
 
 The minimum requirement is a C++17 compiler. spdlog and fmt are included in the repository and

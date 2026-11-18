@@ -19,6 +19,12 @@ configure the SDK to use that interface.
 Check the adapter's kernel driver, find the interface the AIDIN Hand Gen2 is connected to, bring
 it up as CAN-FD, and tell which side each interface is from the frames coming in.
 
+Install the tools this section uses.
+
+```bash
+sudo apt install -y can-utils ethtool gawk
+```
+
 ### 1.1 Check the driver
 
 Without the driver module, connecting the adapter registers no CAN network device.
