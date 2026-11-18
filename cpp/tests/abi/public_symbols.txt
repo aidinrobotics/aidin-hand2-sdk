@@ -1,5 +1,5 @@
 # Prefixes of the symbols libaidin_hand2.so may export, as nm -C prints them.
-# Namespace std is matched in exported_symbols.cmake.
+# Namespaces std and __gnu_cxx are matched in exported_symbols.cmake.
 aidin_hand2::Hand::
 aidin_hand2::HandManager::
 typeinfo for aidin_hand2::Exception
