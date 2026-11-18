@@ -1,4 +1,4 @@
-[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+[← AIDIN Hand Gen2 SDK](../../README.ko.md) | [English](../en/08_cpp_api_reference.md) | 한국어
 
 # C++ API Reference
 

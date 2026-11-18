@@ -1,4 +1,4 @@
-[← AIDIN Hand Gen2 SDK](../../README.md)
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/14_workspace_limits.md)
 
 # Workspace limits
 

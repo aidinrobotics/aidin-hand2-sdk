@@ -1,4 +1,4 @@
-[← AIDIN Hand Gen2 SDK](../../README.ko.md)
+[← AIDIN Hand Gen2 SDK](../../README.ko.md) | [English](../en/07_cpp_usage_guide.md) | 한국어
 
 # C++ guide
 

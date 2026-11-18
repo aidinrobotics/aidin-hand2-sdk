@@ -1,4 +1,4 @@
-[← AIDIN Hand Gen2 SDK](../../README.md)
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/06_sdk_build_and_install.md)
 
 # SDK build & install
 

@@ -1,4 +1,4 @@
-[← AIDIN Hand Gen2 SDK](../../README.md)
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/04_real_time_kernel_setup.md)
 
 # Real-time kernel setup
 

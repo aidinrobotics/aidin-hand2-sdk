@@ -1,4 +1,4 @@
-[← C++ API Reference](../08_cpp_api_reference.md)
+[← C++ API Reference](../08_cpp_api_reference.md) | [English](../../en/08_cpp_api_reference/hand_kinematics.md) | 한국어
 
 # `hand/hand_kinematics.hpp`
 
