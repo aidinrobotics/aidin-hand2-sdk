@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md) | [English](../en/01_specification.md) | 한국어
+
 # Specification
 
 > *작성 예정.* 이 문서는 자리표시자입니다.

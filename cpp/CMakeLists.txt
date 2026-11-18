@@ -6,6 +6,7 @@ add_compile_options(-Wall -Wextra)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(GenerateExportHeader)
 
 # version.hpp comes from project(VERSION)
 set(AIDIN_HAND2_GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/include)
@@ -17,22 +18,12 @@ configure_file(
 
 find_package(Threads REQUIRED)
 
-# 1.9 so that an older spdlog fails here rather than inside the build
-find_package(spdlog 1.9 REQUIRED)
+# spdlog with its own fmt, header-only and compiled into the library (third_party/spdlog/VERSION)
+set(AIDIN_HAND2_SPDLOG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/include)
 
 # ── Kinematics ────────────────────────────────────────────────────────────────
 # Prebuilt archives from the private aidin-hand2-kinematics repository, one per hand model, with a
 # C boundary. Both go into libaidin_hand2.so, and HandConfig::hand_model picks one at run time.
-
-# Build options of older releases, dropped with a warning
-foreach(_old_option AIDIN_HAND2_HAND_TYPE AIDIN_HAND2_THUMB_LEAD)
-  if(DEFINED ${_old_option})
-    message(WARNING
-      "${_old_option} is gone and ignored. Every build carries the hand models Gen2 and Gen2B; "
-      "pick one at run time with HandConfig::hand_model.")
-    unset(${_old_option} CACHE)
-  endif()
-endforeach()
 
 set(_kin_dir ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${CMAKE_SYSTEM_PROCESSOR})
 set(_kin_archives libaidin_hand2_kinematics_type_a.a libaidin_hand2_kinematics_type_b.a)
@@ -63,7 +54,10 @@ target_link_libraries(aidin_hand2_kinematics INTERFACE
   aidin_hand2_kinematics_type_a aidin_hand2_kinematics_type_b)
 message(STATUS "aidin_hand2: kinematics = ${_kin_dir} (hand models Gen2 and Gen2B)")
 
-add_library(aidin_hand2 SHARED
+# ── Library ───────────────────────────────────────────────────────────────────
+# The sources compile once, into the shared library and into the tests that reach src/
+
+add_library(aidin_hand2_objects OBJECT
   src/hand/hand.cpp
   src/hand/hand_manager.cpp
   src/hand_core/hand_core.cpp
@@ -87,6 +81,36 @@ add_library(aidin_hand2 SHARED
   src/logging/logging.cpp
 )
 
+target_compile_features(aidin_hand2_objects PUBLIC cxx_std_17)
+
+target_include_directories(aidin_hand2_objects
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# SYSTEM keeps spdlog's warnings out of the build, PUBLIC reaches the tests that include src/
+target_include_directories(aidin_hand2_objects SYSTEM PUBLIC ${AIDIN_HAND2_SPDLOG_INCLUDE_DIR})
+
+# PUBLIC so that a test linking the objects links what they need
+target_link_libraries(aidin_hand2_objects
+  PUBLIC aidin_hand2_kinematics Threads::Threads)
+
+# Hidden unless a public header marks it AIDIN_HAND2_EXPORT
+set_target_properties(aidin_hand2_objects PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON)
+
+generate_export_header(aidin_hand2_objects
+  BASE_NAME aidin_hand2
+  EXPORT_FILE_NAME ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/export.hpp)
+
+# As objects rather than a link, so that the object library stays out of the install export
+add_library(aidin_hand2 SHARED $<TARGET_OBJECTS:aidin_hand2_objects>)
+
 target_compile_features(aidin_hand2 PUBLIC cxx_std_17)
 
 target_include_directories(aidin_hand2
@@ -94,12 +118,10 @@ target_include_directories(aidin_hand2
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${AIDIN_HAND2_GENERATED_INCLUDE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-  PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(aidin_hand2
-  PRIVATE aidin_hand2_kinematics spdlog::spdlog  # absent from the public headers
+  PRIVATE aidin_hand2_kinematics  # absent from the public headers
   PUBLIC Threads::Threads)
 
 # Unresolved symbols fail here, and the archives' symbols stay local to this library
@@ -111,8 +133,7 @@ target_link_options(aidin_hand2 PRIVATE
 # The soname moves with the minor, as SameMinorVersion below
 set_target_properties(aidin_hand2 PROPERTIES
   VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-  POSITION_INDEPENDENT_CODE ON)
+  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
 add_library(aidin_hand2::aidin_hand2 ALIAS aidin_hand2)
 
@@ -120,7 +141,7 @@ option(AIDIN_HAND2_BUILD_TESTS "Build aidin_hand2 unit tests" ON)
 if(AIDIN_HAND2_BUILD_TESTS)
   enable_testing()
 
-  # Tests that link the library and include src/
+  # Tests that link the objects and include src/
   set(AIDIN_HAND2_TESTS
     canfd/byte_order
     canfd/protocol
@@ -151,7 +172,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
   foreach(test_path IN LISTS AIDIN_HAND2_TESTS)
     get_filename_component(test_name ${test_path} NAME)
     add_executable(${test_name}_test tests/${test_path}_test.cpp)
-    target_link_libraries(${test_name}_test PRIVATE aidin_hand2)
+    target_link_libraries(${test_name}_test PRIVATE aidin_hand2_objects)
     target_include_directories(${test_name}_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME ${test_name} COMMAND ${test_name}_test)
   endforeach()
@@ -164,13 +185,34 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_link_libraries(abi_lock_test PRIVATE aidin_hand2)
   add_test(NAME abi_lock COMMAND abi_lock_test)
 
+  # The shared library only, so that the catch is outside the library
+  add_executable(exception_boundary_test tests/abi/exception_boundary_test.cpp)
+  target_link_libraries(exception_boundary_test PRIVATE aidin_hand2)
+  add_test(NAME exception_boundary COMMAND exception_boundary_test)
+
+  # Fails when the library exports more than the public API
+  add_test(NAME exported_symbols
+    COMMAND ${CMAKE_COMMAND}
+      -DLIB=$<TARGET_FILE:aidin_hand2>
+      -DALLOWED=${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/public_symbols.txt
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/exported_symbols.cmake)
+
+  # spdlog and fmt are compiled in, so that one build runs on every supported distribution
+  add_test(NAME needed_libraries
+    COMMAND ${CMAKE_COMMAND}
+      -DLIB=$<TARGET_FILE:aidin_hand2>
+      -DFORBIDDEN=spdlog,fmt
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/needed_libraries.cmake)
+
   # The archives through each model's kinematics.cpp only, without the rest of the SDK
   add_executable(kinematics_core_test tests/kinematics/kinematics_core_test.cpp
     src/hand_core/kinematics/gen2/kinematics.cpp
     src/hand_core/kinematics/gen2b/kinematics.cpp)
+  target_compile_features(kinematics_core_test PRIVATE cxx_std_17)
   target_link_libraries(kinematics_core_test PRIVATE aidin_hand2_kinematics)
   target_include_directories(kinematics_core_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR})
   add_test(NAME kinematics_core COMMAND kinematics_core_test)
 
   # Built from source so that mock_transport.cpp takes the place of transport.cpp
@@ -205,8 +247,9 @@ if(AIDIN_HAND2_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}          # for tests/liveness/mock_transport.hpp
     ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}
   )
+  target_include_directories(liveness_test SYSTEM PRIVATE ${AIDIN_HAND2_SPDLOG_INCLUDE_DIR})
   target_link_libraries(liveness_test PRIVATE
-    aidin_hand2_kinematics spdlog::spdlog Threads::Threads)
+    aidin_hand2_kinematics Threads::Threads)
   add_test(NAME liveness COMMAND liveness_test)
 
   # On a real hand only: HAND_TEST_CAN=can0 ctest -L hardware, a pass without HAND_TEST_CAN
@@ -266,8 +309,23 @@ install(
 
 # Generated, so not in include/
 install(
-  FILES ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/version.hpp
+  FILES
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/version.hpp
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/export.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aidin_hand2
+)
+
+# The notices that travel with a binary that carries spdlog and fmt
+install(
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../NOTICE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../THIRD_PARTY_NOTICES.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../licenses
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
 )
 
 install(

@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 
+#include <aidin_hand2/export.hpp>
 #include <aidin_hand2/hand/hand.hpp>
 #include <aidin_hand2/types/config.hpp>
 
@@ -15,7 +16,7 @@ namespace aidin_hand2
 class HandCore;
 
 // Owns every HandCore and is the only place they are created or destroyed
-class HandManager {
+class AIDIN_HAND2_EXPORT HandManager {
  public:
   // -------------------------------- Lifetime --------------------------------
 

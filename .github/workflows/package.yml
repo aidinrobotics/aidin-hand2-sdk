@@ -1,0 +1,93 @@
+name: Package
+
+# The prebuilt package, built on the oldest supported release for both architectures, because a
+# library built there loads on the newer ones. A tag attaches the packages to a draft release of
+# that tag, which is published by hand; a manual run keeps them as workflow artifacts.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, ubuntu-22.04-arm]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends linux-libc-dev
+
+      # Also builds and runs cpp/tests/package against the package
+      - name: Package
+        run: scripts/package.sh out
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.runner }}
+          path: |
+            out/*.tar.gz
+            out/*.debug
+
+  # The 22.04 package on 24.04, the claim that one build serves both releases
+  newer-release:
+    name: ${{ matrix.runner }} with the 22.04 package
+    needs: package
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            package: package-ubuntu-22.04
+          - runner: ubuntu-24.04-arm
+            package: package-ubuntu-22.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.package }}
+          path: out
+
+      - name: Build and run against the package
+        run: |
+          tar -C out -xzf out/*.tar.gz
+          package=$(find "$PWD/out" -maxdepth 1 -type d -name 'aidin_hand2-*')
+          cmake -S cpp/tests/package -B consumer -DCMAKE_PREFIX_PATH="$package"
+          cmake --build consumer
+          ./consumer/package_consumer
+
+  release:
+    name: draft release
+    needs: [package, newer-release]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Attach to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
+              --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md."
+          fi
+          gh release upload "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --clobber

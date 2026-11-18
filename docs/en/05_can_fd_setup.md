@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/05_can_fd_setup.md)
+
 # CAN-FD setup
 
 The SDK talks to the AIDIN Hand Gen2 over a USB CAN-FD adapter on Linux SocketCAN (1 Mbit/s
@@ -18,6 +20,12 @@ configure the SDK to use that interface.
 
 Check the adapter's kernel driver, find the interface the AIDIN Hand Gen2 is connected to, bring
 it up as CAN-FD, and tell which side each interface is from the frames coming in.
+
+Install the tools this section uses.
+
+```bash
+sudo apt install -y can-utils ethtool gawk
+```
 
 ### 1.1 Check the driver
 

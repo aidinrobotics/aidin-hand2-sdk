@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md) | [English](../en/04_real_time_kernel_setup.md) | 한국어
+
 # Real-time kernel setup
 
 SDK의 500 Hz 제어·통신 루프를 실시간으로 스케줄링하려면 `PREEMPT_RT` kernel과, root가 아닌 user가

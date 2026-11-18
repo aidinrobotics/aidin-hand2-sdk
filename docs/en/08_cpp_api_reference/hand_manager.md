@@ -1,4 +1,4 @@
-[← C++ API Reference](../08_cpp_api_reference.md)
+[← C++ API Reference](../08_cpp_api_reference.md) | English | [한국어](../../ko/08_cpp_api_reference/hand_manager.md)
 
 # `hand/hand_manager.hpp`
 

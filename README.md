@@ -1,6 +1,11 @@
 <div align="center">
 
-<a href="https://www.aidinrobotics.co.kr/"><img height="240" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2 — AIDIN Robotics"></a>
+<a href="https://www.aidinrobotics.co.kr/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/aidin_hand2_logo_dark.webp">
+    <img height="260" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2, AIDIN Robotics">
+  </picture>
+</a>
 
 <h1>AIDIN Hand Gen2 SDK</h1>
 
@@ -14,31 +19,7 @@ The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. I
 
 ## Latest release
 
-- [0.9.0](CHANGELOG.md#090---2026-11-18)
-  - Build
-    - Request 0.9 in `find_package` and rebuild. The soname is `libaidin_hand2.so.0.9`.
-  - Hand model
-    - The hand model is chosen with the `HandConfig::hand_model` field (the `HandModel::Gen2` or `HandModel::Gen2B` value), not at build time.
-    - The `AIDIN_HAND2_HAND_TYPE` build option and hand type C are removed.
-    - The kinematics functions take a `HandModel` value as their first argument.
-  - Control
-    - The `HandConfig::control_rate` field is removed.
-    - The per-actuator gain fields `stiffness` and `damping` of the `ControllerConfig::JointImpedanceController` struct are removed.
-    - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a value from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
-    - The `Hand::get_max_effort()` and `Hand::get_controller_config()` functions are added. They return the max effort and the controller config in effect.
-  - State
-    - The `velocity_rad_s` and `effort_Nm` fields are added to each joint of the `HandState::joints` field.
-    - The `max_effort_pct` field of the `CommandedState` struct is removed. Read `Hand::get_max_effort()` instead.
-  - Errors and log
-    - The `ErrorCode` enum is renamed `ErrorKind`, and `Exception::code()`, which returned it, is now `Exception::kind()`.
-    - `Exception::code()` now returns the error number, such as 401, which `what()` shows as `[E401]`.
-    - The `ErrorKind::HandFaulted` value is added. A call refused in the `Faulted` state throws with this kind, and the cause is in the `Diagnostics::fault_code` field.
-    - The SDK no longer logs the exceptions it throws. Record `what()` in your application.
-- [0.8.0](CHANGELOG.md#080---2026-10-07)
-  - `TactileState` changed from `std::uint16_t` to `std::int32_t`.
-  - Added the tactile bias (`Hand::set_tactile_bias()` and related functions).
-
-All changes are in the [CHANGELOG](CHANGELOG.md).
+[0.9.0](CHANGELOG.md#090---2026-11-18) (2026-11-18). All changes are in the [CHANGELOG](CHANGELOG.md).
 
 ## System Requirements
 
@@ -51,7 +32,6 @@ The configuration below is verified for building and running the SDK.
 | Build system | CMake ≥ 3.16 |
 | CAN device | CAN FD capable device supported by [SocketCAN](https://docs.kernel.org/networking/can.html) |
 | CAN bitrate | 1 Mbit/s arbitration / 5 Mbit/s data |
-| Dependencies | spdlog ≥ 1.9, can-utils |
 | Python bindings (planned) | Python ≥ 3.10, numpy |
 | ROS 2 wrapper (optional) | Humble |
 
@@ -61,15 +41,10 @@ See [Real-time kernel setup](docs/en/04_real_time_kernel_setup.md) and [CAN-FD s
 
 ## Architecture
 
-```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart LR
-    App["<b>Application</b><br/>C++ &nbsp;&nbsp;·&nbsp;&nbsp; Python (planned)<br/>ROS 2"]
-    SDK["<b>SDK</b><br/>Control loop &nbsp;·&nbsp; CAN-FD<br/>Logging &nbsp;·&nbsp; Diagnostics"]
-    Hand["<b>Hardware</b><br/>AIDIN Hand Gen2"]
-    App <--> SDK
-    SDK <--> Hand
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture_dark.svg">
+  <img src="docs/assets/architecture.svg" alt="Architecture">
+</picture>
 
 For the lifecycle and the command/state API, see the [C++ guide](docs/en/07_cpp_usage_guide.md).
 
@@ -103,15 +78,14 @@ Install dependencies:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libspdlog-dev can-utils
+sudo apt install -y build-essential cmake
 ```
 
-Build and test:
+Build:
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build cpp/build -j"$(nproc)"
-ctest --test-dir cpp/build --output-on-failure
 ```
 
 Install:

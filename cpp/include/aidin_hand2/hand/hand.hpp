@@ -6,6 +6,7 @@
 #include <array>
 #include <memory>
 
+#include <aidin_hand2/export.hpp>
 #include <aidin_hand2/types/command.hpp>
 #include <aidin_hand2/types/config.hpp>
 #include <aidin_hand2/types/diagnostics.hpp>
@@ -18,7 +19,7 @@ namespace aidin_hand2
 class HandCore;
 
 // Non-owning handle to one hand; HandManager owns the resources
-class Hand {
+class AIDIN_HAND2_EXPORT Hand {
  public:
   // ------------------------------- Connection -------------------------------
 

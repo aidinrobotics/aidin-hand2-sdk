@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/01_specification.md)
+
 # Specification
 
 > *Planned.* This page is a placeholder.

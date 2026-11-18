@@ -6,6 +6,14 @@
 #include <string>
 #include <utility>
 
+// The bundled spdlog in cpp/third_party, header-only with its own fmt, whatever an including
+// project defines
+#undef SPDLOG_COMPILED_LIB
+#undef SPDLOG_SHARED_LIB
+#undef SPDLOG_FMT_EXTERNAL
+#undef SPDLOG_FMT_EXTERNAL_HO
+#undef SPDLOG_USE_STD_FORMAT
+
 #include <spdlog/common.h>
 #include <spdlog/logger.h>
 #include <spdlog/pattern_formatter.h>
