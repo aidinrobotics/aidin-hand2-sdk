@@ -18,8 +18,8 @@ configure_file(
 
 find_package(Threads REQUIRED)
 
-# 1.9 so that an older spdlog fails here rather than inside the build
-find_package(spdlog 1.9 REQUIRED)
+# spdlog with its own fmt, header-only and compiled into the library (third_party/spdlog/VERSION)
+set(AIDIN_HAND2_SPDLOG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/include)
 
 # ── Kinematics ────────────────────────────────────────────────────────────────
 # Prebuilt archives from the private aidin-hand2-kinematics repository, one per hand model, with a
@@ -91,9 +91,12 @@ target_include_directories(aidin_hand2_objects
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# SYSTEM keeps spdlog's warnings out of the build, PUBLIC reaches the tests that include src/
+target_include_directories(aidin_hand2_objects SYSTEM PUBLIC ${AIDIN_HAND2_SPDLOG_INCLUDE_DIR})
+
 # PUBLIC so that a test linking the objects links what they need
 target_link_libraries(aidin_hand2_objects
-  PUBLIC aidin_hand2_kinematics spdlog::spdlog Threads::Threads)
+  PUBLIC aidin_hand2_kinematics Threads::Threads)
 
 # Hidden unless a public header marks it AIDIN_HAND2_EXPORT
 set_target_properties(aidin_hand2_objects PROPERTIES
@@ -118,7 +121,7 @@ target_include_directories(aidin_hand2
 )
 
 target_link_libraries(aidin_hand2
-  PRIVATE aidin_hand2_kinematics spdlog::spdlog  # absent from the public headers
+  PRIVATE aidin_hand2_kinematics  # absent from the public headers
   PUBLIC Threads::Threads)
 
 # Unresolved symbols fail here, and the archives' symbols stay local to this library
@@ -194,6 +197,13 @@ if(AIDIN_HAND2_BUILD_TESTS)
       -DALLOWED=${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/public_symbols.txt
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/exported_symbols.cmake)
 
+  # spdlog and fmt are compiled in, so that one build runs on every supported distribution
+  add_test(NAME needed_libraries
+    COMMAND ${CMAKE_COMMAND}
+      -DLIB=$<TARGET_FILE:aidin_hand2>
+      -DFORBIDDEN=spdlog,fmt
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/needed_libraries.cmake)
+
   # The archives through each model's kinematics.cpp only, without the rest of the SDK
   add_executable(kinematics_core_test tests/kinematics/kinematics_core_test.cpp
     src/hand_core/kinematics/gen2/kinematics.cpp
@@ -236,8 +246,9 @@ if(AIDIN_HAND2_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}          # for tests/liveness/mock_transport.hpp
     ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}
   )
+  target_include_directories(liveness_test SYSTEM PRIVATE ${AIDIN_HAND2_SPDLOG_INCLUDE_DIR})
   target_link_libraries(liveness_test PRIVATE
-    aidin_hand2_kinematics spdlog::spdlog Threads::Threads)
+    aidin_hand2_kinematics Threads::Threads)
   add_test(NAME liveness COMMAND liveness_test)
 
   # On a real hand only: HAND_TEST_CAN=can0 ctest -L hardware, a pass without HAND_TEST_CAN
@@ -301,6 +312,19 @@ install(
     ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/version.hpp
     ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/export.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aidin_hand2
+)
+
+# The notices that travel with a binary that carries spdlog and fmt
+install(
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../NOTICE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../THIRD_PARTY_NOTICES.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../licenses
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
 )
 
 install(

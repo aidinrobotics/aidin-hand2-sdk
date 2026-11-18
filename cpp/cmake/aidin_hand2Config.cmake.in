@@ -3,8 +3,7 @@
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)  # aidin_hand2 links Threads::Threads PUBLIC
 
-# Eigen and spdlog end inside the shared library. Eigen is header-only and compiles away, and
-# spdlog is resolved at runtime through DT_NEEDED. Neither is needed at the consumer's link step.
+# Eigen, spdlog and fmt are compiled into the shared library, so the consumer needs none of them
 
 include("${CMAKE_CURRENT_LIST_DIR}/aidin_hand2Targets.cmake")
 
