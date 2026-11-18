@@ -142,7 +142,7 @@ once at startup and do not change it afterwards.
 One log line consists of the following pieces.
 
 ```text
-[1756713600.123456789] [aidin_hand2] [info]     [left] homing complete — home position established
+[1756713600.123456789] [aidin_hand2] [info]     [left] homing complete, home position established
 [1756713600.223456789] [aidin_hand2] [critical] [left] [E404] communication lost (no RX)
 ```
 

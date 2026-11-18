@@ -100,7 +100,7 @@ void HandCore::log_pending_events()
                  homing_phase_text(static_cast<HomingPhase>(event.detail)));
         break;
       case RealtimeEventKind::HomingCompleted:
-        log_info(hand_side_, "homing complete — home position established");
+        log_info(hand_side_, "homing complete, home position established");
         break;
       case RealtimeEventKind::HomingFailed:
         // Index -1 is the whole hand, index 0 and up is one actuator's status word
@@ -118,10 +118,10 @@ void HandCore::log_pending_events()
         }
         break;
       case RealtimeEventKind::TactileBiasSet:
-        log_info(hand_side_, "tactile bias set — current tactile values are now zero");
+        log_info(hand_side_, "tactile bias set, current tactile values read as zero");
         break;
       case RealtimeEventKind::TactileBiasReset:
-        log_info(hand_side_, "tactile bias reset — tactile values are raw again");
+        log_info(hand_side_, "tactile bias reset, tactile values are raw again");
         break;
     }
   }
