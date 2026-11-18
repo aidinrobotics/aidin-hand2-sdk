@@ -12,6 +12,8 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 - Build
   - The SDK no longer needs `libspdlog-dev`. If your application uses spdlog, install it yourself.
+  - `libaidin_hand2.so` exports only the public API. Your application can link its own spdlog or
+    fmt of any version.
 
 ### Changed
 
@@ -19,6 +21,9 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
   12.1.0 it bundles in `cpp/third_party/spdlog`, so a build needs no spdlog package and
   `libaidin_hand2.so` no longer loads `libspdlog` or `libfmt` at run time. An install also places
   the license notices in `share/doc/aidin_hand2`.
+- **`libaidin_hand2.so` exports only the public API.** Symbols outside the headers under
+  `include/aidin_hand2/`, the bundled spdlog and fmt among them, are hidden, so they no longer clash
+  with another copy in the same process.
 
 ## [0.9.0] - 2026-11-18
 
