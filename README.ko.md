@@ -104,12 +104,11 @@ sudo apt update
 sudo apt install -y build-essential cmake
 ```
 
-Build and test:
+Build:
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build cpp/build -j"$(nproc)"
-ctest --test-dir cpp/build --output-on-failure
 ```
 
 Install:
