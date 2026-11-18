@@ -19,31 +19,7 @@ The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. I
 
 ## Latest release
 
-- [0.9.0](CHANGELOG.md#090---2026-11-18)
-  - Build
-    - Request 0.9 in `find_package` and rebuild. The soname is `libaidin_hand2.so.0.9`.
-  - Hand model
-    - The hand model is chosen with the `HandConfig::hand_model` field (the `HandModel::Gen2` or `HandModel::Gen2B` value), not at build time.
-    - The `AIDIN_HAND2_HAND_TYPE` build option and hand type C are removed.
-    - The kinematics functions take a `HandModel` value as their first argument.
-  - Control
-    - The `HandConfig::control_rate` field is removed.
-    - The per-actuator gain fields `stiffness` and `damping` of the `ControllerConfig::JointImpedanceController` struct are removed.
-    - The `ControllerConfig::JointImpedanceController` struct has a `stiffness` field that holds a value from 0 to 1 per active joint, and `filter_enabled` and `cutoff_freq` fields for its target.
-    - The `Hand::get_max_effort()` and `Hand::get_controller_config()` functions are added. They return the max effort and the controller config in effect.
-  - State
-    - The `velocity_rad_s` and `effort_Nm` fields are added to each joint of the `HandState::joints` field.
-    - The `max_effort_pct` field of the `CommandedState` struct is removed. Read `Hand::get_max_effort()` instead.
-  - Errors and log
-    - The `ErrorCode` enum is renamed `ErrorKind`, and `Exception::code()`, which returned it, is now `Exception::kind()`.
-    - `Exception::code()` now returns the error number, such as 401, which `what()` shows as `[E401]`.
-    - The `ErrorKind::HandFaulted` value is added. A call refused in the `Faulted` state throws with this kind, and the cause is in the `Diagnostics::fault_code` field.
-    - The SDK no longer logs the exceptions it throws. Record `what()` in your application.
-- [0.8.0](CHANGELOG.md#080---2026-10-07)
-  - `TactileState` changed from `std::uint16_t` to `std::int32_t`.
-  - Added the tactile bias (`Hand::set_tactile_bias()` and related functions).
-
-All changes are in the [CHANGELOG](CHANGELOG.md).
+[0.9.0](CHANGELOG.md#090---2026-11-18) (2026-11-18). All changes are in the [CHANGELOG](CHANGELOG.md).
 
 ## System Requirements
 
