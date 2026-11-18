@@ -11,7 +11,7 @@
 
 The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. It provides C++ and Python APIs.
 
-[![version](https://img.shields.io/badge/version-0.9.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.9.1-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
 
 [Build](#build-from-source) | [Documentation](#documentation) | [Changelog](CHANGELOG.md) | [Official Site](https://www.aidinrobotics.co.kr/) | English | [한국어](README.ko.md)
 
@@ -19,7 +19,7 @@ The SDK for the AIDIN Hand Gen2, a robot hand with integrated tactile sensors. I
 
 ## Latest release
 
-[0.9.0](CHANGELOG.md#090---2026-11-18) (2026-11-18). All changes are in the [CHANGELOG](CHANGELOG.md).
+[0.9.1](CHANGELOG.md#091---2026-11-18) (2026-11-18). All changes are in the [CHANGELOG](CHANGELOG.md).
 
 ## System Requirements
 
