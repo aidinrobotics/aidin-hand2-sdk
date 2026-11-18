@@ -63,7 +63,10 @@ target_link_libraries(aidin_hand2_kinematics INTERFACE
   aidin_hand2_kinematics_type_a aidin_hand2_kinematics_type_b)
 message(STATUS "aidin_hand2: kinematics = ${_kin_dir} (hand models Gen2 and Gen2B)")
 
-add_library(aidin_hand2 SHARED
+# ── Library ───────────────────────────────────────────────────────────────────
+# The sources compile once, into the shared library and into the tests that reach src/
+
+add_library(aidin_hand2_objects OBJECT
   src/hand/hand.cpp
   src/hand/hand_manager.cpp
   src/hand_core/hand_core.cpp
@@ -87,6 +90,25 @@ add_library(aidin_hand2 SHARED
   src/logging/logging.cpp
 )
 
+target_compile_features(aidin_hand2_objects PUBLIC cxx_std_17)
+
+target_include_directories(aidin_hand2_objects
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# PUBLIC so that a test linking the objects links what they need
+target_link_libraries(aidin_hand2_objects
+  PUBLIC aidin_hand2_kinematics spdlog::spdlog Threads::Threads)
+
+set_target_properties(aidin_hand2_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# As objects rather than a link, so that the object library stays out of the install export
+add_library(aidin_hand2 SHARED $<TARGET_OBJECTS:aidin_hand2_objects>)
+
 target_compile_features(aidin_hand2 PUBLIC cxx_std_17)
 
 target_include_directories(aidin_hand2
@@ -94,8 +116,6 @@ target_include_directories(aidin_hand2
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${AIDIN_HAND2_GENERATED_INCLUDE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-  PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(aidin_hand2
@@ -111,8 +131,7 @@ target_link_options(aidin_hand2 PRIVATE
 # The soname moves with the minor, as SameMinorVersion below
 set_target_properties(aidin_hand2 PROPERTIES
   VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-  POSITION_INDEPENDENT_CODE ON)
+  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
 add_library(aidin_hand2::aidin_hand2 ALIAS aidin_hand2)
 
@@ -120,7 +139,7 @@ option(AIDIN_HAND2_BUILD_TESTS "Build aidin_hand2 unit tests" ON)
 if(AIDIN_HAND2_BUILD_TESTS)
   enable_testing()
 
-  # Tests that link the library and include src/
+  # Tests that link the objects and include src/
   set(AIDIN_HAND2_TESTS
     canfd/byte_order
     canfd/protocol
@@ -151,7 +170,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
   foreach(test_path IN LISTS AIDIN_HAND2_TESTS)
     get_filename_component(test_name ${test_path} NAME)
     add_executable(${test_name}_test tests/${test_path}_test.cpp)
-    target_link_libraries(${test_name}_test PRIVATE aidin_hand2)
+    target_link_libraries(${test_name}_test PRIVATE aidin_hand2_objects)
     target_include_directories(${test_name}_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME ${test_name} COMMAND ${test_name}_test)
   endforeach()
