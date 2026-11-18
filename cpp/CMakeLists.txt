@@ -208,6 +208,7 @@ if(AIDIN_HAND2_BUILD_TESTS)
   add_executable(kinematics_core_test tests/kinematics/kinematics_core_test.cpp
     src/hand_core/kinematics/gen2/kinematics.cpp
     src/hand_core/kinematics/gen2b/kinematics.cpp)
+  target_compile_features(kinematics_core_test PRIVATE cxx_std_17)
   target_link_libraries(kinematics_core_test PRIVATE aidin_hand2_kinematics)
   target_include_directories(kinematics_core_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
