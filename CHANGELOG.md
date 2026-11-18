@@ -8,6 +8,18 @@ versioning is the public C++ API — the headers under `include/aidin_hand2/` an
 
 ## [Unreleased]
 
+### Notable changes
+
+- Build
+  - The SDK no longer needs `libspdlog-dev`. If your application uses spdlog, install it yourself.
+
+### Changed
+
+- **spdlog and fmt are compiled into the library.** The SDK carries spdlog 1.17.0 and the fmt
+  12.1.0 it bundles in `cpp/third_party/spdlog`, so a build needs no spdlog package and
+  `libaidin_hand2.so` no longer loads `libspdlog` or `libfmt` at run time. An install also places
+  the license notices in `share/doc/aidin_hand2`.
+
 ## [0.9.0] - 2026-11-18
 
 ### Notable changes
