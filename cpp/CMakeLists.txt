@@ -6,6 +6,7 @@ add_compile_options(-Wall -Wextra)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(GenerateExportHeader)
 
 # version.hpp comes from project(VERSION)
 set(AIDIN_HAND2_GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/include)
@@ -94,7 +95,15 @@ target_include_directories(aidin_hand2_objects
 target_link_libraries(aidin_hand2_objects
   PUBLIC aidin_hand2_kinematics spdlog::spdlog Threads::Threads)
 
-set_target_properties(aidin_hand2_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Hidden unless a public header marks it AIDIN_HAND2_EXPORT
+set_target_properties(aidin_hand2_objects PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON)
+
+generate_export_header(aidin_hand2_objects
+  BASE_NAME aidin_hand2
+  EXPORT_FILE_NAME ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/export.hpp)
 
 # As objects rather than a link, so that the object library stays out of the install export
 add_library(aidin_hand2 SHARED $<TARGET_OBJECTS:aidin_hand2_objects>)
@@ -173,6 +182,11 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_link_libraries(abi_lock_test PRIVATE aidin_hand2)
   add_test(NAME abi_lock COMMAND abi_lock_test)
 
+  # The shared library only, so that the catch is outside the library
+  add_executable(exception_boundary_test tests/abi/exception_boundary_test.cpp)
+  target_link_libraries(exception_boundary_test PRIVATE aidin_hand2)
+  add_test(NAME exception_boundary COMMAND exception_boundary_test)
+
   # Fails when the library exports more than the public API
   add_test(NAME exported_symbols
     COMMAND ${CMAKE_COMMAND}
@@ -186,7 +200,8 @@ if(AIDIN_HAND2_BUILD_TESTS)
     src/hand_core/kinematics/gen2b/kinematics.cpp)
   target_link_libraries(kinematics_core_test PRIVATE aidin_hand2_kinematics)
   target_include_directories(kinematics_core_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR})
   add_test(NAME kinematics_core COMMAND kinematics_core_test)
 
   # Built from source so that mock_transport.cpp takes the place of transport.cpp
@@ -282,7 +297,9 @@ install(
 
 # Generated, so not in include/
 install(
-  FILES ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/version.hpp
+  FILES
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/version.hpp
+    ${AIDIN_HAND2_GENERATED_INCLUDE_DIR}/aidin_hand2/export.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aidin_hand2
 )
 

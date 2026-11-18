@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 
+#include <aidin_hand2/export.hpp>
 #include <aidin_hand2/types/description.hpp>  // HandSide
 
 namespace aidin_hand2
@@ -92,7 +93,7 @@ namespace detail
 // --------------------------------- Exception --------------------------------
 
 // Thrown by every public call
-class Exception : public std::runtime_error {
+class AIDIN_HAND2_EXPORT Exception : public std::runtime_error {
  public:
   // An SDK failure, whose what() is "[E<code>] <message>"
   Exception(std::uint16_t code, std::string message)

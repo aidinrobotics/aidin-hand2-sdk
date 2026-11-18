@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <variant>
 
+#include <aidin_hand2/export.hpp>
 #include <aidin_hand2/types/description.hpp>
 
 namespace aidin_hand2
@@ -30,7 +31,7 @@ struct Idle {};
 struct JointPositionCommand {
   std::array<double, kActiveJointCount> target{};
 
-  void clamp();
+  AIDIN_HAND2_EXPORT void clamp();
 };
 
 // Target in rad, clamp() pulls it into the reachable workspace
@@ -38,7 +39,7 @@ struct JointPositionCommand {
 struct JointImpedanceCommand {
   std::array<double, kActiveJointCount> target{};
 
-  void clamp();
+  AIDIN_HAND2_EXPORT void clamp();
 };
 
 // Target in encoder count

@@ -1,7 +1,10 @@
-# Fails when the library exports a symbol outside the public API.
+# Fails when the library exports a symbol outside the public API, or a line of the public API
+# matches no exported symbol.
 #   cmake -DLIB=<shared library> -DALLOWED=<prefix file> -P exported_symbols.cmake
 # A symbol passes when its demangled name starts with a line of the prefix file, or when it is in
 # namespace std, which libstdc++ declares with default visibility.
+
+cmake_minimum_required(VERSION 3.16)
 
 find_program(NM nm)
 if(NOT NM)
@@ -24,6 +27,7 @@ string(REPLACE "\n" ";" demangled_lines "${demangled_output}")
 file(STRINGS ${ALLOWED} prefixes REGEX "^[^#]")
 
 set(unexpected "")
+set(matched "")
 list(LENGTH mangled_lines count)
 math(EXPR last "${count} - 1")
 foreach(i RANGE ${last})
@@ -44,6 +48,7 @@ foreach(i RANGE ${last})
     string(FIND "${demangled}" "${prefix}" position)
     if(position EQUAL 0)
       set(allowed TRUE)
+      list(APPEND matched "${prefix}")
       break()
     endif()
   endforeach()
@@ -52,6 +57,16 @@ foreach(i RANGE ${last})
   endif()
 endforeach()
 
-if(NOT unexpected STREQUAL "")
-  message(FATAL_ERROR "exported outside the public API:\n${unexpected}")
+# A public declaration without AIDIN_HAND2_EXPORT exports nothing
+set(missing "")
+foreach(prefix IN LISTS prefixes)
+  if(NOT prefix IN_LIST matched)
+    string(APPEND missing "  ${prefix}\n")
+  endif()
+endforeach()
+
+if(NOT unexpected STREQUAL "" OR NOT missing STREQUAL "")
+  message(FATAL_ERROR
+    "exported outside the public API:\n${unexpected}"
+    "public API not exported:\n${missing}")
 endif()
