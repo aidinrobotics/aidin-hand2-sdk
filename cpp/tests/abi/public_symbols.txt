@@ -1,0 +1,20 @@
+# Prefixes of the symbols libaidin_hand2.so may export, as nm -C prints them.
+# Namespace std is matched in exported_symbols.cmake.
+aidin_hand2::Hand::
+aidin_hand2::HandManager::
+aidin_hand2::Exception::
+typeinfo for aidin_hand2::Exception
+typeinfo name for aidin_hand2::Exception
+vtable for aidin_hand2::Exception
+aidin_hand2::JointPositionCommand::clamp()
+aidin_hand2::JointImpedanceCommand::clamp()
+aidin_hand2::set_log_level(
+aidin_hand2::set_log_to_console(
+aidin_hand2::set_log_to_file(
+aidin_hand2::flush_log(
+aidin_hand2::set_log_callback(
+aidin_hand2::fk_actuator_to_joint(
+aidin_hand2::fk_actuator_to_task(
+aidin_hand2::ik_joint_to_actuator(
+aidin_hand2::ik_task_to_joint(
+aidin_hand2::ik_oriented_task_to_joint(

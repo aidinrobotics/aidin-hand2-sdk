@@ -164,6 +164,13 @@ if(AIDIN_HAND2_BUILD_TESTS)
   target_link_libraries(abi_lock_test PRIVATE aidin_hand2)
   add_test(NAME abi_lock COMMAND abi_lock_test)
 
+  # Fails when the library exports more than the public API
+  add_test(NAME exported_symbols
+    COMMAND ${CMAKE_COMMAND}
+      -DLIB=$<TARGET_FILE:aidin_hand2>
+      -DALLOWED=${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/public_symbols.txt
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/exported_symbols.cmake)
+
   # The archives through each model's kinematics.cpp only, without the rest of the SDK
   add_executable(kinematics_core_test tests/kinematics/kinematics_core_test.cpp
     src/hand_core/kinematics/gen2/kinematics.cpp
