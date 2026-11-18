@@ -139,7 +139,7 @@ hand.connect();
 log 한 줄은 다음 조각으로 이루어집니다.
 
 ```text
-[1756713600.123456789] [aidin_hand2] [info]     [left] homing complete — home position established
+[1756713600.123456789] [aidin_hand2] [info]     [left] homing complete, home position established
 [1756713600.223456789] [aidin_hand2] [critical] [left] [E404] communication lost (no RX)
 ```
 

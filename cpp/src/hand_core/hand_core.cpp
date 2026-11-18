@@ -114,7 +114,7 @@ Status HandCore::connect()
   // Only a confirmed link is a no-op, so a retry after one that never observed a frame reopens
   if (requested_lifecycle_.load() == HandLifecycle::Connected &&
       lifecycle_.load() == HandLifecycle::Connected) {
-    log_info(hand_side_, "connect() ignored — already connected");
+    log_info(hand_side_, "connect() ignored, already connected");
     return {};
   }
   // The CAN layer names the interface and the failure, so the call goes in front here
@@ -168,7 +168,7 @@ Status HandCore::disconnect()
     return allowed;
   }
   if (lifecycle_.load() == HandLifecycle::Disconnected) {
-    log_info(hand_side_, "disconnect() ignored — already disconnected");
+    log_info(hand_side_, "disconnect() ignored, already disconnected");
     return {};
   }
 
@@ -286,7 +286,7 @@ Status HandCore::run()
   }
   if (requested_lifecycle_.load() == HandLifecycle::Running &&
       lifecycle_.load() == HandLifecycle::Running) {
-    log_info(hand_side_, "run() ignored — already running");
+    log_info(hand_side_, "run() ignored, already running");
     return {};
   }
   return enable_control();
@@ -300,7 +300,7 @@ Status HandCore::stop()
   // Only a confirmed stop is a no-op, so a retry after an unconfirmed one waits again
   if (requested_lifecycle_.load() == HandLifecycle::Stopped &&
       lifecycle_.load() == HandLifecycle::Stopped) {
-    log_info(hand_side_, "stop() ignored — already stopped");
+    log_info(hand_side_, "stop() ignored, already stopped");
     return {};
   }
   requested_lifecycle_.store(HandLifecycle::Stopped);
@@ -321,7 +321,7 @@ Status HandCore::stop()
             "cannot stop hand: drives did not reach quick stop within " +
                 std::to_string(kStopTimeoutNanoseconds / 1000000L) + " ms"};
   }
-  log_info(hand_side_, "stop() succeeded — control stopped");
+  log_info(hand_side_, "stop() succeeded, control stopped");
   return {};
 }
 
@@ -670,7 +670,7 @@ void HandCore::transition_to(HandLifecycle next)
       break;
     }
     case HandLifecycle::Running:
-      log_info(hand_side_, "run() succeeded — control active");
+      log_info(hand_side_, "run() succeeded, control active");
       break;
     case HandLifecycle::Disconnected:
       log_info(hand_side_, "disconnect() succeeded");
@@ -791,7 +791,7 @@ bool workspace_clamp_enabled(HandSide side)
   const char* value = std::getenv("AIDIN_HAND2_WORKSPACE_CLAMP");
   if (value == nullptr || std::string(value) != "0") return true;
   log_warn(side, "workspace clamp DISABLED by AIDIN_HAND2_WORKSPACE_CLAMP=0 "
-                 "— targets bypass the reachable-workspace limits (limit measurement only)");
+                 "(targets bypass the reachable-workspace limits, limit measurement only)");
   return false;
 }
 

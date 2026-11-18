@@ -82,11 +82,11 @@ Status HandComms::discover_interface()
   for (const std::string& candidate : candidates) {
     canfd::Transport probe;
     if (!probe.open(candidate).ok()) {
-      log_debug(config_.hand_side, "auto-discovery: cannot open " + candidate + " — skipping");
+      log_debug(config_.hand_side, "auto-discovery: cannot open " + candidate + ", skipping");
       continue;
     }
     if (!probe.set_id_filters(protocol_.rx_filters())) {
-      log_debug(config_.hand_side, "auto-discovery: cannot filter " + candidate + " — skipping");
+      log_debug(config_.hand_side, "auto-discovery: cannot filter " + candidate + ", skipping");
       continue;
     }
     bool observed = false;
@@ -161,7 +161,7 @@ Status HandComms::activate()
   // Set once, so encode only has to fill the payload afterwards
   protocol_.init_tx(tx_frames_);
   log_debug(config_.hand_side, "comms ready on " + config_.interface_name +
-            " — RX filters, TX headers set; no conflicting master");
+            ", RX filters and TX headers set, no conflicting master");
   return {};
 }
 

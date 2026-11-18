@@ -85,7 +85,7 @@ void HandCore::run_control_loop()
       // An RT exception is an SDK bug, so re-establishing the link would not help
       if (!auto_reconnect_ || last_stop_cause_.reason == RealtimeEventKind::ControlLoopFailure) break;
       if (!loop.auto_reconnect_started) {
-        log_info(hand_side_, "auto-reconnect started — retrying communication until it recovers");
+        log_info(hand_side_, "auto-reconnect started, retrying communication until it recovers");
         loop.auto_reconnect_started = true;
         if (auto_reconnect_timeout_ms_ > 0) {
           loop.auto_reconnect_deadline = now_nanoseconds() +
@@ -417,7 +417,7 @@ bool HandCore::try_reconnect_once()
   // The link is back, so the fault is over. The enable evidence is what makes it Running again
   lifecycle_.store(HandLifecycle::Connected, std::memory_order_release);
   log_info(hand_side_, std::string("auto-reconnect succeeded on ") + interface_name_ +
-           " — control resumed" + (auto_reconnect_home_ ? " (homing)" : ""));
+           ", control resumed" + (auto_reconnect_home_ ? " (homing)" : ""));
   return true;
 }
 
