@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/08_cpp_api_reference.md)
+
 # C++ API Reference
 
 The public symbols, organized by header file. Functions carry their declaration and contract;

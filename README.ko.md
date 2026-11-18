@@ -1,12 +1,17 @@
 <div align="center">
 
-<a href="https://www.aidinrobotics.co.kr/"><img height="240" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2 — AIDIN Robotics"></a>
+<a href="https://www.aidinrobotics.co.kr/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/aidin_hand2_logo_dark.webp">
+    <img height="260" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2, AIDIN Robotics">
+  </picture>
+</a>
 
 <h1>AIDIN Hand Gen2 SDK</h1>
 
 촉각 센서가 통합된 로봇 핸드 AIDIN Hand Gen2용 SDK입니다. C++와 Python API를 제공합니다.
 
-[![version](https://img.shields.io/badge/version-0.9.0-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.9.1-blue)](CHANGELOG.md) [![build + unit tests](https://img.shields.io/github/actions/workflow/status/aidinrobotics/aidin-hand2-sdk/ci.yml?branch=main&label=x86_64%20%C2%B7%20arm64%20%7C%20Ubuntu%2022.04%20%7C%2024.04)](https://github.com/aidinrobotics/aidin-hand2-sdk/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/aidinrobotics/aidin-hand2-sdk?label=License)](LICENSE)
 
 [Build](#build-from-source) | [Documentation](#documentation) | [Changelog](CHANGELOG.md) | [Official Site](https://www.aidinrobotics.co.kr/) | [English](README.md) | 한국어
 
@@ -14,31 +19,7 @@
 
 ## Latest release
 
-- [0.9.0](CHANGELOG.md#090---2026-11-18)
-  - Build
-    - `find_package`에서 0.9를 요청하고 다시 빌드하십시오. soname은 `libaidin_hand2.so.0.9`입니다.
-  - Hand model
-    - hand model은 빌드할 때가 아니라 `HandConfig::hand_model` 필드로 선택합니다(`HandModel::Gen2`·`HandModel::Gen2B` 값).
-    - `AIDIN_HAND2_HAND_TYPE` 빌드 옵션과 hand type C는 제거되었습니다.
-    - kinematics 함수는 첫 인자로 `HandModel` 값을 받습니다.
-  - Control
-    - `HandConfig::control_rate` 필드는 제거되었습니다.
-    - `ControllerConfig::JointImpedanceController` 구조체에서 actuator별 gain인 `stiffness`·`damping` 필드는 제거되었습니다.
-    - `ControllerConfig::JointImpedanceController` 구조체에는 active joint별 0~1 값을 담는 `stiffness` 필드와, 목표에 쓰는 `filter_enabled`·`cutoff_freq` 필드가 있습니다.
-    - `Hand::get_max_effort()`·`Hand::get_controller_config()` 함수가 추가되었습니다. 적용 중인 전류 상한과 controller 설정을 반환합니다.
-  - State
-    - `HandState::joints` 필드의 각 joint에 `velocity_rad_s`·`effort_Nm` 필드가 추가되었습니다.
-    - `CommandedState` 구조체의 `max_effort_pct` 필드는 제거되었습니다. 대신 `Hand::get_max_effort()`로 읽으십시오.
-  - Errors and log
-    - `ErrorCode` enum의 이름이 `ErrorKind`로 변경되었고, 이 값을 반환하던 `Exception::code()`는 `Exception::kind()`가 되었습니다.
-    - `Exception::code()`는 이제 오류 번호(예: 401)를 반환하고, 이 번호는 `what()`에 `[E401]`로 나타납니다.
-    - `ErrorKind::HandFaulted` 값이 추가되었습니다. `Faulted` state에서 거부된 호출은 이 kind로 예외를 던지고, 원인은 `Diagnostics::fault_code` 필드에 있습니다.
-    - SDK가 던진 예외를 log에 남기지 않습니다. application에서 `what()`을 남기십시오.
-- [0.8.0](CHANGELOG.md#080---2026-10-07)
-  - `TactileState`의 타입이 `std::uint16_t`에서 `std::int32_t`로 변경되었습니다.
-  - tactile bias 기능(`Hand::set_tactile_bias()` 등)이 추가되었습니다.
-
-전체 변경은 [CHANGELOG](CHANGELOG.md)에 있습니다.
+[0.9.1](CHANGELOG.md#091---2026-11-18) (2026-11-18). 전체 변경은 [CHANGELOG](CHANGELOG.md)에 있습니다.
 
 ## System Requirements
 
@@ -51,7 +32,6 @@
 | Build system | CMake ≥ 3.16 |
 | CAN device | [SocketCAN](https://docs.kernel.org/networking/can.html)이 지원되는 CAN FD capable device |
 | CAN bitrate | arbitration 1 Mbit/s / data 5 Mbit/s |
-| Dependencies | spdlog ≥ 1.9, can-utils |
 | Python bindings (예정) | Python ≥ 3.10, numpy |
 | ROS 2 wrapper (선택) | Humble |
 
@@ -61,15 +41,10 @@
 
 ## Architecture
 
-```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart LR
-    App["<b>Application</b><br/>C++ &nbsp;&nbsp;·&nbsp;&nbsp; Python(예정)<br/>ROS 2"]
-    SDK["<b>SDK</b><br/>Control loop &nbsp;·&nbsp; CAN-FD<br/>Logging &nbsp;·&nbsp; Diagnostics"]
-    Hand["<b>Hardware</b><br/>AIDIN Hand Gen2"]
-    App <--> SDK
-    SDK <--> Hand
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture_dark.svg">
+  <img src="docs/assets/architecture.svg" alt="아키텍처">
+</picture>
 
 lifecycle과 명령·상태 API는 [C++ guide](docs/ko/07_cpp_usage_guide.md)를 참고하십시오.
 
@@ -102,15 +77,14 @@ Install dependencies:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libspdlog-dev can-utils
+sudo apt install -y build-essential cmake
 ```
 
-Build and test:
+Build:
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build cpp/build -j"$(nproc)"
-ctest --test-dir cpp/build --output-on-failure
 ```
 
 Install:

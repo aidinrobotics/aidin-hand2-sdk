@@ -1,0 +1,7 @@
+spdlog:   1.17.0
+fmt:      12.1.0, bundled with spdlog
+tag:      v1.17.0
+commit:   79524ddd08a4ec981b7fea76afd08ee05f83755d
+source:   https://github.com/gabime/spdlog/archive/refs/tags/v1.17.0.tar.gz
+sha256:   d8862955c6d74e5846b3f580b1605d2428b11d97a410d86e2fb13e857cd3a744
+copied:   2026-11-18, include/ only, unmodified

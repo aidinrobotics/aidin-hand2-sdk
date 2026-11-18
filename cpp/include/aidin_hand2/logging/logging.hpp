@@ -6,6 +6,8 @@
 #include <functional>
 #include <string>
 
+#include <aidin_hand2/export.hpp>
+
 namespace aidin_hand2
 {
 
@@ -24,23 +26,23 @@ enum class LogLevel {
 // ----------------------------------- Sinks ----------------------------------
 
 // Set the console level, the file and callback sinks always keep Debug
-void set_log_level(LogLevel level);
+AIDIN_HAND2_EXPORT void set_log_level(LogLevel level);
 
 // Turn console output on or off
-void set_log_to_console(bool enabled);
+AIDIN_HAND2_EXPORT void set_log_to_console(bool enabled);
 
 // Write to a rotating file: 5 MiB each, 3 rotated files plus the current one
 // A path that cannot be opened is reported as a warning, not an exception
-void set_log_to_file(const std::string& path);
+AIDIN_HAND2_EXPORT void set_log_to_file(const std::string& path);
 
 // Flush every sink
-void flush_log();
+AIDIN_HAND2_EXPORT void flush_log();
 
 // --------------------------------- Callback ---------------------------------
 
 // Forward every line from Debug up, independent of the console and file sinks
 // One callback at a time, nullptr clears it
 using LogCallback = std::function<void(LogLevel, const std::string&)>;
-void set_log_callback(LogCallback callback);
+AIDIN_HAND2_EXPORT void set_log_callback(LogCallback callback);
 
 }  // namespace aidin_hand2

@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/15_error_messages.md)
+
 # Error messages and remedies
 
 Look up the error code that the SDK puts on an exception or a log line (`E401` and so on), and find the

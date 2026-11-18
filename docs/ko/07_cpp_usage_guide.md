@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md) | [English](../en/07_cpp_usage_guide.md) | 한국어
+
 # C++ guide
 
 AIDIN Hand Gen2는 5 손가락을 actuator 16개로 joint 21개(active 16 + passive 5)를 움직이는 로봇

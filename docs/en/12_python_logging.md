@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md)
+
 # Logging (Python)
 
 > *Planned.* The Python API is not yet available; the SDK currently ships a C++ API.

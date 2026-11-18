@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.ko.md) | [English](../en/14_workspace_limits.md) | 한국어
+
 # Workspace limits
 
 joint 공간 명령([`JointPositionCommand`](08_cpp_api_reference/types_command.md#jointpositioncommand), [`JointImpedanceCommand`](08_cpp_api_reference/types_command.md#jointimpedancecommand))은 IK 전에 각 finger의 도달 가능

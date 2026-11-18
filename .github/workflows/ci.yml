@@ -1,11 +1,11 @@
 name: CI
 
-# Turns the build row (GCC, CMake, spdlog) from a claim into a check: build plus ctest on the
+# Turns the build row (GCC, CMake) from a claim into a check: build plus ctest on the
 # two supported Ubuntu releases, on both architectures, and the unit tests again under
 # ThreadSanitizer.
 #
 # 22.04 stays in the matrix alongside 24.04 because it is the oldest release the SDK supports.
-# 20.04 is not supported, because spdlog 1.9 is required. CAN-FD, PREEMPT_RT and the 500 Hz loop
+# 20.04 is outside the supported range. CAN-FD, PREEMPT_RT and the 500 Hz loop
 # are kernel-side and still need real hardware, so they are verified on-device rather than here.
 #
 # The jobs run on the GitHub-hosted runner images, which carry a compiler and CMake already, so
@@ -30,19 +30,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # The runner image already has GCC, CMake and git. spdlog is the one dependency the SDK
-      # looks for, and linux-libc-dev provides linux/can.h. Eigen is deliberately absent: it is
-      # compiled into the prebuilt kinematics archive and cpp/CMakeLists.txt no longer finds it.
+      # The runner image already has GCC, CMake and git, and linux-libc-dev provides linux/can.h.
+      # spdlog and fmt come from cpp/third_party. Eigen is deliberately absent: it is compiled
+      # into the prebuilt kinematics archive and cpp/CMakeLists.txt no longer finds it.
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libspdlog-dev linux-libc-dev
+          sudo apt-get install -y --no-install-recommends linux-libc-dev
 
       - name: Tool versions
         run: |
           gcc --version | head -1
           cmake --version | head -1
-          dpkg-query -W libspdlog-dev
 
       - name: Configure
         run: |
@@ -80,7 +79,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libspdlog-dev linux-libc-dev
+          sudo apt-get install -y --no-install-recommends linux-libc-dev
 
       # dev/ is internal-only, so the public snapshot of this workflow has no script to run.
       # The ko/en regression suite is an authoring gate, and authoring happens internally.
@@ -102,7 +101,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libspdlog-dev linux-libc-dev
+          sudo apt-get install -y --no-install-recommends linux-libc-dev
 
       - name: Configure (ThreadSanitizer)
         run: |

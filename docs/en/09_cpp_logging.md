@@ -1,3 +1,5 @@
+[← AIDIN Hand Gen2 SDK](../../README.md) | English | [한국어](../ko/09_cpp_logging.md)
+
 # Logging
 
 Logging sends the log that the SDK writes to three places: the console, a file, and a callback.

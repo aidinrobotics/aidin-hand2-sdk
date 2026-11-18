@@ -1,4 +1,4 @@
-[← C++ API Reference](../08_cpp_api_reference.md)
+[← C++ API Reference](../08_cpp_api_reference.md) | [English](../../en/08_cpp_api_reference/types_diagnostics.md) | 한국어
 
 # `types/diagnostics.hpp`
 
