@@ -1,6 +1,11 @@
 <div align="center">
 
-<a href="https://www.aidinrobotics.co.kr/"><img height="240" src="docs/assets/aidin_hand2_logo.webp" alt="AIDIN Hand Gen2 — AIDIN Robotics"></a>
+<a href="https://www.aidinrobotics.co.kr/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/aidin_robotics_logo_dark.webp">
+    <img height="120" src="docs/assets/aidin_robotics_logo.webp" alt="AIDIN Robotics">
+  </picture>
+</a>
 
 <h1>AIDIN Hand Gen2 SDK</h1>
 
